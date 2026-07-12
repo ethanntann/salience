@@ -1,3 +1,14 @@
+---
+title: Salience
+emoji: 🎯
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 7860
+fullWidth: true
+short_description: Local-first AI highlight ranking for Fortnite clips
+---
+
 # Salience
 
 Salience is a local-first AI highlight ranking layer for Fortnite clips. It
