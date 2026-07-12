@@ -151,7 +151,7 @@ export function ReviewInbox() {
       }
       setVisibleCount(30);
       setMessage(`Indexed ${response.indexed} clip(s). Local student inference is running...`);
-      let run = await startTeacherRun(response.total_found, true);
+      let run = await startTeacherRun(response.total_found, false);
       while (run.running) {
         await new Promise((resolve) => window.setTimeout(resolve, 1500));
         run = await fetchTeacherRunStatus();

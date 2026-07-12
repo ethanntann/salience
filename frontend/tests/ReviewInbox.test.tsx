@@ -210,7 +210,7 @@ describe("ReviewInbox feedback ordering", () => {
     fireEvent.click(screen.getByRole("button", { name: "Process clips" }));
 
     await waitFor(() => expect(scanFolder).toHaveBeenCalledWith("/app/demo-video", false));
-    expect(startTeacherRun).toHaveBeenCalledWith(10, true);
+    expect(startTeacherRun).toHaveBeenCalledWith(10, false);
     expect(await screen.findByText("new-clip.mp4")).toBeInTheDocument();
     expect(screen.getByText("Processed 10 of 10 clip(s).")).toBeInTheDocument();
   });
