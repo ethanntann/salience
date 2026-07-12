@@ -1,5 +1,10 @@
 # Salience
 
+**[Open the live demo](https://salience-demo.onrender.com)** | **[View the source](https://github.com/ethanntann/salience)**
+
+> Render's free instance may sleep after inactivity. Allow roughly 50 seconds
+> for the first request to wake it up.
+
 Salience is a local-first AI highlight ranking layer for Fortnite clips. It
 watches the folder where tools like ShadowPlay, SteelSeries Moments, OBS, or
 Medal already save clips, analyzes each clip, ranks the moments worth
@@ -37,13 +42,36 @@ a local endpoint, or AMD Developer Cloud (Qwen2.5-VL via vLLM), but the
 default judge-facing configuration (`docker-compose.yml`) uses
 `SALIENCE_VLM_PROVIDER=local` and never calls out to the internet.
 
+## AMD, Fireworks, and external-service usage
+
+| Resource | How Salience uses it | Required for the submitted demo? |
+| --- | --- | --- |
+| **Fireworks AI** | Served the Qwen vision-language teacher during development. Sampled gameplay keyframes were sent to it to produce structured weapon, event, timestamp, and context labels used to train and evaluate the local student. It remains available for optional future labeling. | **No.** It is disabled in Docker and on Render. |
+| **AMD Developer Cloud** | The code includes an OpenAI-compatible Qwen2.5-VL/vLLM teacher client (`AmdDeveloperCloudTeacherClient`) and hardware reporting for AMD/Radeon devices. This is an alternative development-time teacher and a path toward future AMD acceleration. | **No.** It was not active for the frozen evaluation or submitted Render runtime. |
+| **Render** | Hosts the public Docker demo from `render.yaml`, runs the local student, and exposes `/health`. | **Yes, only for the hosted URL.** Local Docker use does not require Render. |
+| **GitHub** | Hosts the source, small student artifacts, and judge sample clips; pushes to `main` trigger the Render deployment. | **Only to obtain the source.** |
+| **FFmpeg, OpenCV, ONNX Runtime, RapidOCR** | Decode video, sample frames, execute the student model, and read HUD/victory text. They are installed inside the Docker image. | **Yes, but Docker installs them automatically.** |
+
+No Fireworks or AMD credential is stored in this repository or configured in
+the public demo. The submitted runtime performs inference locally inside its
+Render container; gameplay is not forwarded to either teacher service.
+
 ## Quick start
+
+Prerequisite: Docker Desktop or Docker Engine with Compose.
 
 ```bash
 docker compose up --build
 ```
 
 Then open <http://localhost:7860>.
+
+Optional health check:
+
+```bash
+curl http://localhost:7860/health
+# {"status":"ok"}
+```
 
 This uses `docker-compose.yml` (tracked in git, safe on any machine):
 
@@ -64,8 +92,9 @@ pick "Sample clips (judges)" from the dropdown, and click **Process clips**.
 The ranked inbox updates with labels and scores produced entirely by the
 local student model — no API key, no cloud call.
 
-The same panel can target `demo-video/`, a second baked-in folder used for
-local rehearsal footage (kept out of git; see `demo-video/README.md`).
+The same panel can target `demo-video/`, a local-only folder used for rehearsal
+footage. Its MP4 files are intentionally excluded from git; add your own files
+there before building if you want to use that option.
 
 Equivalent API call, if you'd rather script it:
 
@@ -90,6 +119,31 @@ FIREWORKS_MODEL=accounts/fireworks/models/qwen3p7-plus
 `docker-compose.yml` reads `FIREWORKS_API_KEY`/`FIREWORKS_MODEL` from the
 environment (default provider is `local`, so this is opt-in). Never commit a
 real key — `.env` is gitignored.
+
+### Using AMD Developer Cloud instead (optional, not required)
+
+```bash
+# in a .env file at the repo root:
+SALIENCE_VLM_PROVIDER=amd-developer-cloud
+AMD_DEVELOPER_CLOUD_API_KEY=your_key
+AMD_DEVELOPER_CLOUD_BASE_URL=https://your-amd-endpoint.example/v1
+AMD_DEVELOPER_CLOUD_MODEL=Qwen/Qwen2.5-VL-72B-Instruct
+```
+
+This selects the AMD-hosted teacher for development labeling. It is not used
+by the public demo or the default local setup.
+
+## Main code paths
+
+- `backend/salience_api/app.py` - FastAPI entry point and end-to-end request flow.
+- `backend/salience_api/student/local_teacher.py` - local student inference client.
+- `backend/salience_api/student/onnx_runtime.py` - ONNX model execution.
+- `backend/salience_api/clips/indexer.py` - clip discovery and indexing.
+- `backend/salience_api/ranking/highlights.py` - highlight hierarchy construction.
+- `backend/salience_api/ranking/scoring.py` and `personal_ranker.py` - base and personalized ranking.
+- `frontend/src/App.tsx` - React application entry point.
+- `frontend/src/components/ReviewInbox.tsx` - primary ranked review UI.
+- `Dockerfile`, `docker-compose.yml`, and `render.yaml` - container and deployment definitions.
 
 ## Architecture
 
