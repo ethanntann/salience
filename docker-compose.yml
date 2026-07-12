@@ -1,0 +1,18 @@
+services:
+  salience:
+    build: .
+    ports:
+      - "7860:7860"
+    environment:
+      # Judge-safe defaults: synthetic ranked inbox seeds immediately, and
+      # scanning sample-clips/ uses the local ONNX student (no API key, no
+      # cloud calls). Set SALIENCE_VLM_PROVIDER=fireworks + FIREWORKS_API_KEY
+      # in a .env file to use the cloud teacher instead.
+      SALIENCE_DEMO_MODE: "true"
+      SALIENCE_VLM_PROVIDER: "local"
+      FIREWORKS_API_KEY: "${FIREWORKS_API_KEY:-}"
+      FIREWORKS_MODEL: "${FIREWORKS_MODEL:-accounts/fireworks/models/qwen3p7-plus}"
+      SALIENCE_LOCAL_OCR_ENABLED: "${SALIENCE_LOCAL_OCR_ENABLED:-true}"
+    volumes:
+      - ./sample-clips:/app/sample-clips:ro
+      - ./demo-video:/app/demo-video:ro

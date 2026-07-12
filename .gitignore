@@ -1,0 +1,53 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+
+# Private development notes and agent tooling
+docs/
+.agents/
+.claude/
+.cursor/
+.superpowers/
+submission/*.md
+
+# Python
+.venv/
+venv/
+backend/.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+backend/.pytest-tmp/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+coverage/
+*.tsbuildinfo
+
+# Local runtime data and caches
+.npm-cache/
+.docker-config/
+.local-data/
+salience.db
+*.db-journal
+*.log
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local demo footage (keep usage instructions)
+demo-video/*
+!demo-video/README.md

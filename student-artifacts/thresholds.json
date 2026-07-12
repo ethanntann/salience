@@ -1,0 +1,18 @@
+{
+  "event_kind": 0.5,
+  "target_state": 0.35,
+  "weapon": 0.35,
+  "aim_state": 0.55,
+  "single_shot_damage_known": 0.55,
+  "single_shot_damage_cutoff": 100.0,
+  "combat_visible": 0.35,
+  "enemy_visible": 0.35,
+  "build_fight": 0.35,
+  "clutch": 0.35,
+  "competitive_context": 0.35,
+  "victory": 0.35,
+  "fast_edit": 0.35,
+  "rotation_traversal": 0.35,
+  "looting_or_menu": 0.35,
+  "downtime": 0.35
+}

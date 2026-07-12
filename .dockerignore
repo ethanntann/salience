@@ -1,0 +1,17 @@
+.git
+.env
+.venv
+__pycache__
+*.pyc
+node_modules
+**/node_modules
+dist
+**/dist
+.local-data
+backend/.pytest-tmp
+backend/.pytest_cache
+.DS_Store
+.pytest_cache
+.mypy_cache
+.ruff_cache
+salience.db

@@ -1,0 +1,152 @@
+[
+  {
+    "filename": "sniper-flick-endgame.mp4",
+    "duration_sec": 24,
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "size_bytes": 86400000,
+    "motion_score": 0.82,
+    "audio_peak_score": 0.76,
+    "silence_ratio": 0.08,
+    "action_density": 0.86,
+    "tags": ["sniper", "flick", "endgame"],
+    "thumbnail_variant": "ridge",
+    "explanation": "High motion, strong audio reaction, sniper-like visual label, and short shareable length.",
+    "teacher_labels": {
+      "labels": {
+        "no_scope": "uncertain",
+        "trickshot": "no",
+        "box_fight": "no",
+        "clutch": "yes",
+        "boring_cleanup": "no",
+        "ar_spray": "no",
+        "sniper_visible": "yes",
+        "victory": "no",
+        "funny_fail": "no"
+      },
+      "confidence": 0.82,
+      "evidence": ["scope-like weapon framing", "fast aim movement near action peak", "endgame-style pressure"]
+    }
+  },
+  {
+    "filename": "ar-cleanup-low-action.mp4",
+    "duration_sec": 62,
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "size_bytes": 74400000,
+    "motion_score": 0.18,
+    "audio_peak_score": 0.12,
+    "silence_ratio": 0.72,
+    "action_density": 0.2,
+    "tags": ["ar_spray", "low_action"],
+    "thumbnail_variant": "flat",
+    "explanation": "Long quiet clip with low motion and weak highlight signals.",
+    "teacher_labels": {
+      "labels": {
+        "no_scope": "no",
+        "trickshot": "no",
+        "box_fight": "no",
+        "clutch": "no",
+        "boring_cleanup": "yes",
+        "ar_spray": "yes",
+        "sniper_visible": "no",
+        "victory": "no",
+        "funny_fail": "no"
+      },
+      "confidence": 0.76,
+      "evidence": ["low action density", "long quiet segment", "AR cleanup pattern"]
+    }
+  },
+  {
+    "filename": "funny-fall-win.mp4",
+    "duration_sec": 19,
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "size_bytes": 70300000,
+    "motion_score": 0.64,
+    "audio_peak_score": 0.91,
+    "silence_ratio": 0.05,
+    "action_density": 0.7,
+    "tags": ["funny_fail", "victory"],
+    "thumbnail_variant": "tower",
+    "explanation": "Short funny moment with loud reaction and victory context.",
+    "teacher_labels": {
+      "labels": {
+        "no_scope": "no",
+        "trickshot": "uncertain",
+        "box_fight": "no",
+        "clutch": "yes",
+        "boring_cleanup": "no",
+        "ar_spray": "no",
+        "sniper_visible": "no",
+        "victory": "yes",
+        "funny_fail": "yes"
+      },
+      "confidence": 0.84,
+      "evidence": ["victory context", "loud reaction", "funny failure tag"]
+    }
+  },
+  {
+    "filename": "box-fight-clutch-edit.mp4",
+    "duration_sec": 31,
+    "width": 2560,
+    "height": 1440,
+    "fps": 144,
+    "size_bytes": 186000000,
+    "motion_score": 0.9,
+    "audio_peak_score": 0.68,
+    "silence_ratio": 0.12,
+    "action_density": 0.92,
+    "tags": ["box_fight", "clutch", "mechanics"],
+    "thumbnail_variant": "grid",
+    "explanation": "Dense close-range action, repeated build/edit-like visual texture, and strong clutch signal.",
+    "teacher_labels": {
+      "labels": {
+        "no_scope": "no",
+        "trickshot": "no",
+        "box_fight": "yes",
+        "clutch": "yes",
+        "boring_cleanup": "no",
+        "ar_spray": "no",
+        "sniper_visible": "no",
+        "victory": "uncertain",
+        "funny_fail": "no"
+      },
+      "confidence": 0.88,
+      "evidence": ["dense build/edit texture", "close-range pressure", "high motion around action peak"]
+    }
+  },
+  {
+    "filename": "quiet-rotation-before-zone.mp4",
+    "duration_sec": 74,
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "size_bytes": 83200000,
+    "motion_score": 0.24,
+    "audio_peak_score": 0.18,
+    "silence_ratio": 0.64,
+    "action_density": 0.18,
+    "tags": ["rotation", "low_action"],
+    "thumbnail_variant": "field",
+    "explanation": "Mostly quiet rotation with low action density, so Salience keeps it low until your feedback says otherwise.",
+    "teacher_labels": {
+      "labels": {
+        "no_scope": "no",
+        "trickshot": "no",
+        "box_fight": "no",
+        "clutch": "no",
+        "boring_cleanup": "yes",
+        "ar_spray": "no",
+        "sniper_visible": "no",
+        "victory": "no",
+        "funny_fail": "no"
+      },
+      "confidence": 0.71,
+      "evidence": ["quiet rotation", "low motion", "no strong event signal"]
+    }
+  }
+]
