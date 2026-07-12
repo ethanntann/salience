@@ -29,6 +29,12 @@ export function clipMatchesFilter(clip: Clip, filter: ClipFilter): boolean {
   return !isSample && !isDemo && Boolean(clip.teacher_provider && clip.teacher_provider !== "local");
 }
 
+function initialClipFilter(clips: Clip[]): ClipFilter {
+  if (clips.some((clip) => clipMatchesFilter(clip, "teacher"))) return "teacher";
+  if (clips.some((clip) => clipMatchesFilter(clip, "sample"))) return "sample";
+  return "demo";
+}
+
 function scoreLabel(score: number | null): string {
   if (score === null) {
     return "pending";
@@ -59,6 +65,7 @@ export function ReviewInbox() {
     Promise.all([fetchClips(), fetchTrainingStatus()])
       .then(([items, training]) => {
         setClips(items);
+        setClipFilter(initialClipFilter(items));
         setTrainingStatus(training);
         setStatus("ready");
       })

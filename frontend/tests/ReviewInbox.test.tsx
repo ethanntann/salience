@@ -215,4 +215,16 @@ describe("ReviewInbox feedback ordering", () => {
     expect(screen.getByText("demo.mp4")).toBeInTheDocument();
     expect(screen.queryByText("sample.mp4")).not.toBeInTheDocument();
   });
+
+  it("opens the seeded demo set when no teacher-ranked clips exist", async () => {
+    fetchClips.mockResolvedValueOnce([
+      clipInSet(1, "seeded-demo.mp4", "demo://seeded-demo.mp4", "seeded-fireworks-teacher", "demo")
+    ]);
+    fetchTrainingStatus.mockResolvedValueOnce(training(0));
+
+    render(<ReviewInbox />);
+
+    expect(await screen.findByText("seeded-demo.mp4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Demo clips 1/ })).toHaveAttribute("aria-pressed", "true");
+  });
 });
