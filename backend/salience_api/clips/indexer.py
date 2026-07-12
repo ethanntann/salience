@@ -593,7 +593,8 @@ def index_demo_clip(conn: sqlite3.Connection, seed: dict) -> int:
         conn.execute(
             """
             update clip_scores
-            set base_score = ?, final_score = ?, confidence = ?, explanation = ?
+            set base_score = ?, final_score = ?, confidence = ?,
+                explanation = coalesce(?, explanation)
             where clip_id = ?
             """,
             (
@@ -733,6 +734,7 @@ def rescore_all_clips(conn: sqlite3.Connection) -> None:
         """
         select
             c.id as clip_id,
+            c.path,
             c.duration_sec,
             cf.motion_score,
             cf.audio_peak_score,
@@ -760,7 +762,11 @@ def rescore_all_clips(conn: sqlite3.Connection) -> None:
             f"{TEACHER_SCHEMA_VERSION}:%",
         ),
     ).fetchall()
-    features_by_id = [(int(row["clip_id"]), _features_from_row(row)) for row in rows]
+    features_by_id = [
+        (int(row["clip_id"]), _features_from_row(row))
+        for row in rows
+        if not str(row["path"]).startswith("snapshot://")
+    ]
     predictions = ranker.predict(
         [_feature_row(features) for _, features in features_by_id]
     )

@@ -60,6 +60,36 @@ def test_ranked_local_clip_exposes_video_url(tmp_path: Path):
     assert ranked[0]["video_url"] == f"/clips/{clip_id}/video"
 
 
+def test_rescore_preserves_frozen_submission_snapshot_score():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_db(conn)
+    index_demo_clip(
+        conn,
+        {
+            "filename": "teacher-ranked-001.mp4",
+            "path": "snapshot://teacher-ranked-001.mp4",
+            "source": "supervised",
+            "duration_sec": 20,
+            "motion_score": 0.6,
+            "audio_peak_score": 0.6,
+            "silence_ratio": 0.1,
+            "action_density": 0.6,
+            "tags": ["sniper_kill"],
+            "final_score": 0.8929,
+            "base_score": 0.5717,
+            "confidence": 0.8,
+        },
+    )
+
+    rescore_all_clips(conn)
+
+    ranked = list_ranked_clips(conn)
+    assert ranked[0]["final_score"] == 0.8929
+    assert ranked[0]["base_score"] == 0.5717
+    assert ranked[0]["video_url"] is None
+
+
 def test_feedback_changes_ranked_scores():
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
