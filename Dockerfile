@@ -33,4 +33,4 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 EXPOSE 7860
 
-CMD ["uvicorn", "salience_api.app:app", "--host", "0.0.0.0", "--port", "7860", "--app-dir", "/app/backend"]
+CMD ["sh", "-c", "uvicorn salience_api.app:app --host 0.0.0.0 --port ${PORT:-7860} --app-dir /app/backend"]
