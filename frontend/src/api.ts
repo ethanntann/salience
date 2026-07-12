@@ -85,12 +85,12 @@ export async function fetchTrainingStatus(): Promise<TrainingStatus> {
   return parseJson<TrainingStatus>(await fetch(`${API_BASE}/training/status`));
 }
 
-export async function startTeacherRun(limit = 10000): Promise<TeacherRunStatus> {
+export async function startTeacherRun(limit = 10000, unresolvedOnly = false): Promise<TeacherRunStatus> {
   return parseJson<TeacherRunStatus>(
     await fetch(`${API_BASE}/ai/enrich/background`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ limit })
+      body: JSON.stringify({ limit, unresolved_only: unresolvedOnly })
     })
   );
 }

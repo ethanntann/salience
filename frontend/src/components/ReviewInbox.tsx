@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchClips,
   fetchTrainingStatus,
+  fetchTeacherRunStatus,
   resetTasteProfile,
   scanFolder,
   sendFeedback,
-  saveTasteProfile
+  saveTasteProfile,
+  startTeacherRun
 } from "../api";
 import type { Clip, TrainingStatus } from "../types";
 import { ClipCard } from "./ClipCard";
@@ -140,7 +142,7 @@ export function ReviewInbox() {
     setBusy(true);
     setMessage("Processing clips with the local student model...");
     try {
-      const response = await scanFolder(path, true);
+      const response = await scanFolder(path, false);
       setClips(response.clips);
       if (path.replace(/\\/g, "/").toLowerCase().includes("/sample-clips")) {
         setClipFilter("sample");
@@ -148,8 +150,23 @@ export function ReviewInbox() {
         setClipFilter("demo");
       }
       setVisibleCount(30);
+      setMessage(`Indexed ${response.indexed} clip(s). Local student inference is running...`);
+      let run = await startTeacherRun(response.total_found, true);
+      while (run.running) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+        run = await fetchTeacherRunStatus();
+        setMessage(
+          `Local student: ${run.enriched + run.failed} of ${Math.max(run.requested, response.total_found)} finished` +
+            (run.failed ? ` (${run.failed} failed)` : "") +
+            "."
+        );
+      }
+      setClips(await fetchClips());
       await refreshTrainingStatus();
-      setMessage(`Processed ${response.indexed} of ${response.total_found} clip(s) from ${path}.`);
+      setMessage(
+        `Processed ${run.enriched} of ${response.total_found} clip(s)` +
+          (run.failed ? `; ${run.failed} failed${run.last_error ? `: ${run.last_error}` : "."}` : ".")
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {

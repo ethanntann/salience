@@ -3,23 +3,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Clip, TrainingStatus } from "../src/types";
 import { ReviewInbox } from "../src/components/ReviewInbox";
 
-const { fetchClips, fetchTrainingStatus, scanFolder, sendFeedback } = vi.hoisted(() => ({
+const { fetchClips, fetchTeacherRunStatus, fetchTrainingStatus, scanFolder, sendFeedback, startTeacherRun } = vi.hoisted(() => ({
   fetchClips: vi.fn(),
+  fetchTeacherRunStatus: vi.fn(),
   fetchTrainingStatus: vi.fn(),
   scanFolder: vi.fn(),
-  sendFeedback: vi.fn()
+  sendFeedback: vi.fn(),
+  startTeacherRun: vi.fn()
 }));
 
 vi.mock("../src/api", () => ({
   exportClips: vi.fn(),
   fetchClips,
+  fetchTeacherRunStatus,
   fetchTrainingStatus,
   importLikedFolder: vi.fn(),
   resetTasteProfile: vi.fn(),
   resolveApiUrl: (path: string) => path,
   saveTasteProfile: vi.fn(),
   scanFolder,
-  sendFeedback
+  sendFeedback,
+  startTeacherRun
 }));
 
 function deferred<T>() {
@@ -83,8 +87,10 @@ describe("ReviewInbox feedback ordering", () => {
   beforeEach(() => {
     fetchClips.mockReset();
     fetchTrainingStatus.mockReset();
+    fetchTeacherRunStatus.mockReset();
     scanFolder.mockReset();
     sendFeedback.mockReset();
+    startTeacherRun.mockReset();
   });
 
   it("serializes feedback and training refreshes in FIFO order", async () => {
@@ -174,12 +180,25 @@ describe("ReviewInbox feedback ordering", () => {
   });
 
   it("processes the selected clip source through the local student model", async () => {
-    fetchClips.mockResolvedValueOnce([]);
+    fetchClips
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        clipInSet(1, "new-clip.mp4", "/app/demo-video/new-clip.mp4", "local")
+      ]);
     fetchTrainingStatus.mockResolvedValueOnce(training(0)).mockResolvedValueOnce(training(0));
     scanFolder.mockResolvedValueOnce({
       indexed: 10,
       total_found: 10,
       clips: [clipInSet(1, "new-clip.mp4", "/app/demo-video/new-clip.mp4", "local")]
+    });
+    startTeacherRun.mockResolvedValueOnce({
+      running: false,
+      requested: 10,
+      enriched: 10,
+      failed: 0,
+      last_error: null,
+      started_at: "now",
+      finished_at: "now"
     });
 
     render(<ReviewInbox />);
@@ -190,9 +209,10 @@ describe("ReviewInbox feedback ordering", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Process clips" }));
 
-    await waitFor(() => expect(scanFolder).toHaveBeenCalledWith("/app/demo-video", true));
+    await waitFor(() => expect(scanFolder).toHaveBeenCalledWith("/app/demo-video", false));
+    expect(startTeacherRun).toHaveBeenCalledWith(10, true);
     expect(await screen.findByText("new-clip.mp4")).toBeInTheDocument();
-    expect(screen.getByText("Processed 10 of 10 clip(s) from /app/demo-video.")).toBeInTheDocument();
+    expect(screen.getByText("Processed 10 of 10 clip(s).")).toBeInTheDocument();
   });
 
   it("filters the inbox between teacher, sample, and demo clip sets", async () => {

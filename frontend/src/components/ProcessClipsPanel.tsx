@@ -18,7 +18,7 @@ export function ProcessClipsPanel({
     <section className="processClipsPanel">
       <div>
         <h2>Process new clips</h2>
-        <p>Run the local student model on a fixed set of unseen clips baked into this container.</p>
+        <p>Run the local student model on unseen clips baked into this container. Progress appears below while Render processes them.</p>
       </div>
       <form
         onSubmit={(event) => {

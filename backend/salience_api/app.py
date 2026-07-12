@@ -118,7 +118,7 @@ def _ensure_database(conn: sqlite3.Connection, settings: Settings) -> None:
     init_db(conn)
     if settings.demo_mode:
         count = conn.execute(
-            "select count(*) from clips where source = 'demo'"
+            "select count(*) from clips where path like 'demo://%' or path like 'snapshot://%'"
         ).fetchone()[0]
         if count == 0 and settings.demo_data_path.exists():
             seed_demo_clips(conn, load_demo_clips(settings.demo_data_path))
@@ -679,9 +679,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     status_code=404, detail=f"Clip not found: {clip_id}"
                 )
             path_text = str(row["path"])
-            if path_text.startswith("demo://"):
+            if path_text.startswith(("demo://", "snapshot://")):
                 raise HTTPException(
-                    status_code=404, detail="Demo clips do not have local video files"
+                    status_code=404, detail="This ranked record does not include a local video file"
                 )
             video_path = resolve_container_path(path_text)
             if video_path is None or not video_path.exists():
@@ -1390,7 +1390,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not resolved_settings.demo_data_path.exists():
             raise HTTPException(status_code=404, detail="Demo data file not found")
         with db() as conn:
-            conn.execute("delete from clips where source = 'demo'")
+            conn.execute(
+                "delete from clips where source = 'demo' or path like 'snapshot://%'"
+            )
             seed_demo_clips(conn, load_demo_clips(resolved_settings.demo_data_path))
             rescore_all_clips(conn)
             return list_ranked_clips(conn)

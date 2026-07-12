@@ -35,8 +35,11 @@ def test_clips_endpoint_returns_seeded_demo_clips(tmp_path):
 
     assert response.status_code == 200
     clips = response.json()
-    assert len(clips) >= 3
-    assert clips[0]["teacher_provider"] == "seeded-fireworks-teacher"
+    assert len(clips) == 553
+    assert clips[0]["source"] == "supervised"
+    assert clips[0]["path"].startswith("snapshot://")
+    assert clips[0]["video_url"] is None
+    assert clips[0]["teacher_provider"] != "local"
     assert clips[0]["teacher_labels"]
 
 
@@ -672,10 +675,10 @@ def test_enrichment_rollback_preserves_fresh_demo_seed(monkeypatch, tmp_path):
     assert response.json()["failed"] == 1
     assert len(response.json()["clips"]) >= 3
     with connect(settings.resolved_database_path()) as conn:
-        demo_count = conn.execute(
-            "select count(*) from clips where source = 'demo'"
+        snapshot_count = conn.execute(
+            "select count(*) from clips where path like 'snapshot://%'"
         ).fetchone()[0]
-        assert demo_count >= 3
+        assert snapshot_count == 553
 
 
 def test_scan_folder_indexes_without_teacher_by_default(tmp_path: Path):

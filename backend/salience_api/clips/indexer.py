@@ -524,6 +524,8 @@ def index_known_clip_path(
 
 def index_demo_clip(conn: sqlite3.Connection, seed: dict) -> int:
     filename = str(seed["filename"])
+    source = str(seed.get("source", "demo"))
+    seed_path = str(seed.get("path", f"demo://{filename}"))
     features = BasicFeatures(
         duration_sec=float(seed["duration_sec"]),
         motion_score=float(seed["motion_score"]),
@@ -536,7 +538,7 @@ def index_demo_clip(conn: sqlite3.Connection, seed: dict) -> int:
     conn.execute(
         """
         insert into clips(path, filename, duration_sec, width, height, fps, size_bytes, created_at, indexed_at, source)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'demo')
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         on conflict(path) do update set
             filename = excluded.filename,
             duration_sec = excluded.duration_sec,
@@ -548,7 +550,7 @@ def index_demo_clip(conn: sqlite3.Connection, seed: dict) -> int:
             source = excluded.source
         """,
         (
-            f"demo://{filename}",
+            seed_path,
             filename,
             features.duration_sec,
             seed.get("width"),
@@ -557,10 +559,11 @@ def index_demo_clip(conn: sqlite3.Connection, seed: dict) -> int:
             seed.get("size_bytes"),
             _now(),
             _now(),
+            source,
         ),
     )
     row = conn.execute(
-        "select id from clips where path = ?", (f"demo://{filename}",)
+        "select id from clips where path = ?", (seed_path,)
     ).fetchone()
     if row is None:
         raise RuntimeError(f"Failed to seed demo clip: {filename}")
@@ -573,7 +576,7 @@ def index_demo_clip(conn: sqlite3.Connection, seed: dict) -> int:
             "tags": list(seed.get("tags", [])),
             "seed_explanation": seed.get("explanation"),
             "thumbnail_variant": seed.get("thumbnail_variant", "ridge"),
-            "source": "demo_seed",
+            "source": seed.get("feature_source", "demo_seed"),
         },
     )
     teacher_seed = seed.get("teacher_labels")
@@ -581,11 +584,26 @@ def index_demo_clip(conn: sqlite3.Connection, seed: dict) -> int:
         record_teacher_labels(
             conn,
             clip_id=clip_id,
-            provider="seeded-fireworks-teacher",
+            provider=str(seed.get("teacher_provider", "seeded-fireworks-teacher")),
             labels=normalize_teacher_payload(teacher_seed),
-            model="demo-precomputed",
+            model=str(seed.get("teacher_model", "demo-precomputed")),
         )
     _upsert_score(conn, clip_id, features, personal_score=None)
+    if seed.get("final_score") is not None:
+        conn.execute(
+            """
+            update clip_scores
+            set base_score = ?, final_score = ?, confidence = ?, explanation = ?
+            where clip_id = ?
+            """,
+            (
+                float(seed.get("base_score", seed["final_score"])),
+                float(seed["final_score"]),
+                float(seed.get("confidence", features.extraction_confidence)),
+                seed.get("score_explanation") or seed.get("explanation"),
+                clip_id,
+            ),
+        )
     return clip_id
 
 
@@ -938,7 +956,7 @@ def list_ranked_clips(conn: sqlite3.Connection) -> list[dict]:
                 "size_bytes": row["size_bytes"],
                 "source": row["source"],
                 "video_url": None
-                if str(row["path"]).startswith("demo://")
+                if str(row["path"]).startswith(("demo://", "snapshot://"))
                 else f"/clips/{int(row['id'])}/video",
                 "final_score": row["final_score"],
                 "base_score": row["base_score"],
