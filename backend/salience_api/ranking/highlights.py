@@ -105,6 +105,12 @@ def dedupe_verified_finishes(events: list[dict]) -> list[dict]:
 
 
 def _events_are_duplicates(left: dict, right: dict) -> bool:
+    # An active-target knock and a later already-downed cleanup are two
+    # different facts. The cleanup weapon must never replace the knock weapon.
+    if bool(left.get("target_was_downed", False)) != bool(
+        right.get("target_was_downed", False)
+    ):
+        return False
     left_ts = left.get("finish_timestamp")
     right_ts = right.get("finish_timestamp")
     if left_ts is None or right_ts is None:
@@ -116,7 +122,12 @@ def _events_are_duplicates(left: dict, right: dict) -> bool:
             abs(int(left.get("event_index", 0)) - int(right.get("event_index", 0))) <= 1
         )
     gap = abs(float(left_ts) - float(right_ts))
-    if _same_named_target(left, right) and gap <= 3.0:
+    same_named_target = _same_named_target(left, right)
+    if _same_concrete_target_across_clip(left, right):
+        # A concrete player cannot be actively knocked/eliminated twice in one
+        # short clip. Later evidence is the finish; earlier evidence is setup.
+        return True
+    if same_named_target and gap <= 3.0:
         return True
     if gap > 1.1:
         return False
@@ -143,14 +154,42 @@ def _same_named_target(left: dict, right: dict) -> bool:
     return SequenceMatcher(None, left_name, right_name).ratio() >= 0.78
 
 
+def _same_concrete_target_across_clip(left: dict, right: dict) -> bool:
+    if _generic_target_identity(left) or _generic_target_identity(right):
+        return False
+    left_name = _normalized_target(left)
+    right_name = _normalized_target(right)
+    if left_name in {"", "unknown"} or right_name in {"", "unknown"}:
+        return False
+    return left_name == right_name or SequenceMatcher(
+        None, left_name, right_name
+    ).ratio() >= 0.88
+
+
 def _normalized_target(event: dict) -> str:
     return re.sub(
         r"[^a-z0-9]+", "", str(event.get("target_identity", "unknown")).lower()
     )
 
 
+def _generic_target_identity(event: dict) -> bool:
+    name = _normalized_target(event)
+    return name.startswith("anonymous") or name in {
+        "securityguard",
+        "guard",
+        "boss",
+        "npc",
+    }
+
+
 def _finish_evidence_rank(event: dict) -> tuple[float, ...]:
-    """Rank duplicate descriptions by deterministic, inspectable evidence."""
+    """Rank duplicate descriptions by finish evidence, then chronology.
+
+    When two concrete weapon windows both describe the same target's finish,
+    the later final shot owns the kill. An earlier setup-damage weapon wins only
+    when the later window lacks equivalent shot/HUD evidence and is therefore
+    likely just reading a persistent banner after a weapon swap.
+    """
     local_ocr = event.get("local_ocr")
     ocr_applied = bool(
         isinstance(local_ocr, dict)
@@ -158,20 +197,27 @@ def _finish_evidence_rank(event: dict) -> tuple[float, ...]:
         and not local_ocr.get("ambiguous")
         and local_ocr.get("category") not in {None, "", "unknown"}
     )
+    named_weapon = weapon_category_from_text(event.get("selected_weapon_name_text"))
+    weapon_grounded = ocr_applied or named_weapon != "unknown"
     timestamp = event.get("finish_timestamp")
+    if timestamp is None:
+        chronology = float("-inf")
+    elif weapon_grounded:
+        chronology = float(timestamp)
+    else:
+        chronology = -float(timestamp)
     return (
         1.0 if ocr_applied else 0.0,
-        1.0
-        if weapon_category_from_text(event.get("selected_weapon_name_text"))
-        != "unknown"
-        else 0.0,
-        1.0 if event.get("single_shot_damage") is not None else 0.0,
-        1.0 if _normalized_target(event) not in {"", "unknown"} else 0.0,
+        1.0 if named_weapon != "unknown" else 0.0,
+        1.0 if event.get("finish_onset_supported") else 0.0,
+        1.0 if event.get("visual_action_supported") else 0.0,
         1.0 if event.get("visible_defeat_supported") else 0.0,
         1.0 if event.get("new_damage_visible") else 0.0,
+        chronology,
+        1.0 if event.get("single_shot_damage") is not None else 0.0,
+        1.0 if _normalized_target(event) not in {"", "unknown"} else 0.0,
         float(event.get("teacher_confidence") or 0.0),
-        -float(timestamp) if timestamp is not None else float("-inf"),
-        -float(event.get("event_index") or 0),
+        float(event.get("event_index") or 0),
     )
 
 

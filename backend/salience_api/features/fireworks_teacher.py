@@ -750,19 +750,8 @@ def resolve_event_summaries(payload: dict) -> WeaponAttribution:
     )
 
 
-_DEFERRED_FINISH_BIND_WINDOW_SEC = 2.0
-_SAME_TARGET_FINISH_WINDOW_SEC = 2.0
-_BINDABLE_DAMAGE_WEAPONS = {
-    "sniper_or_hunting",
-    "shotgun",
-    "pistol",
-    "automatic",
-    "other",
-}
-
-
 def _collapse_duplicate_target_finishes(events: list[dict]) -> list[dict]:
-    """Keep the latest attributed active finish per named target in a short window."""
+    """Mark duplicate finish windows using the shared evidence-based reducer."""
     attributed = [
         event
         for event in events
@@ -771,47 +760,30 @@ def _collapse_duplicate_target_finishes(events: list[dict]) -> list[dict]:
         and event.get("target_was_active")
         and not event.get("target_was_downed")
     ]
-    by_target: dict[str, list[dict]] = {}
+    winners = dedupe_verified_finishes(attributed)
+    winner_ids = {id(event) for event in winners}
     for event in attributed:
-        name = str(event.get("target_identity", "unknown")).strip().lower()
-        if name in {"", "unknown"}:
+        if id(event) in winner_ids:
             continue
-        by_target.setdefault(name, []).append(event)
-
-    for group in by_target.values():
-        ordered = sorted(
-            group,
-            key=lambda item: (
-                item.get("finish_timestamp") is None,
-                float(item["finish_timestamp"])
-                if item.get("finish_timestamp") is not None
-                else float("inf"),
-                int(item.get("event_index", 0)),
+        timestamp = event.get("finish_timestamp")
+        winner = min(
+            winners,
+            key=lambda candidate: abs(
+                float(candidate.get("finish_timestamp") or 0.0)
+                - float(timestamp or 0.0)
             ),
+            default=None,
         )
-        kept: list[dict] = []
-        for event in ordered:
-            if not kept:
-                kept.append(event)
-                continue
-            prior = kept[-1]
-            prior_ts = prior.get("finish_timestamp")
-            event_ts = event.get("finish_timestamp")
-            if (
-                prior_ts is not None
-                and event_ts is not None
-                and abs(float(event_ts) - float(prior_ts)) <= _SAME_TARGET_FINISH_WINDOW_SEC
-                and prior.get("resolved_weapon") != event.get("resolved_weapon")
-                and prior.get("resolved_weapon") not in {None, "unknown"}
-                and event.get("resolved_weapon") not in {None, "unknown"}
-            ):
-                # Conflicting weapons on the same named finish: keep the later window.
-                prior["status"] = "duplicate_target_finish"
-                prior["resolved_weapon"] = "unknown"
-                prior["duplicate_of_event_index"] = int(event.get("event_index", 0))
-                kept[-1] = event
-            else:
-                kept.append(event)
+        if winner is not None and event.get("resolved_weapon") == winner.get(
+            "resolved_weapon"
+        ):
+            # Preserve corroborating same-weapon windows for aim-state vetoes
+            # and audit detail. The shared reducer still counts them once.
+            continue
+        event["status"] = "duplicate_target_finish"
+        event["resolved_weapon"] = "unknown"
+        if winner is not None:
+            event["duplicate_of_event_index"] = int(winner.get("event_index", 0))
     return events
 
 
@@ -876,116 +848,6 @@ def apply_weapon_ocr_to_event(
     )
     event["local_ocr"] = {**ocr_evidence, "applied": True}
     return True
-
-
-def _event_named_weapon(event: dict) -> str:
-    named = weapon_category_from_text(event.get("selected_weapon_name_text"))
-    if named != "unknown":
-        return named
-    resolved = str(event.get("resolved_weapon", "unknown"))
-    return resolved if resolved in _BINDABLE_DAMAGE_WEAPONS else "unknown"
-
-
-def _compatible_event_targets(left: dict, right: dict) -> bool:
-    left_name = str(left.get("target_identity", "unknown")).strip().lower()
-    right_name = str(right.get("target_identity", "unknown")).strip().lower()
-    if left_name in {"", "unknown"} or right_name in {"", "unknown"}:
-        return True
-    return left_name == right_name
-
-
-def _bind_deferred_finishes(events: list[dict]) -> list[dict]:
-    """Attach a nearby finish UI to an earlier serious weapon hit after a swap.
-
-    Specialist windows often mark the damaging shot as damage_only, then attribute
-    the knock/elim banner in a later window to the swapped weapon. This is not
-    weapon-specific: any named weapon with a serious hit can reclaim that finish.
-    """
-    if len(events) < 2:
-        return events
-
-    bound_donor_indices: set[int] = set()
-    for damage in events:
-        if (
-            damage.get("status") != "no_finish"
-            or damage.get("event_kind") != "damage_only"
-        ):
-            continue
-        if damage.get("target_was_downed") or not damage.get("target_was_active"):
-            continue
-        if not damage.get("pov_shot_visible"):
-            continue
-        named_weapon = _event_named_weapon(damage)
-        if named_weapon not in _BINDABLE_DAMAGE_WEAPONS:
-            continue
-        damage_value = damage.get("single_shot_damage")
-        serious_hit = bool(damage.get("high_damage_one_shot")) or (
-            damage_value is not None and int(damage_value) >= 100
-        )
-        # Automatic sprays can qualify via multiple distinct damaging shots.
-        if named_weapon == "automatic" and not serious_hit:
-            serious_hit = int(damage.get("damage_hit_count") or 0) >= 3
-        if not serious_hit:
-            continue
-        damage_ts = damage.get("finish_timestamp")
-        if damage_ts is None:
-            continue
-
-        donor: dict | None = None
-        donor_gap = float("inf")
-        for finish in events:
-            if finish is damage or finish.get("status") != "attributed":
-                continue
-            if finish.get("event_kind") not in {"knock", "elimination"}:
-                continue
-            if finish.get("target_was_downed") or not finish.get("target_was_active"):
-                continue
-            finish_ts = finish.get("finish_timestamp")
-            if finish_ts is None:
-                continue
-            gap = float(finish_ts) - float(damage_ts)
-            if gap <= 0 or gap > _DEFERRED_FINISH_BIND_WINDOW_SEC:
-                continue
-            if not _compatible_event_targets(damage, finish):
-                continue
-            # Prefer swap-shaped donors; same-weapon donors are left alone.
-            if finish.get("resolved_weapon") == named_weapon:
-                continue
-            if gap < donor_gap:
-                donor = finish
-                donor_gap = gap
-        if donor is None:
-            continue
-
-        damage["event_kind"] = donor["event_kind"]
-        damage["status"] = "attributed"
-        damage["resolved_weapon"] = named_weapon
-        damage["finish_onset_supported"] = True
-        damage["visible_defeat_supported"] = bool(
-            donor.get("visible_defeat_supported")
-            or damage.get("visible_defeat_supported")
-        )
-        damage["kill_feed_corroborates_pov"] = bool(
-            donor.get("kill_feed_corroborates_pov")
-            or damage.get("kill_feed_corroborates_pov")
-        )
-        damage["visual_action_supported"] = True
-        damage["deferred_finish_bound"] = True
-        damage["bound_from_event_index"] = int(donor.get("event_index", 0))
-        if donor.get("target_identity") and (
-            str(damage.get("target_identity", "unknown")).lower() in {"", "unknown"}
-        ):
-            damage["target_identity"] = donor["target_identity"]
-
-        donor_index = int(donor.get("event_index", -1))
-        if donor_index in bound_donor_indices:
-            continue
-        donor["status"] = "deferred_finish_donor"
-        donor["resolved_weapon"] = "unknown"
-        donor["deferred_finish_donor"] = True
-        bound_donor_indices.add(donor_index)
-
-    return events
 
 
 def _evidence_single_shot_damage(evidence: list[str]) -> int | None:
@@ -1361,10 +1223,17 @@ class OpenAICompatibleTeacherClient:
                 "(integer or null); damage_display_is_cumulative (boolean); target_identity "
                 "(visible target name or unknown); high_damage_one_shot (boolean); damaging_shot_count "
                 "(integer); and summary (one short sentence). All evidence fields use yes, no, "
-                "or unknown. Keep numbered events completely independent. Determine the weapon "
-                "selected at the damaging shot immediately before that event's finish; ignore "
-                "weapons selected afterward. If the HUD weapon changes between the shot and the "
-                "finish banner, use the weapon from the shot frames, not the swapped weapon. "
+                "or unknown. Compare numbered events chronologically before classifying them. "
+                "Adjacent windows that show the same persistent knock/elimination banner, target "
+                "name, or damage number are one finish, not multiple finishes; only the window "
+                "containing the final damaging shot that first causes the defeat may use knock or "
+                "elimination, and the other windows must use damage_only or none. Determine the "
+                "weapon selected for that final damaging shot immediately before the finish; an "
+                "earlier setup-damage weapon never owns the kill. For example, sniper damage "
+                "followed by a shotgun finishing shot is only a shotgun kill. This rule applies "
+                "equally to every weapon family. Ignore weapons selected after the finish. If the "
+                "HUD weapon changes between the final shot and the finish banner, use the weapon "
+                "from the final-shot frames, not the later swapped weapon. "
                 "If two different weapons are both clearly selected in the same event window, "
                 "set selected_weapon_before_finish to unknown and weapon_confidence below 0.7. "
                 "Transcribe the on-screen weapon name exactly when visible; never invent or "

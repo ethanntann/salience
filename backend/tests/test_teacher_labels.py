@@ -1060,7 +1060,7 @@ def test_separate_shotgun_damage_does_not_rewrite_later_pistol_finish():
     assert attribution.labels["pistol_kill"] == "yes"
 
 
-def test_deferred_finish_bind_skips_weak_damage_and_different_named_targets():
+def test_weak_setup_damage_does_not_rewrite_different_target_finish():
     attribution = resolve_event_summaries(
         {
             "events": [
@@ -1456,6 +1456,46 @@ def test_same_target_keeps_latest_finish_weapon_only():
     assert merged.multi_kill == "no"
 
 
+def test_same_target_rejects_later_ungrounded_sniper_guess():
+    common = {
+        "event_kind": "knock",
+        "target_state": "active",
+        "target_identity": "SameOpponent",
+        "visual_action_supported": "yes",
+        "pov_shot_visible": "yes",
+        "new_damage_visible": "yes",
+        "target_defeat_visible": "yes",
+        "finish_ui_newly_appeared": "yes",
+        "weapon_confidence": 0.95,
+        "selected_weapon_name_text": "CHAOS EXPLORER RIFLE",
+    }
+    attribution = resolve_event_summaries(
+        {
+            "events": [
+                {
+                    **common,
+                    "event_index": 0,
+                    "event_timestamp": 14.6,
+                    "selected_weapon_before_finish": "automatic",
+                    "damaging_shot_count": 3,
+                },
+                {
+                    **common,
+                    "event_index": 1,
+                    "event_timestamp": 16.5,
+                    "selected_weapon_before_finish": "sniper_or_hunting",
+                    "damaging_shot_count": 1,
+                },
+            ]
+        }
+    )
+    merged = merge_event_labels(normalize_teacher_payload({"labels": {}}), attribution)
+
+    assert merged.automatic_kill == "yes"
+    assert merged.sniper_kill == "no"
+    assert merged.multi_kill == "no"
+
+
 def test_overlapping_finish_windows_emit_only_the_evidence_backed_weapon_label():
     """Regression: one shotgun finish was exported as shotgun + SMG + sniper."""
     common = {
@@ -1479,6 +1519,12 @@ def test_overlapping_finish_windows_emit_only_the_evidence_backed_weapon_label()
                     "selected_weapon_name_text": "STRIKER PUMP SHOTGUN",
                     "single_shot_damage": 190,
                     "damaging_shot_count": 1,
+                    "local_ocr": {
+                        "applied": True,
+                        "ambiguous": False,
+                        "category": "shotgun",
+                        "confidence": 0.998,
+                    },
                 },
                 {
                     **common,
@@ -1753,6 +1799,38 @@ def test_weapon_specialist_prefers_strong_pre_finish_hud_ocr(tmp_path):
     assert attribution.labels["shotgun_kill"] == "yes"
     assert attribution.labels["sniper_kill"] == "no"
     assert attribution.raw_payload["applied_ocr"][0]["category"] == "shotgun"
+
+
+def test_weapon_specialist_prompt_assigns_kill_to_final_damaging_shot(tmp_path):
+    frame = tmp_path / "frame.jpg"
+    frame.write_bytes(b"frame")
+
+    class StubTeacher(OpenAICompatibleTeacherClient):
+        def __init__(self):
+            self.prompt = ""
+
+        def _complete(self, content, *, max_tokens):
+            self.prompt = str(content[0]["text"])
+            return '{"events":[{"event_index":0,"event_kind":"none"}]}'
+
+    client = StubTeacher()
+    client.label_weapon_event(
+        ClipTeacherInput(
+            filename="clip.mp4",
+            duration_sec=20,
+            width=1920,
+            height=1080,
+            fps=60,
+            tags=[],
+            image_paths=[frame],
+            image_timestamps=[5.0],
+            image_event_indices=[0],
+        )
+    )
+
+    assert "final damaging shot" in client.prompt
+    assert "earlier setup-damage weapon never owns the kill" in client.prompt
+    assert "sniper damage followed by a shotgun finishing shot" in client.prompt
 
 
 def test_weapon_specialist_recovers_duplicate_ids_with_focused_event_calls(tmp_path):

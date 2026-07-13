@@ -63,3 +63,56 @@ def test_reconcile_keeps_distinct_named_rapid_finishes():
     assert labels["sniper_kill"] == "yes"
     assert labels["pistol_kill"] == "yes"
     assert labels["multi_kill"] == "yes"
+
+
+def test_reconcile_uses_finishing_weapon_after_setup_damage():
+    sniper = _finish(0, 2.15, "sniper_or_hunting", "SameOpponent")
+    sniper.update(
+        {
+            "selected_weapon_name_text": "HUNTING RIFLE",
+            "single_shot_damage": 150,
+            "local_ocr": {
+                "applied": True,
+                "ambiguous": False,
+                "category": "sniper_or_hunting",
+                "confidence": 0.99,
+            },
+        }
+    )
+    shotgun = _finish(1, 3.59, "shotgun", "SameOpponent")
+    shotgun.update(
+        {
+            "selected_weapon_name_text": "STRIKER PUMP SHOTGUN",
+            "single_shot_damage": 150,
+            "local_ocr": {
+                "applied": True,
+                "ambiguous": False,
+                "category": "shotgun",
+                "confidence": 0.99,
+            },
+        }
+    )
+
+    labels = _reconciled_labels({}, [sniper, shotgun])
+
+    assert labels["sniper_kill"] == "no"
+    assert labels["shotgun_kill"] == "yes"
+    assert labels["multi_kill"] == "no"
+
+
+def test_reconcile_does_not_credit_weapon_used_only_for_downed_cleanup():
+    knock = _finish(0, 10.0, "pistol", "SameOpponent")
+    cleanup = _finish(1, 11.5, "shotgun", "SameOpponent")
+    cleanup.update(
+        {
+            "event_kind": "downed_finish",
+            "target_was_active": False,
+            "target_was_downed": True,
+        }
+    )
+
+    labels = _reconciled_labels({}, [knock, cleanup])
+
+    assert labels["pistol_kill"] == "yes"
+    assert labels["shotgun_kill"] == "no"
+    assert labels["downed_finish"] == "yes"

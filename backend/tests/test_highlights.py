@@ -322,3 +322,181 @@ def test_dedupe_preserves_rapid_finishes_for_distinct_named_targets():
     finishes = dedupe_verified_finishes(events)
 
     assert [event["event_index"] for event in finishes] == [0, 1]
+
+
+def test_dedupe_credits_the_later_finishing_weapon_not_setup_damage_weapon():
+    """A sniper setup hit followed by a shotgun finish is a shotgun kill."""
+    common = {
+        "status": "attributed",
+        "event_kind": "knock",
+        "target_was_active": True,
+        "target_was_downed": False,
+        "visual_action_supported": True,
+        "finish_onset_supported": True,
+        "visible_defeat_supported": True,
+        "new_damage_visible": True,
+        "target_identity": "SameOpponent",
+        "single_shot_damage": 150,
+        "damage_hit_count": 1,
+    }
+    events = [
+        {
+            **common,
+            "event_index": 0,
+            "finish_timestamp": 2.15,
+            "resolved_weapon": "sniper_or_hunting",
+            "selected_weapon_name_text": "HUNTING RIFLE",
+            "local_ocr": {
+                "applied": True,
+                "ambiguous": False,
+                "category": "sniper_or_hunting",
+                "confidence": 0.99,
+            },
+        },
+        {
+            **common,
+            "event_index": 1,
+            "finish_timestamp": 3.59,
+            "resolved_weapon": "shotgun",
+            "selected_weapon_name_text": "STRIKER PUMP SHOTGUN",
+            "local_ocr": {
+                "applied": True,
+                "ambiguous": False,
+                "category": "shotgun",
+                "confidence": 0.99,
+            },
+        },
+    ]
+
+    finishes = dedupe_verified_finishes(events)
+
+    assert len(finishes) == 1
+    assert finishes[0]["event_index"] == 1
+    assert finishes[0]["resolved_weapon"] == "shotgun"
+
+
+def test_dedupe_does_not_let_an_ungrounded_later_weapon_guess_steal_finish():
+    common = {
+        "status": "attributed",
+        "event_kind": "knock",
+        "target_was_active": True,
+        "target_was_downed": False,
+        "visual_action_supported": True,
+        "finish_onset_supported": True,
+        "visible_defeat_supported": True,
+        "new_damage_visible": True,
+        "target_identity": "SameOpponent",
+        "single_shot_damage": None,
+    }
+    events = [
+        {
+            **common,
+            "event_index": 0,
+            "finish_timestamp": 14.6,
+            "resolved_weapon": "automatic",
+            "selected_weapon_name_text": "CHAOS EXPLORER RIFLE",
+            "damage_hit_count": 3,
+        },
+        {
+            **common,
+            "event_index": 1,
+            "finish_timestamp": 16.5,
+            "resolved_weapon": "sniper_or_hunting",
+            "selected_weapon_name_text": "CHAOS EXPLORER RIFLE",
+            "damage_hit_count": 1,
+        },
+    ]
+
+    finishes = dedupe_verified_finishes(events)
+
+    assert len(finishes) == 1
+    assert finishes[0]["event_index"] == 0
+    assert finishes[0]["resolved_weapon"] == "automatic"
+
+
+def test_dedupe_keeps_active_knock_separate_from_later_downed_cleanup():
+    common = {
+        "status": "attributed",
+        "target_identity": "SameOpponent",
+        "finish_onset_supported": True,
+        "visual_action_supported": True,
+        "visible_defeat_supported": True,
+        "new_damage_visible": True,
+    }
+    events = [
+        {
+            **common,
+            "event_index": 0,
+            "event_kind": "knock",
+            "finish_timestamp": 10.0,
+            "resolved_weapon": "pistol",
+            "selected_weapon_name_text": "RANGER PISTOL",
+            "target_was_active": True,
+            "target_was_downed": False,
+        },
+        {
+            **common,
+            "event_index": 1,
+            "event_kind": "downed_finish",
+            "finish_timestamp": 11.5,
+            "resolved_weapon": "shotgun",
+            "selected_weapon_name_text": "STRIKER PUMP SHOTGUN",
+            "target_was_active": False,
+            "target_was_downed": True,
+        },
+    ]
+
+    finishes = dedupe_verified_finishes(events)
+
+    assert [event["event_index"] for event in finishes] == [0, 1]
+
+
+def test_dedupe_credits_later_finish_for_same_named_target_across_clip():
+    common = {
+        "status": "attributed",
+        "event_kind": "elimination",
+        "target_was_active": True,
+        "target_was_downed": False,
+        "visual_action_supported": True,
+        "finish_onset_supported": True,
+        "visible_defeat_supported": True,
+        "new_damage_visible": True,
+        "target_identity": "Forbidden80",
+        "single_shot_damage": 91,
+        "damage_hit_count": 1,
+    }
+    events = [
+        {
+            **common,
+            "event_index": 0,
+            "finish_timestamp": 9.7,
+            "resolved_weapon": "sniper_or_hunting",
+            "selected_weapon_name_text": "HUNTING RIFLE",
+            "local_ocr": {
+                "applied": True,
+                "ambiguous": False,
+                "category": "sniper_or_hunting",
+                "confidence": 0.99,
+            },
+        },
+        {
+            **common,
+            "event_index": 1,
+            "finish_timestamp": 15.5,
+            "resolved_weapon": "pistol",
+            "selected_weapon_name_text": "RANGER PISTOL",
+            "target_identity": "Forbidden60",
+            "local_ocr": {
+                "applied": True,
+                "ambiguous": False,
+                "category": "pistol",
+                "confidence": 0.99,
+            },
+        },
+    ]
+
+    finishes = dedupe_verified_finishes(events)
+
+    assert len(finishes) == 1
+    assert finishes[0]["event_index"] == 1
+    assert finishes[0]["resolved_weapon"] == "pistol"
