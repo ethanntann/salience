@@ -1456,6 +1456,60 @@ def test_same_target_keeps_latest_finish_weapon_only():
     assert merged.multi_kill == "no"
 
 
+def test_overlapping_finish_windows_emit_only_the_evidence_backed_weapon_label():
+    """Regression: one shotgun finish was exported as shotgun + SMG + sniper."""
+    common = {
+        "event_kind": "elimination",
+        "target_state": "active",
+        "visual_action_supported": "yes",
+        "pov_shot_visible": "yes",
+        "new_damage_visible": "yes",
+        "target_defeat_visible": "yes",
+        "finish_ui_newly_appeared": "yes",
+        "weapon_confidence": 0.95,
+    }
+    attribution = resolve_event_summaries(
+        {
+            "events": [
+                {
+                    **common,
+                    "event_index": 1,
+                    "event_timestamp": 14.44,
+                    "selected_weapon_before_finish": "shotgun",
+                    "selected_weapon_name_text": "STRIKER PUMP SHOTGUN",
+                    "single_shot_damage": 190,
+                    "damaging_shot_count": 1,
+                },
+                {
+                    **common,
+                    "event_index": 2,
+                    "event_timestamp": 15.40,
+                    "selected_weapon_before_finish": "automatic",
+                    "selected_weapon_name_text": "Stinger SMG",
+                    "single_shot_damage": None,
+                    "damaging_shot_count": 1,
+                },
+                {
+                    **common,
+                    "event_index": 3,
+                    "event_timestamp": 16.37,
+                    "selected_weapon_before_finish": "sniper_or_hunting",
+                    "selected_weapon_name_text": "unknown",
+                    "single_shot_damage": 190,
+                    "damaging_shot_count": 1,
+                    "target_identity": "Agraphone-8",
+                },
+            ]
+        }
+    )
+    merged = merge_event_labels(normalize_teacher_payload({"labels": {}}), attribution)
+
+    assert merged.shotgun_kill == "yes"
+    assert merged.automatic_kill == "no"
+    assert merged.sniper_kill == "no"
+    assert merged.multi_kill == "no"
+
+
 def test_ocr_does_not_override_named_conflicting_vlm_weapon():
     event = {
         "selected_weapon_before_finish": "automatic",
@@ -1651,6 +1705,54 @@ def test_weapon_specialist_retries_incomplete_event_summaries(tmp_path):
     assert client.calls == 2
     assert attribution.status == "attributed"
     assert attribution.raw_payload["prepared_event_count"] == 1
+
+
+def test_weapon_specialist_prefers_strong_pre_finish_hud_ocr(tmp_path):
+    frame = tmp_path / "frame.jpg"
+    frame.write_bytes(b"frame")
+
+    class StubTeacher(OpenAICompatibleTeacherClient):
+        def __init__(self):
+            pass
+
+        def _complete(self, content, *, max_tokens):
+            return (
+                '{"events":[{"event_index":0,"event_timestamp":5.0,'
+                '"event_kind":"elimination","target_state":"active",'
+                '"visual_action_supported":"yes","pov_shot_visible":"yes",'
+                '"target_reaction_visible":"yes","new_damage_visible":"yes",'
+                '"finish_ui_newly_appeared":"yes","target_defeat_visible":"yes",'
+                '"selected_weapon_before_finish":"sniper_or_hunting",'
+                '"selected_weapon_name_text":"Hunting Rifle",'
+                '"weapon_confidence":0.95}]}'
+            )
+
+    attribution = StubTeacher().label_weapon_event(
+        ClipTeacherInput(
+            filename="clip.mp4",
+            duration_sec=20,
+            width=1920,
+            height=1080,
+            fps=60,
+            tags=[],
+            image_paths=[frame],
+            image_timestamps=[5.0],
+            image_event_indices=[0],
+            ocr_observations=[
+                {
+                    "event_index": 0,
+                    "timestamp": 4.8,
+                    "text": "STRIKER PUMP SHOTGUN",
+                    "confidence": 0.99,
+                }
+            ],
+        )
+    )
+
+    assert attribution.events[0]["resolved_weapon"] == "shotgun"
+    assert attribution.labels["shotgun_kill"] == "yes"
+    assert attribution.labels["sniper_kill"] == "no"
+    assert attribution.raw_payload["applied_ocr"][0]["category"] == "shotgun"
 
 
 def test_weapon_specialist_recovers_duplicate_ids_with_focused_event_calls(tmp_path):

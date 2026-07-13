@@ -699,7 +699,7 @@ def resolve_event_summaries(payload: dict) -> WeaponAttribution:
         _sanitize_event_damage(event)
 
     labels = {key: "no" for key in _WEAPON_LABELS}
-    attributable = [event for event in events if event["status"] == "attributed"]
+    attributable = dedupe_verified_finishes(events)
     if not attributable:
         labels = {key: "uncertain" for key in _WEAPON_LABELS}
     for event in attributable:
@@ -1540,7 +1540,10 @@ class OpenAICompatibleTeacherClient:
             )
             if ocr_evidence is None:
                 continue
-            if apply_weapon_ocr_to_event(event, ocr_evidence):
+            # Stable pre-finish HUD text is stronger than a VLM weapon-family
+            # guess. This also prevents a lingering finish banner from inheriting
+            # the weapon selected after the actual kill.
+            if apply_weapon_ocr_to_event(event, ocr_evidence, prefer_ocr=True):
                 applied_ocr.append({"event_index": event_index, **ocr_evidence})
             else:
                 rejected_ocr.append(

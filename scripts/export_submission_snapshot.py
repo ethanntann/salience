@@ -39,6 +39,7 @@ def export_snapshot(
         # Evidence may contain OCR-read player names. Labels and confidence are
         # sufficient for the public ranked inbox, so do not export raw evidence.
         teacher_labels["evidence"] = []
+        teacher_labels.pop("label_confidences", None)
         snapshot.append(
             {
                 "filename": f"teacher-ranked-{rank:03d}.mp4",
@@ -100,6 +101,7 @@ def export_snapshot(
         features = json.loads(row["feature_json"] or "{}")
         teacher_labels = json.loads(row["label_json"])
         teacher_labels["evidence"] = []
+        teacher_labels.pop("label_confidences", None)
         raw_events = json.loads(row["event_json"] or "{}")
         # Only the user-facing verified description is needed by the hosted UI.
         # Do not export raw OCR/event evidence from local gameplay.

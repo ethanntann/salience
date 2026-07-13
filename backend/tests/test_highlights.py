@@ -7,6 +7,7 @@ from salience_api.ranking.highlights import (
     attach_event_audit,
     build_event_audit,
     build_highlight_profile,
+    dedupe_verified_finishes,
     event_audit_summary,
     format_highlight_description,
 )
@@ -231,3 +232,93 @@ def test_event_audit_summary_does_not_invent_legacy_descriptions():
     )
     assert available["available"] is True
     assert available["highlight_description"] == "0:14 - Hunting Rifle headshot"
+
+
+def test_dedupe_collapses_conflicting_weapon_windows_from_one_lingering_finish():
+    """One shotgun finish must not become shotgun + SMG + sniper after swaps."""
+    common = {
+        "status": "attributed",
+        "event_kind": "elimination",
+        "target_was_active": True,
+        "target_was_downed": False,
+        "visual_action_supported": True,
+        "finish_onset_supported": True,
+        "visible_defeat_supported": True,
+        "new_damage_visible": True,
+    }
+    events = [
+        {
+            **common,
+            "event_index": 1,
+            "finish_timestamp": 14.44,
+            "resolved_weapon": "shotgun",
+            "selected_weapon_name_text": "STRIKER PUMP SHOTGUN",
+            "single_shot_damage": 190,
+            "damage_hit_count": 1,
+            "target_identity": "unknown",
+            "local_ocr": {
+                "applied": True,
+                "ambiguous": False,
+                "category": "shotgun",
+                "confidence": 0.998,
+            },
+        },
+        {
+            **common,
+            "event_index": 2,
+            "finish_timestamp": 15.40,
+            "resolved_weapon": "automatic",
+            "selected_weapon_name_text": "Stinger SMG",
+            "single_shot_damage": None,
+            "damage_hit_count": 1,
+            "target_identity": "unknown",
+        },
+        {
+            **common,
+            "event_index": 3,
+            "finish_timestamp": 16.37,
+            "resolved_weapon": "sniper_or_hunting",
+            "selected_weapon_name_text": "unknown",
+            "single_shot_damage": 190,
+            "damage_hit_count": 1,
+            "target_identity": "Agraphone-8",
+        },
+    ]
+
+    finishes = dedupe_verified_finishes(events)
+
+    assert len(finishes) == 1
+    assert finishes[0]["event_index"] == 1
+    assert finishes[0]["resolved_weapon"] == "shotgun"
+
+
+def test_dedupe_preserves_rapid_finishes_for_distinct_named_targets():
+    common = {
+        "status": "attributed",
+        "event_kind": "knock",
+        "target_was_active": True,
+        "target_was_downed": False,
+        "visual_action_supported": True,
+        "finish_onset_supported": True,
+        "visible_defeat_supported": True,
+    }
+    events = [
+        {
+            **common,
+            "event_index": 0,
+            "finish_timestamp": 10.0,
+            "resolved_weapon": "sniper_or_hunting",
+            "target_identity": "FirstOpponent",
+        },
+        {
+            **common,
+            "event_index": 1,
+            "finish_timestamp": 10.8,
+            "resolved_weapon": "pistol",
+            "target_identity": "SecondOpponent",
+        },
+    ]
+
+    finishes = dedupe_verified_finishes(events)
+
+    assert [event["event_index"] for event in finishes] == [0, 1]

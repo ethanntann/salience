@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from difflib import SequenceMatcher
+import re
+
+from salience_api.features.weapon_ontology import weapon_category_from_text
 
 HIGHLIGHT_HIERARCHY = (
     "no_scope",
@@ -58,13 +62,21 @@ class HighlightProfile:
 
 
 def dedupe_verified_finishes(events: list[dict]) -> list[dict]:
+    """Collapse overlapping locator windows and keep the best-supported finish.
+
+    A finish banner persists for several seconds. Dense locator proposals can
+    therefore describe one kill repeatedly while the player has already swapped
+    weapons. We cluster those adjacent windows before choosing the event with the
+    strongest action/HUD evidence. Distinct named targets remain separate even
+    when their finishes are close in time.
+    """
     verified = [
         event
         for event in events
         if event.get("status") == "attributed"
         and event.get("event_kind") in {"knock", "elimination", "downed_finish"}
     ]
-    deduplicated: list[dict] = []
+    clusters: list[list[dict]] = []
     for event in sorted(
         verified,
         key=lambda item: (
@@ -75,14 +87,21 @@ def dedupe_verified_finishes(events: list[dict]) -> list[dict]:
             int(item.get("event_index", 0)),
         ),
     ):
-        duplicate = False
-        for prior in deduplicated:
-            if _events_are_duplicates(prior, event):
-                duplicate = True
-                break
-        if not duplicate:
-            deduplicated.append(event)
-    return deduplicated
+        matching = [
+            index
+            for index, cluster in enumerate(clusters)
+            if any(_events_are_duplicates(prior, event) for prior in cluster)
+        ]
+        if not matching:
+            clusters.append([event])
+            continue
+        first = matching[0]
+        clusters[first].append(event)
+        # Preserve single-link chains (for example 14.4, 15.4, 16.4 seconds)
+        # even if the first and last windows are farther apart.
+        for index in reversed(matching[1:]):
+            clusters[first].extend(clusters.pop(index))
+    return [max(cluster, key=_finish_evidence_rank) for cluster in clusters]
 
 
 def _events_are_duplicates(left: dict, right: dict) -> bool:
@@ -96,10 +115,14 @@ def _events_are_duplicates(left: dict, right: dict) -> bool:
         return (
             abs(int(left.get("event_index", 0)) - int(right.get("event_index", 0))) <= 1
         )
-    close_in_time = abs(float(left_ts) - float(right_ts)) <= 1.1
-    if not close_in_time:
+    gap = abs(float(left_ts) - float(right_ts))
+    if _same_named_target(left, right) and gap <= 3.0:
+        return True
+    if gap > 1.1:
         return False
-    if _same_named_target(left, right):
+    left_name = _normalized_target(left)
+    right_name = _normalized_target(right)
+    if left_name in {"", "unknown"} or right_name in {"", "unknown"}:
         return True
     return (
         left.get("resolved_weapon") == right.get("resolved_weapon")
@@ -109,9 +132,47 @@ def _events_are_duplicates(left: dict, right: dict) -> bool:
 
 
 def _same_named_target(left: dict, right: dict) -> bool:
-    left_name = str(left.get("target_identity", "unknown")).lower()
-    right_name = str(right.get("target_identity", "unknown")).lower()
-    return left_name not in {"", "unknown"} and left_name == right_name
+    left_name = _normalized_target(left)
+    right_name = _normalized_target(right)
+    if left_name in {"", "unknown"} or right_name in {"", "unknown"}:
+        return False
+    if left_name == right_name:
+        return True
+    # Kill-feed OCR commonly changes one or two characters between overlapping
+    # windows. Treat those as the same target, but do not merge unrelated names.
+    return SequenceMatcher(None, left_name, right_name).ratio() >= 0.78
+
+
+def _normalized_target(event: dict) -> str:
+    return re.sub(
+        r"[^a-z0-9]+", "", str(event.get("target_identity", "unknown")).lower()
+    )
+
+
+def _finish_evidence_rank(event: dict) -> tuple[float, ...]:
+    """Rank duplicate descriptions by deterministic, inspectable evidence."""
+    local_ocr = event.get("local_ocr")
+    ocr_applied = bool(
+        isinstance(local_ocr, dict)
+        and local_ocr.get("applied")
+        and not local_ocr.get("ambiguous")
+        and local_ocr.get("category") not in {None, "", "unknown"}
+    )
+    timestamp = event.get("finish_timestamp")
+    return (
+        1.0 if ocr_applied else 0.0,
+        1.0
+        if weapon_category_from_text(event.get("selected_weapon_name_text"))
+        != "unknown"
+        else 0.0,
+        1.0 if event.get("single_shot_damage") is not None else 0.0,
+        1.0 if _normalized_target(event) not in {"", "unknown"} else 0.0,
+        1.0 if event.get("visible_defeat_supported") else 0.0,
+        1.0 if event.get("new_damage_visible") else 0.0,
+        float(event.get("teacher_confidence") or 0.0),
+        -float(timestamp) if timestamp is not None else float("-inf"),
+        -float(event.get("event_index") or 0),
+    )
 
 
 def _event_labels(event: dict) -> list[str]:
