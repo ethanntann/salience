@@ -61,6 +61,7 @@ export function ReviewInbox() {
   const [trainingStatus, setTrainingStatus] = useState<TrainingStatus | null>(null);
   const [visibleCount, setVisibleCount] = useState(30);
   const [clipFilter, setClipFilter] = useState<ClipFilter>("teacher");
+  const [sampleResultsRevealed, setSampleResultsRevealed] = useState(false);
   const feedbackQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
@@ -78,16 +79,21 @@ export function ReviewInbox() {
   }, []);
 
   const filteredClips = useMemo(
-    () => clips.filter((clip) => clipMatchesFilter(clip, clipFilter)),
-    [clips, clipFilter]
+    () =>
+      clipFilter === "sample" && !sampleResultsRevealed
+        ? []
+        : clips.filter((clip) => clipMatchesFilter(clip, clipFilter)),
+    [clips, clipFilter, sampleResultsRevealed]
   );
   const filterCounts = useMemo(
     () => ({
       teacher: clips.filter((clip) => clipMatchesFilter(clip, "teacher")).length,
-      sample: clips.filter((clip) => clipMatchesFilter(clip, "sample")).length,
+      sample: sampleResultsRevealed
+        ? clips.filter((clip) => clipMatchesFilter(clip, "sample")).length
+        : 0,
       demo: clips.filter((clip) => clipMatchesFilter(clip, "demo")).length
     }),
-    [clips]
+    [clips, sampleResultsRevealed]
   );
   const reviewedCount = useMemo(
     () => filteredClips.filter((clip) => clip.feedback.some((item) => ["favorite", "keep", "skip", "boring", "delete"].includes(item))).length,
@@ -145,6 +151,7 @@ export function ReviewInbox() {
       const response = await scanFolder(path, false);
       setClips(response.clips);
       if (path.replace(/\\/g, "/").toLowerCase().includes("/sample-clips")) {
+        setSampleResultsRevealed(true);
         setClipFilter("sample");
       } else if (path.replace(/\\/g, "/").toLowerCase().includes("/demo-video")) {
         setClipFilter("demo");

@@ -183,23 +183,20 @@ describe("ReviewInbox feedback ordering", () => {
     fetchClips
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
-        clipInSet(1, "new-clip.mp4", "/app/demo-video/new-clip.mp4", "local")
+        clipInSet(1, "new-clip.mp4", "/app/sample-clips/new-clip.mp4", "local")
       ]);
     fetchTrainingStatus.mockResolvedValueOnce(training(0)).mockResolvedValueOnce(training(0));
     scanFolder.mockResolvedValueOnce({
       indexed: 1,
       total_found: 1,
-      clips: [clipInSet(1, "new-clip.mp4", "/app/demo-video/new-clip.mp4", "local")]
+      clips: [clipInSet(1, "new-clip.mp4", "/app/sample-clips/new-clip.mp4", "local")]
     });
     render(<ReviewInbox />);
     await screen.findByText("Process new clips");
 
-    fireEvent.change(screen.getByLabelText("Clip source"), {
-      target: { value: "/app/demo-video" }
-    });
     fireEvent.click(screen.getByRole("button", { name: "Process clips" }));
 
-    await waitFor(() => expect(scanFolder).toHaveBeenCalledWith("/app/demo-video", false));
+    await waitFor(() => expect(scanFolder).toHaveBeenCalledWith("/app/sample-clips", false));
     expect(startTeacherRun).not.toHaveBeenCalled();
     expect(await screen.findByText("new-clip.mp4")).toBeInTheDocument();
     expect(
@@ -219,9 +216,7 @@ describe("ReviewInbox feedback ordering", () => {
     expect(await screen.findByText("teacher.mp4")).toBeInTheDocument();
     expect(screen.queryByText("sample.mp4")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Sample clips 1/ }));
-    expect(screen.getByText("sample.mp4")).toBeInTheDocument();
-    expect(screen.queryByText("teacher.mp4")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sample clips 0/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Demo clips 1/ }));
     expect(screen.getByText("demo.mp4")).toBeInTheDocument();
