@@ -160,7 +160,10 @@ def teacher_provider_configured(settings: Settings) -> bool:
 def build_teacher_client(settings: Settings) -> OpenAICompatibleTeacherClient:
     provider = settings.vlm_provider.lower()
     if provider == "local":
-        return LocalTeacherClient.from_artifacts(settings.student_artifacts_dir)
+        return LocalTeacherClient.from_artifacts(
+            settings.student_artifacts_dir,
+            accelerator=settings.accelerator,
+        )
     if provider == "amd" or provider == "amd-developer-cloud":
         return AmdDeveloperCloudTeacherClient(settings)
     return FireworksTeacherClient(settings)
@@ -171,6 +174,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Salience API", version="0.1.0")
     teacher_run_lock = Lock()
     local_ocr = RapidHudOcr(enabled=resolved_settings.local_ocr_enabled)
+    teacher_client_cache: OpenAICompatibleTeacherClient | None = None
     teacher_run_state = {
         "running": False,
         "requested": 0,
@@ -208,7 +212,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return teacher_provider_configured(resolved_settings)
 
     def teacher_client() -> OpenAICompatibleTeacherClient:
-        return build_teacher_client(resolved_settings)
+        nonlocal teacher_client_cache
+        if teacher_client_cache is None:
+            # Loading ONNX sessions is expensive. Keep one provider/model client
+            # for the app lifetime instead of rebuilding it for every clip.
+            teacher_client_cache = build_teacher_client(resolved_settings)
+        return teacher_client_cache
 
     def teacher_run_snapshot() -> dict:
         with teacher_run_lock:

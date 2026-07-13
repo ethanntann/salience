@@ -127,14 +127,16 @@ class LocalTeacherClient:
         return cls(models=models, model=model)
 
     @classmethod
-    def from_artifacts(cls, artifacts_dir: Path) -> LocalTeacherClient:
+    def from_artifacts(
+        cls, artifacts_dir: Path, *, accelerator: str = "auto"
+    ) -> LocalTeacherClient:
         root = Path(artifacts_dir)
         model = "local-student"
         meta_path = root / "artifact_meta.json"
         if meta_path.is_file():
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             model = str(meta.get("version", model))
-        models = StudentOnnxModels.from_artifacts(root)
+        models = StudentOnnxModels.from_artifacts(root, accelerator=accelerator)
         return cls(models=models, model=model)
 
     def locate_event_timestamps(self, clip: ClipTeacherInput) -> list[float]:
@@ -228,9 +230,11 @@ class LocalTeacherClient:
             # Victory banners and post-match menus live in the final seconds,
             # so always OCR the last few frames alongside the even samples.
             tail_indices = range(max(0, total - 3), total)
-            sample_indices = sorted(
-                set(select_window_indices(total, sample_count)) | set(tail_indices)
-            )
+            # Victory/menu banners are end-state signals. Check the tail first,
+            # then fall back to evenly spaced frames only when needed.
+            sample_indices = list(dict.fromkeys(
+                [*tail_indices, *select_window_indices(total, sample_count)]
+            ))
             for index in sample_indices:
                 texts = ocr.recognize_full_frame_text(clip.image_paths[index])
                 if not texts:

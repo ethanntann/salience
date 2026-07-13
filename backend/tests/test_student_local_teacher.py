@@ -7,7 +7,7 @@ from salience_api.features.fireworks_teacher import ClipTeacherInput
 from salience_api.student.event_heads import EventHeadPrediction
 from salience_api.student.backbone import CONTEXT_HEADS
 from salience_api.student.local_teacher import LocalTeacherClient
-from salience_api.student.onnx_runtime import StudentOnnxModels
+from salience_api.student.onnx_runtime import StudentOnnxModels, execution_provider_candidates
 from salience_api.student.schema import AIM_STATES, EVENT_KINDS, TARGET_STATES, WEAPON_CLASSES
 
 
@@ -15,6 +15,18 @@ def _one_hot_logits(num_classes: int, index: int, *, batch: int = 1) -> np.ndarr
     logits = np.full((batch, num_classes), -8.0, dtype=np.float32)
     logits[:, index] = 8.0
     return logits
+
+
+def test_execution_provider_selection_keeps_cpu_fallback():
+    assert execution_provider_candidates("cpu", ["DmlExecutionProvider", "CPUExecutionProvider"]) == [
+        "CPUExecutionProvider"
+    ]
+    assert execution_provider_candidates(
+        "auto", ["DmlExecutionProvider", "CPUExecutionProvider"]
+    ) == ["DmlExecutionProvider", "CPUExecutionProvider"]
+    assert execution_provider_candidates("gpu", ["CPUExecutionProvider"]) == [
+        "CPUExecutionProvider"
+    ]
 
 
 class _MockOnnxSession:

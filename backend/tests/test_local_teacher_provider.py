@@ -44,7 +44,9 @@ def test_teacher_client_returns_local_teacher_client(monkeypatch, tmp_path):
     )
     captured: dict[str, Path] = {}
 
-    def fake_from_artifacts(path: Path) -> LocalTeacherClient:
+    def fake_from_artifacts(
+        path: Path, *, accelerator: str = "auto"
+    ) -> LocalTeacherClient:
         captured["artifacts_dir"] = path
         return LocalTeacherClient.from_sessions(
             models=object(),  # type: ignore[arg-type]

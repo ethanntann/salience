@@ -79,9 +79,23 @@ This uses `docker-compose.yml` (tracked in git, safe on any machine):
   so there's something to review immediately.
 - `SALIENCE_VLM_PROVIDER=local` — any clip you scan gets labeled by the local
   ONNX student, not a cloud API. No key needed.
+- `SALIENCE_ACCELERATOR=auto` selects DirectML, OpenVINO, CUDA, or ROCm when
+  an installed ONNX Runtime provider supports it, then falls back to CPU.
+  Set `cpu` to force the portable path.
 - The trained student model (`student-artifacts/`) and 10 unseen sample
   clips (`sample-clips/`) are baked into the image, so the container is
   fully self-contained.
+
+### Optional local GPU acceleration
+
+The shipped Docker image intentionally uses portable CPU ONNX Runtime. On a
+Windows machine with a compatible GPU, install a matching GPU-enabled ONNX
+Runtime build and run the backend locally with `SALIENCE_ACCELERATOR=auto`.
+The app keeps a CPU fallback when the provider or driver is unavailable. GPU
+provider selection keeps FP32 weights, so it should not change model accuracy;
+validate any FP16 or INT8 conversion separately against the frozen evaluation.
+See [ONNX Runtime execution providers](https://onnxruntime.ai/docs/execution-providers/)
+for provider installation details.
 
 ## Trying the local student model on new clips
 

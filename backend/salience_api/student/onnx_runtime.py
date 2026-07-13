@@ -167,6 +167,33 @@ DEFAULT_EVIDENCE_THRESHOLD = 0.6
 DEFAULT_SINGLE_SHOT_DAMAGE_CUTOFF = 100.0
 
 
+def execution_provider_candidates(
+    accelerator: str = "auto", available: list[str] | None = None
+) -> list[str]:
+    """Choose an optional hardware EP while always retaining CPU fallback."""
+    available_set = set(available or [])
+    if available is None:
+        try:
+            import onnxruntime as ort
+
+            available_set = set(ort.get_available_providers())
+        except Exception:
+            available_set = {"CPUExecutionProvider"}
+    cpu = "CPUExecutionProvider"
+    if str(accelerator).lower() in {"cpu", "off", "disabled"}:
+        return [cpu]
+    preferred = [
+        "DmlExecutionProvider",
+        "OpenVINOExecutionProvider",
+        "CUDAExecutionProvider",
+        "ROCMExecutionProvider",
+    ]
+    selected = next((name for name in preferred if name in available_set), None)
+    if selected is None:
+        return [cpu]
+    return [selected, cpu]
+
+
 def _resolve_threshold(thresholds: dict[str, float], field: str, default: float) -> float:
     return float(thresholds.get(field, default))
 
@@ -326,6 +353,7 @@ class StudentOnnxModels:
         locator_session: _OnnxSession,
         event_heads_session: _OnnxSession,
         thresholds: dict[str, float] | None = None,
+        execution_provider: str = "CPUExecutionProvider",
     ) -> None:
         self._locator_session = locator_session
         self._event_heads_session = event_heads_session
@@ -333,6 +361,7 @@ class StudentOnnxModels:
         self._event_inputs = _session_input_names(event_heads_session)
         self._event_input = self._event_inputs[0]
         self._thresholds = dict(thresholds or {})
+        self.execution_provider = execution_provider
 
     @classmethod
     def from_sessions(
@@ -341,15 +370,19 @@ class StudentOnnxModels:
         locator_session: _OnnxSession,
         event_heads_session: _OnnxSession,
         thresholds: dict[str, float] | None = None,
+        execution_provider: str = "CPUExecutionProvider",
     ) -> StudentOnnxModels:
         return cls(
             locator_session=locator_session,
             event_heads_session=event_heads_session,
             thresholds=thresholds,
+            execution_provider=execution_provider,
         )
 
     @classmethod
-    def from_artifacts(cls, artifacts_dir: Path) -> StudentOnnxModels:
+    def from_artifacts(
+        cls, artifacts_dir: Path, *, accelerator: str = "auto"
+    ) -> StudentOnnxModels:
         import json
         import onnxruntime as ort
 
@@ -369,10 +402,32 @@ class StudentOnnxModels:
                     f"expected one of {sorted(SUPPORTED_ARTIFACT_VERSIONS)!r}"
                 )
 
+        providers = execution_provider_candidates(accelerator)
+        try:
+            locator_session = ort.InferenceSession(str(locator_path), providers=providers)
+            event_heads_session = ort.InferenceSession(
+                str(event_heads_path), providers=providers
+            )
+        except Exception:
+            # A driver/provider can be present but fail to initialize. Preserve
+            # the local-first contract by retrying both sessions on CPU.
+            locator_session = ort.InferenceSession(
+                str(locator_path), providers=["CPUExecutionProvider"]
+            )
+            event_heads_session = ort.InferenceSession(
+                str(event_heads_path), providers=["CPUExecutionProvider"]
+            )
+            providers = ["CPUExecutionProvider"]
+        active = getattr(locator_session, "get_providers", lambda: providers)()
+        provider = next(
+            (name for name in active if name != "CPUExecutionProvider"),
+            "CPUExecutionProvider",
+        )
         return cls(
-            locator_session=ort.InferenceSession(str(locator_path)),
-            event_heads_session=ort.InferenceSession(str(event_heads_path)),
+            locator_session=locator_session,
+            event_heads_session=event_heads_session,
             thresholds=_load_thresholds(root),
+            execution_provider=provider,
         )
 
     def score_frames(self, images_nchw: list[np.ndarray]) -> list[float]:

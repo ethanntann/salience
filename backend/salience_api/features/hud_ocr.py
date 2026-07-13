@@ -81,15 +81,22 @@ class RapidHudOcr:
                 else:
                     selected = eligible[-2:]
             for frame in selected:
-                observations.extend(
-                    self._recognize_weapon_panel(
-                        engine,
-                        frame.ocr_path or frame.path,
-                        event_index=event_index,
-                        timestamp=frame.timestamp_sec,
-                        dedicated_crop=frame.ocr_path is not None,
-                    )
+                frame_observations = self._recognize_weapon_panel(
+                    engine,
+                    frame.ocr_path or frame.path,
+                    event_index=event_index,
+                    timestamp=frame.timestamp_sec,
+                    dedicated_crop=frame.ocr_path is not None,
                 )
+                observations.extend(frame_observations)
+                # Most HUDs are stable across neighboring frames. Only pay for
+                # the fallback frame when the first pass found no usable weapon.
+                if any(
+                    item.get("weapon_category") != "unknown"
+                    and float(item.get("confidence", 0.0)) >= 0.5
+                    for item in frame_observations
+                ):
+                    break
         return observations
 
     def recognize_full_frame_text(self, path: Path) -> list[str]:
