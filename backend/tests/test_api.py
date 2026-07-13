@@ -35,12 +35,16 @@ def test_clips_endpoint_returns_seeded_demo_clips(tmp_path):
 
     assert response.status_code == 200
     clips = response.json()
-    assert len(clips) == 553
+    assert len(clips) == 563
     assert clips[0]["source"] == "supervised"
     assert clips[0]["path"].startswith("snapshot://")
     assert clips[0]["video_url"] is None
     assert clips[0]["teacher_provider"] != "local"
     assert clips[0]["teacher_labels"]
+    samples = [clip for clip in clips if "/sample-clips/" in clip["path"]]
+    assert len(samples) == 10
+    assert all(clip["teacher_provider"] == "local" for clip in samples)
+    assert all(clip["highlight_description"] for clip in samples)
 
 
 def test_feedback_rejects_unknown_clip(tmp_path):

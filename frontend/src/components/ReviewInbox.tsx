@@ -150,6 +150,18 @@ export function ReviewInbox() {
         setClipFilter("demo");
       }
       setVisibleCount(30);
+      const normalizedSource = path.replace(/\\/g, "/").toLowerCase();
+      const precomputed = response.clips.filter(
+        (clip) =>
+          normalizedPath(clip).includes(normalizedSource) && clip.teacher_provider === "local"
+      );
+      if (response.total_found > 0 && precomputed.length >= response.total_found) {
+        await refreshTrainingStatus();
+        setMessage(
+          `Loaded ${precomputed.length} preprocessed local-student result(s); no cloud inference needed.`
+        );
+        return;
+      }
       setMessage(`Indexed ${response.indexed} clip(s). Local student inference is running...`);
       let run = await startTeacherRun(response.total_found, false);
       while (run.running) {

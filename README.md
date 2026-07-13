@@ -92,6 +92,17 @@ pick "Sample clips (judges)" from the dropdown, and click **Process clips**.
 The ranked inbox updates with labels and scores produced entirely by the
 local student model — no API key, no cloud call.
 
+The public Render demo loads precomputed outputs for these exact ten files so
+judges do not have to run video inference on Render's 0.1-CPU free instance.
+The results were generated locally with the bundled ONNX student and RapidOCR;
+their videos, labels, scores, and verified descriptions are included in the
+container. Reproduce the preprocessing with:
+
+```bash
+python scripts/precompute_sample_clips.py \
+  sample-clips .local-data/submission-samples.db student-artifacts
+```
+
 The same panel can target `demo-video/`, a local-only folder used for rehearsal
 footage. Its MP4 files are intentionally excluded from git; add your own files
 there before building if you want to use that option.

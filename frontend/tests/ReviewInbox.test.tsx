@@ -179,7 +179,7 @@ describe("ReviewInbox feedback ordering", () => {
     expect(screen.getByText("1 keep signals")).toBeInTheDocument();
   });
 
-  it("processes the selected clip source through the local student model", async () => {
+  it("loads precomputed local-student samples without starting hosted inference", async () => {
     fetchClips
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
@@ -187,20 +187,10 @@ describe("ReviewInbox feedback ordering", () => {
       ]);
     fetchTrainingStatus.mockResolvedValueOnce(training(0)).mockResolvedValueOnce(training(0));
     scanFolder.mockResolvedValueOnce({
-      indexed: 10,
-      total_found: 10,
+      indexed: 1,
+      total_found: 1,
       clips: [clipInSet(1, "new-clip.mp4", "/app/demo-video/new-clip.mp4", "local")]
     });
-    startTeacherRun.mockResolvedValueOnce({
-      running: false,
-      requested: 10,
-      enriched: 10,
-      failed: 0,
-      last_error: null,
-      started_at: "now",
-      finished_at: "now"
-    });
-
     render(<ReviewInbox />);
     await screen.findByText("Process new clips");
 
@@ -210,9 +200,11 @@ describe("ReviewInbox feedback ordering", () => {
     fireEvent.click(screen.getByRole("button", { name: "Process clips" }));
 
     await waitFor(() => expect(scanFolder).toHaveBeenCalledWith("/app/demo-video", false));
-    expect(startTeacherRun).toHaveBeenCalledWith(10, false);
+    expect(startTeacherRun).not.toHaveBeenCalled();
     expect(await screen.findByText("new-clip.mp4")).toBeInTheDocument();
-    expect(screen.getByText("Processed 10 of 10 clip(s).")).toBeInTheDocument();
+    expect(
+      screen.getByText("Loaded 1 preprocessed local-student result(s); no cloud inference needed.")
+    ).toBeInTheDocument();
   });
 
   it("filters the inbox between teacher, sample, and demo clip sets", async () => {

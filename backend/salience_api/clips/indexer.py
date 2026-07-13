@@ -588,6 +588,16 @@ def index_demo_clip(conn: sqlite3.Connection, seed: dict) -> int:
             labels=normalize_teacher_payload(teacher_seed),
             model=str(seed.get("teacher_model", "demo-precomputed")),
         )
+    event_seed = seed.get("teacher_events")
+    if isinstance(event_seed, dict):
+        record_teacher_events(
+            conn,
+            clip_id=clip_id,
+            provider=str(seed.get("teacher_provider", "seeded-fireworks-teacher")),
+            model=str(seed.get("teacher_model", "demo-precomputed")),
+            status=str(seed.get("teacher_event_status", "precomputed")),
+            event_data=event_seed,
+        )
     _upsert_score(conn, clip_id, features, personal_score=None)
     if seed.get("final_score") is not None:
         conn.execute(
@@ -766,6 +776,8 @@ def rescore_all_clips(conn: sqlite3.Connection) -> None:
         (int(row["clip_id"]), _features_from_row(row))
         for row in rows
         if not str(row["path"]).startswith("snapshot://")
+        and json.loads(row["feature_json"] or "{}").get("source")
+        != "precomputed_local_student"
     ]
     predictions = ranker.predict(
         [_feature_row(features) for _, features in features_by_id]
