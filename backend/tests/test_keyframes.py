@@ -2,6 +2,7 @@ from pathlib import Path
 
 from salience_api.clips.keyframes import (
     Keyframe,
+    _parallel_map,
     cleanup_keyframes,
     event_window_timestamps,
     keyframe_timestamps,
@@ -43,6 +44,12 @@ def test_long_montage_uses_more_context_and_event_capacity():
     assert len(keyframe_timestamps(120.0)) == 60
     assert max_event_candidates(20.0) == 4
     assert max_event_candidates(120.0) == 12
+
+
+def test_parallel_map_preserves_frame_order(monkeypatch):
+    monkeypatch.setenv("SALIENCE_FFMPEG_WORKERS", "2")
+
+    assert _parallel_map([3, 1, 2], lambda value: value * 2) == [6, 2, 4]
 
 
 def test_cleanup_keyframes_removes_temporary_parent(tmp_path: Path):

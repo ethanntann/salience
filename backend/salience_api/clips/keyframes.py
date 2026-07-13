@@ -1,8 +1,16 @@
 from dataclasses import dataclass
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+from typing import TypeVar
+
+
+_T = TypeVar("_T")
+_U = TypeVar("_U")
 
 
 @dataclass(frozen=True)
@@ -13,6 +21,30 @@ class Keyframe:
     event_index: int | None = None
     event_center_sec: float | None = None
     ocr_path: Path | None = None
+
+
+def _ffmpeg_worker_count() -> int:
+    """Return a bounded extraction pool size with a sequential override."""
+    configured = os.getenv("SALIENCE_FFMPEG_WORKERS")
+    if configured:
+        try:
+            return max(1, min(8, int(configured)))
+        except ValueError:
+            pass
+    cpu_count = getattr(os, "process_cpu_count", os.cpu_count)() or 1
+    return max(1, min(4, cpu_count))
+
+
+def _parallel_map(items: list[_T], worker: Callable[[_T], _U]) -> list[_U]:
+    """Run independent FFmpeg jobs concurrently while preserving input order."""
+    workers = _ffmpeg_worker_count()
+    if workers <= 1 or len(items) <= 1:
+        return [worker(item) for item in items]
+    with ThreadPoolExecutor(
+        max_workers=min(workers, len(items)),
+        thread_name_prefix="salience-ffmpeg",
+    ) as executor:
+        return list(executor.map(worker, items))
 
 
 def keyframe_timestamps(
@@ -99,14 +131,26 @@ def extract_timeline_keyframes(
         return []
     output_dir = Path(tempfile.mkdtemp(prefix="salience-timeline-"))
     frames: list[Keyframe] = []
-    for index, timestamp in enumerate(keyframe_timestamps(duration_sec, count=count)):
-        output = output_dir / f"timeline-{index}.jpg"
-        if _extract_frame(
+    specs = [
+        (index, timestamp, output_dir / f"timeline-{index}.jpg")
+        for index, timestamp in enumerate(
+            keyframe_timestamps(duration_sec, count=count)
+        )
+    ]
+
+    def extract(spec: tuple[int, float, Path]) -> bool:
+        _, timestamp, output = spec
+        return _extract_frame(
             path,
             timestamp,
             output,
             "scale=w=960:h=-2:force_original_aspect_ratio=decrease",
-        ):
+        )
+
+    for (index, timestamp, output), extracted in zip(
+        specs, _parallel_map(specs, extract)
+    ):
+        if extracted:
             frames.append(
                 Keyframe(
                     path=output,
@@ -140,21 +184,44 @@ def extract_event_keyframes(
         "pad=400:432:(ow-iw)/2:(oh-ih)[hudout];"
         "[fullout][actionout][hudout]hstack=inputs=3"
     )
+    specs: list[tuple[int, int, float, Path, Path]] = []
     for frame_index, (event_index, timestamp) in enumerate(
         event_window_timestamps(duration_sec, event_timestamps)
     ):
-        output = output_dir / f"event-{event_index}-{frame_index}.jpg"
-        ocr_output = output_dir / f"event-ocr-{event_index}-{frame_index}.jpg"
-        if _extract_frame(path, timestamp, output, filter_graph):
-            has_ocr_crop = _extract_frame(
-                path,
+        specs.append(
+            (
+                frame_index,
+                event_index,
                 timestamp,
-                ocr_output,
-                (
-                    "crop=w=iw*0.48:h=ih*0.26:x=iw*0.32:y=ih*0.70,"
-                    "scale=1440:-2:flags=lanczos,unsharp=5:5:0.8:3:3:0.4"
-                ),
+                output_dir / f"event-{event_index}-{frame_index}.jpg",
+                output_dir / f"event-ocr-{event_index}-{frame_index}.jpg",
             )
+        )
+
+    def extract(
+        spec: tuple[int, int, float, Path, Path]
+    ) -> tuple[bool, bool]:
+        _, _, timestamp, output, ocr_output = spec
+        full_ok = _extract_frame(path, timestamp, output, filter_graph)
+        has_ocr_crop = _extract_frame(
+            path,
+            timestamp,
+            ocr_output,
+            (
+                "crop=w=iw*0.48:h=ih*0.26:x=iw*0.32:y=ih*0.70,"
+                "scale=1440:-2:flags=lanczos,unsharp=5:5:0.8:3:3:0.4"
+            ),
+        )
+        return full_ok, has_ocr_crop
+
+    for (
+        frame_index,
+        event_index,
+        timestamp,
+        output,
+        ocr_output,
+    ), (full_ok, has_ocr_crop) in zip(specs, _parallel_map(specs, extract)):
+        if full_ok:
             frames.append(
                 Keyframe(
                     path=output,

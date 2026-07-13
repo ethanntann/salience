@@ -82,6 +82,9 @@ This uses `docker-compose.yml` (tracked in git, safe on any machine):
 - `SALIENCE_ACCELERATOR=auto` selects DirectML, OpenVINO, CUDA, or ROCm when
   an installed ONNX Runtime provider supports it, then falls back to CPU.
   Set `cpu` to force the portable path.
+- `SALIENCE_FFMPEG_WORKERS` controls bounded parallel frame extraction. It
+  defaults to at most four workers and can be set to `1` for sequential work
+  on very small machines.
 - The trained student model (`student-artifacts/`) and 10 unseen sample
   clips (`sample-clips/`) are baked into the image, so the container is
   fully self-contained.
