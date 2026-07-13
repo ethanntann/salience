@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from fractions import Fraction
+from functools import lru_cache
+import math
 import os
 from pathlib import Path
 import shutil
@@ -11,6 +14,11 @@ from typing import TypeVar
 
 _T = TypeVar("_T")
 _U = TypeVar("_U")
+_BATCH_DECODE_MAX_DURATION_SEC = 60.0
+_OCR_FILTER = (
+    "crop=w=iw*0.48:h=ih*0.26:x=iw*0.32:y=ih*0.70,"
+    "scale=1440:-2:flags=lanczos,unsharp=5:5:0.8:3:3:0.4"
+)
 
 
 @dataclass(frozen=True)
@@ -45,6 +53,92 @@ def _parallel_map(items: list[_T], worker: Callable[[_T], _U]) -> list[_U]:
         thread_name_prefix="salience-ffmpeg",
     ) as executor:
         return list(executor.map(worker, items))
+
+
+@lru_cache(maxsize=64)
+def _probe_constant_fps(path: str) -> float | None:
+    """Return a nominal CFR rate, or None when frame-index mapping is unsafe."""
+    try:
+        completed = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=r_frame_rate,avg_frame_rate",
+                "-of",
+                "csv=p=0",
+                path,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        rates = [
+            float(Fraction(value.strip()))
+            for value in completed.stdout.strip().split(",")
+            if value.strip() and value.strip() != "0/0"
+        ]
+    except (OSError, ValueError, ZeroDivisionError):
+        return None
+    if completed.returncode != 0 or not rates or rates[0] <= 0:
+        return None
+    nominal = rates[0]
+    average = rates[1] if len(rates) > 1 else nominal
+    if abs(nominal - average) > max(0.5, nominal * 0.01):
+        return None
+    return nominal
+
+
+def _extract_many(
+    path: Path,
+    timestamps: list[float],
+    outputs: list[Path],
+    filter_graph: str,
+    fps: float | None,
+) -> bool:
+    """Decode selected CFR frames in one pass, preserving current filters."""
+    if not timestamps or fps is None or len(timestamps) != len(outputs):
+        return False
+    indices = [
+        max(0, math.ceil(timestamp * fps - 1e-9)) for timestamp in timestamps
+    ]
+    unique_indices = sorted(set(indices))
+    select_expression = "+".join(f"eq(n\\,{index})" for index in unique_indices)
+    output_dir = Path(tempfile.mkdtemp(prefix="salience-batch-"))
+    try:
+        completed = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(path),
+                "-vf",
+                f"select='{select_expression}',{filter_graph}",
+                "-vsync",
+                "0",
+                "-an",
+                "-q:v",
+                "3",
+                str(output_dir / "frame-%06d.jpg"),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if completed.returncode != 0:
+            return False
+        extracted = sorted(output_dir.glob("frame-*.jpg"))
+        if len(extracted) != len(unique_indices):
+            return False
+        by_index = dict(zip(unique_indices, extracted, strict=True))
+        for index, output in zip(indices, outputs, strict=True):
+            shutil.copyfile(by_index[index], output)
+        return True
+    except (OSError, shutil.Error):
+        return False
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
 
 
 def keyframe_timestamps(
@@ -147,8 +241,27 @@ def extract_timeline_keyframes(
             "scale=w=960:h=-2:force_original_aspect_ratio=decrease",
         )
 
+    timestamps = [timestamp for _, timestamp, _ in specs]
+    outputs = [output for _, _, output in specs]
+    fps = (
+        _probe_constant_fps(str(path))
+        if duration_sec is not None
+        and duration_sec <= _BATCH_DECODE_MAX_DURATION_SEC
+        else None
+    )
+    batched = _extract_many(
+        path,
+        timestamps,
+        outputs,
+        "scale=w=960:h=-2:force_original_aspect_ratio=decrease",
+        fps,
+    )
+    extracted_results = (
+        [True] * len(specs) if batched else _parallel_map(specs, extract)
+    )
+
     for (index, timestamp, output), extracted in zip(
-        specs, _parallel_map(specs, extract)
+        specs, extracted_results, strict=True
     ):
         if extracted:
             frames.append(
@@ -198,21 +311,37 @@ def extract_event_keyframes(
             )
         )
 
-    def extract(
-        spec: tuple[int, int, float, Path, Path]
-    ) -> tuple[bool, bool]:
-        _, _, timestamp, output, ocr_output = spec
-        full_ok = _extract_frame(path, timestamp, output, filter_graph)
-        has_ocr_crop = _extract_frame(
-            path,
-            timestamp,
-            ocr_output,
-            (
-                "crop=w=iw*0.48:h=ih*0.26:x=iw*0.32:y=ih*0.70,"
-                "scale=1440:-2:flags=lanczos,unsharp=5:5:0.8:3:3:0.4"
-            ),
-        )
-        return full_ok, has_ocr_crop
+    def extract_full(spec: tuple[int, int, float, Path, Path]) -> bool:
+        _, _, timestamp, output, _ = spec
+        return _extract_frame(path, timestamp, output, filter_graph)
+
+    def extract_ocr(spec: tuple[int, int, float, Path, Path]) -> bool:
+        _, _, timestamp, _, ocr_output = spec
+        return _extract_frame(path, timestamp, ocr_output, _OCR_FILTER)
+
+    timestamps = [timestamp for _, _, timestamp, _, _ in specs]
+    full_outputs = [output for _, _, _, output, _ in specs]
+    ocr_outputs = [ocr_output for _, _, _, _, ocr_output in specs]
+    fps = (
+        _probe_constant_fps(str(path))
+        if duration_sec is not None
+        and duration_sec <= _BATCH_DECODE_MAX_DURATION_SEC
+        else None
+    )
+    full_batched = _extract_many(
+        path, timestamps, full_outputs, filter_graph, fps
+    )
+    ocr_batched = _extract_many(path, timestamps, ocr_outputs, _OCR_FILTER, fps)
+    full_results = (
+        [True] * len(specs)
+        if full_batched
+        else _parallel_map(specs, extract_full)
+    )
+    ocr_results = (
+        [True] * len(specs)
+        if ocr_batched
+        else _parallel_map(specs, extract_ocr)
+    )
 
     for (
         frame_index,
@@ -220,7 +349,9 @@ def extract_event_keyframes(
         timestamp,
         output,
         ocr_output,
-    ), (full_ok, has_ocr_crop) in zip(specs, _parallel_map(specs, extract)):
+    ), full_ok, has_ocr_crop in zip(
+        specs, full_results, ocr_results, strict=True
+    ):
         if full_ok:
             frames.append(
                 Keyframe(

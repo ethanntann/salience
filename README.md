@@ -85,6 +85,9 @@ This uses `docker-compose.yml` (tracked in git, safe on any machine):
 - `SALIENCE_FFMPEG_WORKERS` controls bounded parallel frame extraction. It
   defaults to at most four workers and can be set to `1` for sequential work
   on very small machines.
+- Constant-frame-rate clips up to 60 seconds use deterministic batched frame
+  extraction; longer or variable-rate clips automatically use the compatibility
+  fallback.
 - The trained student model (`student-artifacts/`) and 10 unseen sample
   clips (`sample-clips/`) are baked into the image, so the container is
   fully self-contained.
