@@ -1,0 +1,16 @@
+name: v2
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: python -m pip install -e '.[dev]'
+      # Linux is the reason pipeline_v2 must not import capture.windows at
+      # module scope; test_portability guards that and runs here.
+      - run: python -m ruff check pipeline_v2 salience_media
+      - run: python -m pytest

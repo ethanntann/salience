@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "salience"
+version = "0.2.0"
+description = "VLM-first gameplay review and personalized fight ranking"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "pydantic>=2.8", "scikit-learn>=1.5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2", "ruff>=0.11"]
+semantic = ["sentence-transformers>=3"]
+# Windows Graphics Capture, the backend that replaces Desktop Duplication.
+# A prebuilt wheel, so it bundles into a shipped executable and the end
+# user installs nothing.
+capture = ["soundcard>=0.4", "windows-capture>=2.0"]
+# Drives OBS's replay buffer over obs-websocket. `capture/obs_client.py`
+# needed this and nothing declared it.
+obs = ["obsws-python>=1.6"]
+audio = ["soundfile>=0.12", "faster-whisper>=1"]
+
+[project.scripts]
+salience = "pipeline_v2.cli:main"
+
+[tool.setuptools]
+package-dir = {salience_api = "backend/salience_api"}
+
+[tool.setuptools.packages.find]
+where = [".", "backend"]
+include = ["pipeline_v2*", "salience_media*", "salience_api*"]
+exclude = ["pipeline_v2.tests*", "salience_media.tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["pipeline_v2/tests", "salience_media/tests"]
+pythonpath = [".", "backend"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
