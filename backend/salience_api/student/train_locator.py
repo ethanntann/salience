@@ -130,7 +130,6 @@ def build_locator_dataset(
 
 
 def _load_image_tensor(path: Path):
-    import torch
     from PIL import Image
     from torchvision import transforms
 

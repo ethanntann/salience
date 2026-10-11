@@ -38,6 +38,9 @@ coverage/
 .npm-cache/
 .docker-config/
 .local-data/
+pipeline_v2/.data/
+tmp/
+build/
 salience.db
 *.db-journal
 *.log

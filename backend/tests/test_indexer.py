@@ -11,6 +11,7 @@ from salience_api.clips.indexer import (
     record_teacher_events,
     record_teacher_labels,
     rescore_all_clips,
+    rescore_clips_preserving_personalization,
     training_status,
 )
 from salience_api.db import init_db
@@ -88,6 +89,24 @@ def test_rescore_preserves_frozen_submission_snapshot_score():
     assert ranked[0]["final_score"] == 0.8929
     assert ranked[0]["base_score"] == 0.5717
     assert ranked[0]["video_url"] is None
+
+
+def test_targeted_rescore_preserves_existing_personalization():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_db(conn)
+    clip_id = index_demo_clip(conn, demo_seed("personalized.mp4"))
+    conn.execute(
+        "update clip_scores set personal_score = 0.91 where clip_id = ?",
+        (clip_id,),
+    )
+
+    rescore_clips_preserving_personalization(conn, [clip_id])
+
+    score = conn.execute(
+        "select personal_score from clip_scores where clip_id = ?", (clip_id,)
+    ).fetchone()
+    assert score["personal_score"] == 0.91
 
 
 def test_feedback_changes_ranked_scores():

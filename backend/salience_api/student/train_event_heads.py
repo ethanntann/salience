@@ -221,19 +221,19 @@ def context_sample_weights(samples: list[ContextSample]) -> list[float]:
 
     ``_context_value`` maps "yes" to index 0, so a masked target of 0 is a positive.
     """
-    positive_counts = {field: 0 for field in CONTEXT_HEADS}
+    positive_counts = {head: 0 for head in CONTEXT_HEADS}
     for sample in samples:
-        for field in CONTEXT_HEADS:
-            if sample.masks[field] and sample.targets[field] == 0:
-                positive_counts[field] += 1
+        for head in CONTEXT_HEADS:
+            if sample.masks[head] and sample.targets[head] == 0:
+                positive_counts[head] += 1
 
     total = len(samples)
     weights: list[float] = []
     for sample in samples:
         weight = 1.0
-        for field in CONTEXT_HEADS:
-            if sample.masks[field] and sample.targets[field] == 0:
-                count = positive_counts[field]
+        for head in CONTEXT_HEADS:
+            if sample.masks[head] and sample.targets[head] == 0:
+                count = positive_counts[head]
                 if count:
                     weight = max(weight, total / count)
         weights.append(weight)
@@ -674,13 +674,13 @@ def train_event_heads(
                     single_damage_mask,
                     confidence_weights["single_shot_damage"].to(device),
                 )
-            for field in EVIDENCE_HEADS:
+            for head in EVIDENCE_HEADS:
                 loss = loss + _masked_ce(
-                    outputs[f"{field}_logits"],
-                    targets[field].to(device),
-                    masks[field].to(device),
-                    weight=weights[field],
-                    sample_weights=confidence_weights[field].to(device),
+                    outputs[f"{head}_logits"],
+                    targets[head].to(device),
+                    masks[head].to(device),
+                    weight=weights[head],
+                    sample_weights=confidence_weights[head].to(device),
                 )
             loss.backward()
             optimizer.step()

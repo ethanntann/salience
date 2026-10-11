@@ -54,9 +54,16 @@ def weapon_category_from_text(value: object) -> str:
     text = " ".join(text.split())
     if not text or text == "unknown":
         return "unknown"
+    # OCR of stylised HUD fonts routinely loses the space inside a two-word
+    # weapon name ("HUNTING RIFLE" -> "HUNTINGRIFLE"), and an exact substring
+    # match drops those reads on the floor as "unknown". Whether the space
+    # survives depends on crop width and batching, so compare a despaced form
+    # too rather than depending on the recogniser to be consistent.
+    squeezed = text.replace(" ", "")
     for category, terms in WEAPON_TERMS:
-        if any(term in text for term in terms):
-            return category
+        for term in terms:
+            if term in text or term.replace(" ", "") in squeezed:
+                return category
     return "unknown"
 
 

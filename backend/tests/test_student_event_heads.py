@@ -1,52 +1,5 @@
 from salience_api.features.fireworks_teacher import resolve_event_summaries
-from salience_api.student.event_heads import (
-    EventHeadPrediction,
-    collapse_same_kill_finishes,
-    event_summary_from_heads,
-)
-
-
-def _finish(index: int, timestamp: float, *, confidence: float = 0.5, kind: str = "elimination"):
-    return {
-        "event_index": index,
-        "event_timestamp": timestamp,
-        "event_kind": kind,
-        "weapon_confidence": confidence,
-    }
-
-
-def test_collapse_merges_banner_tail_chain_into_one_finish():
-    # One kill at 10s whose lingering banner produces finishes at 11.5s and 13s;
-    # chained gaps < 3s collapse to the single most confident summary.
-    summaries = [
-        _finish(0, 10.0, confidence=0.9),
-        _finish(1, 11.5, confidence=0.6),
-        _finish(2, 13.0, confidence=0.7),
-    ]
-    collapsed = collapse_same_kill_finishes(summaries)
-    assert len(collapsed) == 1
-    assert collapsed[0]["event_timestamp"] == 10.0
-
-
-def test_collapse_keeps_distinct_kills_separated_by_quiet_gap():
-    summaries = [
-        _finish(0, 10.0, confidence=0.9),
-        _finish(1, 11.0, confidence=0.5),
-        _finish(2, 20.0, confidence=0.8),
-    ]
-    collapsed = collapse_same_kill_finishes(summaries)
-    assert [s["event_timestamp"] for s in collapsed] == [10.0, 20.0]
-
-
-def test_collapse_passes_non_finish_summaries_through():
-    summaries = [
-        _finish(0, 10.0),
-        _finish(1, 11.0, kind="damage_only"),
-        _finish(2, 12.0, kind="none"),
-    ]
-    collapsed = collapse_same_kill_finishes(summaries)
-    kinds = sorted(s["event_kind"] for s in collapsed)
-    assert kinds == ["damage_only", "elimination", "none"]
+from salience_api.student.event_heads import EventHeadPrediction, event_summary_from_heads
 
 
 def test_event_summary_requires_visible_damage_for_damage_claim():

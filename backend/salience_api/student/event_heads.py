@@ -5,10 +5,6 @@ from dataclasses import dataclass
 from salience_api.student.schema import AIM_STATES, EVENT_KINDS, TARGET_STATES, WEAPON_CLASSES
 
 _EVIDENCE_STATES = ("yes", "no", "unknown")
-_FINISH_KINDS = {"knock", "elimination", "downed_finish"}
-# Kill banner/feed UI keeps the event heads firing for ~3s after a finish, so
-# finish summaries chained closer than this are the same kill.
-SAME_KILL_COLLAPSE_GAP_SEC = 3.0
 
 
 def _normalize_evidence(value: str) -> str:
@@ -108,45 +104,3 @@ def event_summary_from_heads(
             and pred.damage_display_is_cumulative != "yes"
         ),
     }
-
-
-def collapse_same_kill_finishes(
-    summaries: list[dict],
-    *,
-    gap_sec: float = SAME_KILL_COLLAPSE_GAP_SEC,
-) -> list[dict]:
-    """Merge finish summaries that chain within ``gap_sec`` into one finish.
-
-    Dense locator proposals give the event heads several windows around each
-    kill (good for recall), but each window that reads the lingering banner
-    becomes another "finish" and fakes multi_kill. Single-linkage chaining on
-    the event timestamp merges those; a real second kill needs a quiet gap of
-    at least ``gap_sec`` before it.  Non-finish summaries pass through.
-    """
-    finishes = sorted(
-        (s for s in summaries if s.get("event_kind") in _FINISH_KINDS),
-        key=lambda s: float(s.get("event_timestamp", 0.0)),
-    )
-    others = [s for s in summaries if s.get("event_kind") not in _FINISH_KINDS]
-
-    collapsed: list[dict] = []
-    chain: list[dict] = []
-    for summary in finishes:
-        if chain and (
-            float(summary.get("event_timestamp", 0.0))
-            - float(chain[-1].get("event_timestamp", 0.0))
-            > gap_sec
-        ):
-            collapsed.append(
-                max(chain, key=lambda s: float(s.get("weapon_confidence", 0.0)))
-            )
-            chain = []
-        chain.append(summary)
-    if chain:
-        collapsed.append(
-            max(chain, key=lambda s: float(s.get("weapon_confidence", 0.0)))
-        )
-    return sorted(
-        collapsed + others,
-        key=lambda s: (int(s.get("event_index", 0)), float(s.get("event_timestamp", 0.0))),
-    )

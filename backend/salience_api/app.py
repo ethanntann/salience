@@ -36,7 +36,7 @@ from salience_api.clips.keyframes import (
     extract_event_keyframes,
     extract_timeline_keyframes,
 )
-from salience_api.student.backbone import ARTIFACT_VERSION, SUPPORTED_ARTIFACT_VERSIONS
+from salience_api.student.backbone import SUPPORTED_ARTIFACT_VERSIONS
 from salience_api.clips.scanner import find_clip_files
 from salience_api.config import Settings, get_settings
 from salience_api.db import connect, init_db

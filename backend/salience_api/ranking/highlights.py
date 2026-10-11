@@ -61,6 +61,31 @@ class HighlightProfile:
     multi_kill: bool = False
 
 
+@dataclass(frozen=True)
+class TeacherDecision:
+    """Canonical event decision consumed by labels, ranking, audit, and repair."""
+
+    profile: HighlightProfile
+    verified_finishes: tuple[dict, ...]
+    active_finishes: tuple[dict, ...]
+    downed_finishes: tuple[dict, ...]
+    primary_source: dict | None
+    primary_labels: frozenset[str]
+
+
+_PRIMARY_EVENT_LABELS = (
+    "high_damage_hit",
+    "no_scope",
+    "spray_kill",
+    "sniper_kill",
+    "shotgun_kill",
+    "shotgun_one_pump",
+    "pistol_kill",
+    "automatic_kill",
+    "other_weapon_kill",
+)
+
+
 def dedupe_verified_finishes(events: list[dict]) -> list[dict]:
     """Collapse overlapping locator windows and keep the best-supported finish.
 
@@ -579,6 +604,92 @@ def build_highlight_profile(events: list[dict]) -> HighlightProfile:
         active_finish_count=len(ranked_active),
         multi_kill=len(ranked_active) >= 2,
     )
+
+
+def build_teacher_decision(events: list[dict]) -> TeacherDecision:
+    """Resolve one primary highlight and keep clip-wide finish facts separate.
+
+    Weapon and mechanic labels belong only to the selected primary active finish.
+    Secondary events remain available for audit and multi-kill metadata.
+    """
+    verified = tuple(dedupe_verified_finishes(events))
+    active = tuple(
+        event
+        for event in verified
+        if event.get("target_was_active", False)
+        and not event.get("target_was_downed", False)
+    )
+    downed = tuple(
+        event for event in verified if event.get("target_was_downed", False)
+    )
+    profile = build_highlight_profile(events)
+    primary_source = None
+    if profile.primary is not None:
+        primary_source = next(
+            (
+                event
+                for event in verified
+                if int(event.get("event_index", 0)) == profile.primary.event_index
+            ),
+            None,
+        )
+    primary_labels = frozenset(
+        profile.primary.labels
+        if profile.primary is not None and profile.primary.active
+        else ()
+    )
+    return TeacherDecision(
+        profile=profile,
+        verified_finishes=verified,
+        active_finishes=active,
+        downed_finishes=downed,
+        primary_source=primary_source,
+        primary_labels=primary_labels,
+    )
+
+
+def project_teacher_event_labels(
+    decision: TeacherDecision, *, unresolved: bool = False
+) -> dict[str, str]:
+    """Project the canonical decision into persisted event-owned label states."""
+    has_primary = (
+        decision.profile.primary is not None
+        and decision.profile.primary.active
+        and decision.primary_source is not None
+    )
+    missing_state = (
+        "uncertain" if unresolved and not decision.verified_finishes else "no"
+    )
+    states = {
+        key: "yes" if key in decision.primary_labels else missing_state
+        for key in _PRIMARY_EVENT_LABELS
+    }
+    states["elimination_or_knock"] = "yes" if decision.active_finishes else "no"
+    states["downed_finish"] = "yes" if decision.downed_finishes else "no"
+    states["multi_kill"] = "yes" if decision.profile.multi_kill else "no"
+
+    def evidence_state(key: str) -> str:
+        if not has_primary:
+            return "no"
+        value = str(decision.primary_source.get(key, "unknown"))
+        return value if value in {"yes", "no"} else "uncertain"
+
+    states["flick_shot"] = evidence_state("flick_shot")
+    states["trickshot"] = evidence_state("trickshot")
+    states["cleanup_kill"] = evidence_state("cleanup_kill")
+    states["opponent_likely_bot"] = evidence_state("opponent_likely_bot")
+    states["stationary_target"] = (
+        evidence_state("stationary_target")
+        if has_primary
+        and decision.primary_source.get("visual_action_supported", False)
+        else "no"
+    )
+    states["stationary_sniper_target"] = (
+        states["stationary_target"]
+        if states["sniper_kill"] == "yes"
+        else "no"
+    )
+    return states
 
 
 def _describe_event(event: RankedHighlightEvent) -> str:

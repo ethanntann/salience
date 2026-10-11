@@ -178,6 +178,63 @@ def test_label_weapon_event_applies_ocr_when_present(stub_frames):
     assert attribution.events[0].get("local_ocr", {}).get("applied") is True
 
 
+def test_local_teacher_preserves_distinct_finishes_inside_three_seconds(stub_frames):
+    predictions = iter(
+        [
+            EventHeadPrediction(
+                event_kind="elimination",
+                target_state="active",
+                weapon="shotgun",
+                weapon_confidence=0.95,
+                aim_state="hipfire",
+                pov_shot_visible="yes",
+                target_reaction_visible="yes",
+                new_damage_visible="yes",
+                target_defeat_visible="yes",
+                finish_ui_newly_appeared="yes",
+                damaging_shot_count=1,
+            ),
+            EventHeadPrediction(
+                event_kind="elimination",
+                target_state="active",
+                weapon="automatic",
+                weapon_confidence=0.95,
+                aim_state="other_ads",
+                pov_shot_visible="yes",
+                target_reaction_visible="yes",
+                new_damage_visible="yes",
+                target_defeat_visible="yes",
+                finish_ui_newly_appeared="yes",
+                damaging_shot_count=1,
+            ),
+        ]
+    )
+
+    class _TwoFinishModels:
+        def predict_event(self, images, hud_images):
+            return next(predictions)
+
+    client = LocalTeacherClient(models=_TwoFinishModels(), model="test-student")
+    clip = ClipTeacherInput(
+        filename="rapid-double.mp4",
+        duration_sec=20.0,
+        width=1920,
+        height=1080,
+        fps=60.0,
+        tags=[],
+        image_paths=[Path("first.jpg"), Path("second.jpg")],
+        image_timestamps=[10.0, 12.0],
+        image_event_indices=[0, 1],
+        image_event_centers=[10.0, 12.0],
+    )
+
+    attribution = client.label_weapon_event(clip)
+
+    assert len([e for e in attribution.events if e["status"] == "attributed"]) == 2
+    assert attribution.labels["shotgun_kill"] == "yes"
+    assert attribution.labels["automatic_kill"] == "no"
+
+
 def test_locate_event_timestamps_peak_decode_and_cap(stub_frames):
     # Locator mock emits raw logits; runtime applies sigmoid.
     client = _shotgun_client(locator_scores=[-2.0, 3.0, -2.0, 2.5, -3.0])

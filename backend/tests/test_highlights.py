@@ -106,6 +106,53 @@ def test_primary_highlight_prefers_distinctive_mechanic_over_weapon_family():
     assert profile.multi_kill is True
 
 
+def test_clip_tags_come_only_from_primary_high_signal_kill():
+    primary = _active_spray(index=0, timestamp=10.0)
+    primary.update(
+        {
+            "flick_shot": "no",
+            "trickshot": "no",
+            "cleanup_kill": "no",
+            "opponent_likely_bot": "no",
+            "stationary_target": "no",
+            "stationary_duration_supported": "no",
+        }
+    )
+    secondary = _active_sniper(
+        index=1,
+        timestamp=14.0,
+        aim="hunting_ads_zoom",
+    )
+    secondary.update(
+        {
+            "flick_shot": "yes",
+            "trickshot": "yes",
+            "cleanup_kill": "yes",
+            "opponent_likely_bot": "yes",
+            "stationary_target": "yes",
+            "stationary_duration_supported": "yes",
+        }
+    )
+    attribution = resolve_event_summaries({"events": [primary, secondary]})
+    merged = merge_event_labels(
+        normalize_teacher_payload({"labels": {}}), attribution
+    )
+
+    assert attribution.labels["automatic_kill"] == "yes"
+    assert attribution.labels["spray_kill"] == "yes"
+    assert attribution.labels["sniper_kill"] == "no"
+    assert merged.automatic_kill == "yes"
+    assert merged.spray_kill == "yes"
+    assert merged.sniper_kill == "no"
+    assert merged.high_damage_hit == "no"
+    assert merged.flick_shot != "yes"
+    assert merged.trickshot != "yes"
+    assert merged.cleanup_kill != "yes"
+    assert merged.opponent_likely_bot != "yes"
+    assert merged.stationary_target != "yes"
+    assert merged.multi_kill == "yes"
+
+
 def test_no_scope_vetoed_when_same_target_has_ads_contradiction():
     attribution = resolve_event_summaries(
         {

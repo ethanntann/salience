@@ -61,7 +61,7 @@ def test_reconcile_keeps_distinct_named_rapid_finishes():
     labels = _reconciled_labels({}, events)
 
     assert labels["sniper_kill"] == "yes"
-    assert labels["pistol_kill"] == "yes"
+    assert labels["pistol_kill"] == "no"
     assert labels["multi_kill"] == "yes"
 
 

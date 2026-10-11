@@ -32,8 +32,10 @@ train = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
-addopts = "--basetemp=C:/tmp/salience-pytest -o cache_dir=C:/tmp/salience-pytest-cache"
+# ".." so tests covering repo-root tooling (scripts/) import the same way
+# the tooling is run. Without it test_reconcile_teacher_weapons cannot
+# collect under the documented `cd backend && pytest` invocation.
+pythonpath = [".", ".."]
 markers = [
   "train: optional training smoke tests requiring torch",
 ]

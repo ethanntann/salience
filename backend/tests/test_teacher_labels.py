@@ -1267,8 +1267,8 @@ def test_current_event_reducer_derives_styles_from_explicit_event_facts():
     )
 
     assert attribution.labels["shotgun_one_pump"] == "yes"
-    assert attribution.labels["spray_kill"] == "yes"
-    assert attribution.labels["sniper_kill"] == "yes"
+    assert attribution.labels["spray_kill"] == "no"
+    assert attribution.labels["sniper_kill"] == "no"
     assert attribution.labels["no_scope"] == "no"
 
 
@@ -1330,7 +1330,7 @@ def test_current_one_pump_requires_numeric_single_shot_damage():
     assert merged.high_damage_hit == "no"
 
 
-def test_high_damage_survives_fast_flick_after_visible_shot_and_number():
+def test_damage_only_event_does_not_tag_unselected_high_damage():
     attribution = resolve_event_summaries(
         {
             "events": [
@@ -1354,7 +1354,7 @@ def test_high_damage_survives_fast_flick_after_visible_shot_and_number():
 
     merged = merge_event_labels(context, attribution)
 
-    assert merged.high_damage_hit == "yes"
+    assert merged.high_damage_hit == "no"
     assert merged.sniper_kill != "yes"
 
 
@@ -1689,7 +1689,7 @@ def test_spray_damage_count_clears_single_shot_claim():
     assert attribution.events[0]["single_shot_damage"] is None
 
 
-def test_stationary_target_requires_sustained_duration_evidence():
+def test_stationary_target_requires_sustained_primary_finish_evidence():
     common = {
         "event_index": 0,
         "event_kind": "damage_only",
@@ -1705,10 +1705,25 @@ def test_stationary_target_requires_sustained_duration_evidence():
     sustained = resolve_event_summaries(
         {"events": [{**common, "stationary_duration_supported": "yes"}]}
     )
+    selected_finish = resolve_event_summaries(
+        {
+            "events": [
+                {
+                    **common,
+                    "event_kind": "elimination",
+                    "finish_ui_newly_appeared": "yes",
+                    "selected_weapon_before_finish": "shotgun",
+                    "weapon_confidence": 1,
+                    "stationary_duration_supported": "yes",
+                }
+            ]
+        }
+    )
     context = normalize_teacher_payload({"labels": {}})
 
     assert merge_event_labels(context, momentary).stationary_target == "no"
-    assert merge_event_labels(context, sustained).stationary_target == "yes"
+    assert merge_event_labels(context, sustained).stationary_target == "no"
+    assert merge_event_labels(context, selected_finish).stationary_target == "yes"
 
 
 def test_weapon_specialist_retries_incomplete_event_summaries(tmp_path):
@@ -1773,7 +1788,8 @@ def test_weapon_specialist_prefers_strong_pre_finish_hud_ocr(tmp_path):
                 '"weapon_confidence":0.95}]}'
             )
 
-    attribution = StubTeacher().label_weapon_event(
+    client = StubTeacher()
+    attribution = client.label_weapon_event(
         ClipTeacherInput(
             filename="clip.mp4",
             duration_sec=20,
@@ -1853,11 +1869,16 @@ def test_weapon_specialist_recovers_duplicate_ids_with_focused_event_calls(tmp_p
                     '{"event_index":1,"event_kind":"none"}',
                 ]
             )
+            self.image_counts = []
 
         def _complete(self, content, *, max_tokens):
+            self.image_counts.append(
+                sum(item.get("type") == "image_url" for item in content)
+            )
             return next(self.responses)
 
-    attribution = StubTeacher().label_weapon_event(
+    client = StubTeacher()
+    attribution = client.label_weapon_event(
         ClipTeacherInput(
             filename="clip.mp4",
             duration_sec=20,
@@ -1874,6 +1895,7 @@ def test_weapon_specialist_recovers_duplicate_ids_with_focused_event_calls(tmp_p
     assert attribution.status == "no_event"
     assert attribution.raw_payload["prepared_event_count"] == 2
     assert all(value == "uncertain" for value in attribution.labels.values())
+    assert client.image_counts == [2, 2, 2, 2]
 
 
 def test_teacher_client_retries_rate_limits(monkeypatch):

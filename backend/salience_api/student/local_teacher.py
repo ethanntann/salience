@@ -17,10 +17,7 @@ from salience_api.features.fireworks_teacher import (
 from salience_api.features.hud_ocr import RapidHudOcr, best_weapon_ocr
 from salience_api.features.screen_state_ocr import matches_menu_screen, matches_victory_banner
 from salience_api.features.teacher_labels import TeacherClipLabels, normalize_teacher_payload
-from salience_api.student.event_heads import (
-    collapse_same_kill_finishes,
-    event_summary_from_heads,
-)
+from salience_api.student.event_heads import event_summary_from_heads
 from salience_api.student.locator import timestamps_from_frame_scores
 from salience_api.student.onnx_runtime import IMAGE_SIZE, StudentOnnxModels, preprocess_frame_nchw
 from salience_api.student.schema import hud_crop_left, select_window_indices
@@ -187,7 +184,6 @@ class LocalTeacherClient:
             )
             events.append(summary)
 
-        events = collapse_same_kill_finishes(events)
         confidences = [float(summary["weapon_confidence"]) for summary in events]
 
         prepared: dict = {
@@ -235,16 +231,21 @@ class LocalTeacherClient:
             sample_indices = list(dict.fromkeys(
                 [*tail_indices, *select_window_indices(total, sample_count)]
             ))
-            for index in sample_indices:
-                texts = ocr.recognize_full_frame_text(clip.image_paths[index])
+            # One batched read over every sampled frame. The old per-frame loop
+            # could stop early once both labels were set, but neither label can
+            # be unset by a later frame, so the outcome is identical and the
+            # batch is faster whenever the early exit does not fire immediately.
+            texts_by_frame = ocr.recognize_frames_text(
+                [clip.image_paths[index] for index in sample_indices]
+            )
+            for position in range(len(sample_indices)):
+                texts = texts_by_frame.get(position) or []
                 if not texts:
                     continue
                 if matches_victory_banner(texts):
                     labels["victory"] = "yes"
                 if matches_menu_screen(texts):
                     labels["looting_or_menu"] = "yes"
-                if labels.get("victory") == "yes" and labels.get("looting_or_menu") == "yes":
-                    break
 
         return normalize_teacher_payload(
             {

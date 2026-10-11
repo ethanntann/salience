@@ -23,8 +23,7 @@
       "high_damage_hit",
       "multi_kill",
       "shotgun_kill",
-      "shotgun_one_pump",
-      "sniper_kill"
+      "shotgun_one_pump"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -42,7 +41,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
@@ -88,7 +87,6 @@
       "high_damage_hit",
       "multi_kill",
       "no_scope",
-      "shotgun_kill",
       "sniper_kill",
       "victory"
     ],
@@ -109,7 +107,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "yes",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "no",
@@ -153,7 +151,6 @@
       "enemy_visible",
       "multi_kill",
       "no_scope",
-      "pistol_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -175,7 +172,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -218,8 +215,7 @@
       "high_damage_hit",
       "multi_kill",
       "shotgun_kill",
-      "shotgun_one_pump",
-      "sniper_kill"
+      "shotgun_one_pump"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -237,7 +233,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
@@ -411,7 +407,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -433,7 +428,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -475,8 +470,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "sniper_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -494,7 +488,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
@@ -539,8 +533,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "sniper_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -558,7 +551,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
@@ -603,7 +596,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -625,7 +617,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -667,9 +659,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill",
-      "sniper_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -687,8 +677,8 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
-      "shotgun_kill": "yes",
+      "sniper_kill": "no",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -734,8 +724,7 @@
       "multi_kill",
       "rotation_traversal",
       "shotgun_kill",
-      "shotgun_one_pump",
-      "sniper_kill"
+      "shotgun_one_pump"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -753,7 +742,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
@@ -861,7 +850,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "sniper_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -880,7 +868,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "yes",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
@@ -925,7 +913,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "sniper_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -944,7 +931,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "yes",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
@@ -988,9 +975,7 @@
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
-      "high_damage_hit",
       "multi_kill",
-      "sniper_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -1000,7 +985,7 @@
       "combat_visible": "yes",
       "enemy_visible": "yes",
       "elimination_or_knock": "yes",
-      "high_damage_hit": "yes",
+      "high_damage_hit": "no",
       "flick_shot": "no",
       "no_scope": "no",
       "trickshot": "no",
@@ -1009,7 +994,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "yes",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
@@ -1054,7 +1039,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "sniper_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -1073,7 +1057,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "yes",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
@@ -1117,11 +1101,8 @@
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
-      "high_damage_hit",
       "multi_kill",
-      "sniper_kill",
-      "spray_kill",
-      "stationary_sniper_target"
+      "spray_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -1130,7 +1111,7 @@
       "combat_visible": "yes",
       "enemy_visible": "yes",
       "elimination_or_knock": "yes",
-      "high_damage_hit": "yes",
+      "high_damage_hit": "no",
       "flick_shot": "no",
       "no_scope": "no",
       "trickshot": "no",
@@ -1139,7 +1120,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "yes",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
@@ -1147,7 +1128,7 @@
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
-      "stationary_sniper_target": "yes",
+      "stationary_sniper_target": "no",
       "competitive_context": "no",
       "victory": "no",
       "multi_kill": "yes",
@@ -1161,7 +1142,7 @@
     "base_score": 0.47175,
     "final_score": 0.8679375,
     "confidence": 0.35,
-    "score_explanation": "primary spray kill, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, stationary sniper target, matches your recent feedback"
+    "score_explanation": "primary spray kill, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, matches your recent feedback"
   },
   {
     "filename": "teacher-ranked-019.mp4",
@@ -1184,7 +1165,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "sniper_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -1203,7 +1183,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "yes",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
@@ -1247,8 +1227,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
-      "sniper_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -1266,7 +1245,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
@@ -1311,7 +1290,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -1333,7 +1311,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -1692,8 +1670,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "sniper_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -1711,7 +1688,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
@@ -1945,7 +1922,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -1967,7 +1943,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -2009,8 +1985,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "sniper_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -2028,7 +2003,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
@@ -2074,7 +2049,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -2096,7 +2070,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -2138,7 +2112,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -2160,7 +2133,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -2328,7 +2301,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -2350,7 +2322,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -2455,8 +2427,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
-      "sniper_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -2474,7 +2445,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
@@ -2522,8 +2493,7 @@
       "multi_kill",
       "rotation_traversal",
       "shotgun_kill",
-      "shotgun_one_pump",
-      "sniper_kill"
+      "shotgun_one_pump"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -2541,7 +2511,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
@@ -2581,7 +2551,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
@@ -2608,7 +2577,7 @@
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -2648,7 +2617,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "shotgun_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -2668,7 +2636,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "yes",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "no",
@@ -2839,8 +2807,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
-      "sniper_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -2858,7 +2825,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
@@ -2902,7 +2869,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -2924,7 +2890,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -3029,8 +2995,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
-      "sniper_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -3048,7 +3013,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
@@ -3093,9 +3058,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "rotation_traversal",
-      "shotgun_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -3115,9 +3078,9 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "yes",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -4589,8 +4552,7 @@
       "enemy_visible",
       "multi_kill",
       "pistol_kill",
-      "rotation_traversal",
-      "sniper_kill"
+      "rotation_traversal"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -4608,7 +4570,7 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
@@ -4653,7 +4615,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "rotation_traversal",
       "sniper_kill"
     ],
@@ -4676,7 +4637,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -4713,7 +4674,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
@@ -4742,7 +4702,7 @@
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -4848,7 +4808,6 @@
       "high_damage_hit",
       "multi_kill",
       "rotation_traversal",
-      "shotgun_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -4868,7 +4827,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "yes",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "no",
@@ -5826,7 +5785,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
       "rotation_traversal",
       "sniper_kill"
     ],
@@ -5849,7 +5807,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -6756,68 +6714,6 @@
     "path": "snapshot://teacher-ranked-108.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
-    "duration_sec": 20.335167,
-    "width": 1920,
-    "height": 1080,
-    "fps": 60.0,
-    "size_bytes": 43068464,
-    "motion_score": 0.2125,
-    "audio_peak_score": 0.25,
-    "silence_ratio": 0.65,
-    "action_density": 0.2708333333333333,
-    "extraction_confidence": 0.35,
-    "tags": [
-      "combat_visible",
-      "elimination_or_knock",
-      "enemy_visible",
-      "looting_or_menu",
-      "sniper_kill"
-    ],
-    "thumbnail_variant": "ridge",
-    "teacher_provider": "fireworks",
-    "teacher_model": "precomputed-submission-snapshot",
-    "teacher_labels": {
-      "combat_visible": "yes",
-      "enemy_visible": "yes",
-      "elimination_or_knock": "yes",
-      "high_damage_hit": "no",
-      "flick_shot": "no",
-      "no_scope": "no",
-      "trickshot": "no",
-      "build_fight": "no",
-      "clutch": "no",
-      "cleanup_kill": "no",
-      "downed_finish": "no",
-      "spray_kill": "no",
-      "sniper_kill": "yes",
-      "shotgun_kill": "no",
-      "shotgun_one_pump": "no",
-      "pistol_kill": "no",
-      "automatic_kill": "no",
-      "other_weapon_kill": "no",
-      "opponent_likely_bot": "no",
-      "stationary_target": "no",
-      "stationary_sniper_target": "no",
-      "competitive_context": "no",
-      "victory": "no",
-      "multi_kill": "no",
-      "fast_edit": "no",
-      "rotation_traversal": "no",
-      "looting_or_menu": "yes",
-      "downtime": "no",
-      "confidence": 0.95,
-      "evidence": []
-    },
-    "base_score": 0.3317499999999999,
-    "final_score": 0.8329375,
-    "confidence": 0.35,
-    "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, matches your recent feedback"
-  },
-  {
-    "filename": "teacher-ranked-109.mp4",
-    "path": "snapshot://teacher-ranked-109.mp4",
-    "source": "supervised",
-    "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.233938,
     "width": 1920,
     "height": 1080,
@@ -6876,8 +6772,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, matches your recent feedback"
   },
   {
-    "filename": "teacher-ranked-110.mp4",
-    "path": "snapshot://teacher-ranked-110.mp4",
+    "filename": "teacher-ranked-109.mp4",
+    "path": "snapshot://teacher-ranked-109.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.052458,
@@ -6938,8 +6834,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent, matches your recent feedback"
   },
   {
-    "filename": "teacher-ranked-111.mp4",
-    "path": "snapshot://teacher-ranked-111.mp4",
+    "filename": "teacher-ranked-110.mp4",
+    "path": "snapshot://teacher-ranked-110.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.064833,
@@ -7000,8 +6896,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, matches your recent feedback"
   },
   {
-    "filename": "teacher-ranked-112.mp4",
-    "path": "snapshot://teacher-ranked-112.mp4",
+    "filename": "teacher-ranked-111.mp4",
+    "path": "snapshot://teacher-ranked-111.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.082511,
@@ -7062,8 +6958,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, matches your recent feedback"
   },
   {
-    "filename": "teacher-ranked-113.mp4",
-    "path": "snapshot://teacher-ranked-113.mp4",
+    "filename": "teacher-ranked-112.mp4",
+    "path": "snapshot://teacher-ranked-112.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 15.382311,
@@ -7123,8 +7019,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, quiet/low energy penalty, low-action tag penalty, matches your recent feedback"
   },
   {
-    "filename": "teacher-ranked-114.mp4",
-    "path": "snapshot://teacher-ranked-114.mp4",
+    "filename": "teacher-ranked-113.mp4",
+    "path": "snapshot://teacher-ranked-113.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 15.217922,
@@ -7184,8 +7080,8 @@
     "score_explanation": "primary active finish, good clip length, matches victory, quiet/low energy penalty, low-action tag penalty, matches your recent feedback"
   },
   {
-    "filename": "teacher-ranked-115.mp4",
-    "path": "snapshot://teacher-ranked-115.mp4",
+    "filename": "teacher-ranked-114.mp4",
+    "path": "snapshot://teacher-ranked-114.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.384078,
@@ -7243,6 +7139,69 @@
     "final_score": 0.8216875,
     "confidence": 0.35,
     "score_explanation": "primary active finish, good clip length, matches combat_visible, quiet/low energy penalty, low-action tag penalty, matches your recent feedback"
+  },
+  {
+    "filename": "teacher-ranked-115.mp4",
+    "path": "snapshot://teacher-ranked-115.mp4",
+    "source": "supervised",
+    "feature_source": "sanitized_submission_snapshot",
+    "duration_sec": 20.335167,
+    "width": 1920,
+    "height": 1080,
+    "fps": 60.0,
+    "size_bytes": 43068464,
+    "motion_score": 0.2125,
+    "audio_peak_score": 0.25,
+    "silence_ratio": 0.65,
+    "action_density": 0.2708333333333333,
+    "extraction_confidence": 0.35,
+    "tags": [
+      "combat_visible",
+      "elimination_or_knock",
+      "enemy_visible",
+      "looting_or_menu",
+      "opponent_likely_bot",
+      "sniper_kill"
+    ],
+    "thumbnail_variant": "ridge",
+    "teacher_provider": "fireworks",
+    "teacher_model": "precomputed-submission-snapshot",
+    "teacher_labels": {
+      "combat_visible": "yes",
+      "enemy_visible": "yes",
+      "elimination_or_knock": "yes",
+      "high_damage_hit": "no",
+      "flick_shot": "no",
+      "no_scope": "no",
+      "trickshot": "no",
+      "build_fight": "no",
+      "clutch": "no",
+      "cleanup_kill": "no",
+      "downed_finish": "no",
+      "spray_kill": "no",
+      "sniper_kill": "yes",
+      "shotgun_kill": "no",
+      "shotgun_one_pump": "no",
+      "pistol_kill": "no",
+      "automatic_kill": "no",
+      "other_weapon_kill": "no",
+      "opponent_likely_bot": "yes",
+      "stationary_target": "no",
+      "stationary_sniper_target": "no",
+      "competitive_context": "no",
+      "victory": "no",
+      "multi_kill": "no",
+      "fast_edit": "no",
+      "rotation_traversal": "no",
+      "looting_or_menu": "yes",
+      "downtime": "no",
+      "confidence": 0.95,
+      "evidence": []
+    },
+    "base_score": 0.27174999999999994,
+    "final_score": 0.8179375,
+    "confidence": 0.35,
+    "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent, matches your recent feedback"
   },
   {
     "filename": "teacher-ranked-116.mp4",
@@ -7705,9 +7664,7 @@
       "enemy_visible",
       "multi_kill",
       "pistol_kill",
-      "rotation_traversal",
-      "shotgun_kill",
-      "sniper_kill"
+      "rotation_traversal"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -7725,8 +7682,8 @@
       "cleanup_kill": "no",
       "downed_finish": "no",
       "spray_kill": "no",
-      "sniper_kill": "yes",
-      "shotgun_kill": "yes",
+      "sniper_kill": "no",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -7832,7 +7789,8 @@
       "elimination_or_knock",
       "enemy_visible",
       "high_damage_hit",
-      "opponent_likely_bot"
+      "opponent_likely_bot",
+      "stationary_target"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -7857,7 +7815,7 @@
       "automatic_kill": "yes",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "yes",
-      "stationary_target": "no",
+      "stationary_target": "yes",
       "stationary_sniper_target": "no",
       "competitive_context": "no",
       "victory": "no",
@@ -7872,7 +7830,7 @@
     "base_score": 0.3517499999999999,
     "final_score": 0.681133757361723,
     "confidence": 0.35,
-    "score_explanation": "primary high damage hit, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent, matches your recent feedback"
+    "score_explanation": "primary high damage hit, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent, stationary target, matches your recent feedback"
   },
   {
     "filename": "teacher-ranked-126.mp4",
@@ -8401,7 +8359,6 @@
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
-      "high_damage_hit",
       "multi_kill",
       "spray_kill"
     ],
@@ -8412,7 +8369,7 @@
       "combat_visible": "yes",
       "enemy_visible": "yes",
       "elimination_or_knock": "yes",
-      "high_damage_hit": "yes",
+      "high_damage_hit": "no",
       "flick_shot": "no",
       "no_scope": "no",
       "trickshot": "no",
@@ -9457,7 +9414,6 @@
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
-      "high_damage_hit",
       "multi_kill",
       "spray_kill"
     ],
@@ -9468,7 +9424,7 @@
       "combat_visible": "yes",
       "enemy_visible": "yes",
       "elimination_or_knock": "yes",
-      "high_damage_hit": "yes",
+      "high_damage_hit": "no",
       "flick_shot": "no",
       "no_scope": "no",
       "trickshot": "no",
@@ -10027,7 +9983,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "other_weapon_kill",
       "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -10051,7 +10006,7 @@
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
-      "other_weapon_kill": "yes",
+      "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
       "stationary_sniper_target": "no",
@@ -10090,11 +10045,11 @@
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
-      "high_damage_hit",
       "looting_or_menu",
       "multi_kill",
       "opponent_likely_bot",
-      "spray_kill"
+      "spray_kill",
+      "stationary_target"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -10103,7 +10058,7 @@
       "combat_visible": "yes",
       "enemy_visible": "yes",
       "elimination_or_knock": "yes",
-      "high_damage_hit": "yes",
+      "high_damage_hit": "no",
       "flick_shot": "no",
       "no_scope": "no",
       "trickshot": "no",
@@ -10119,7 +10074,7 @@
       "automatic_kill": "yes",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "yes",
-      "stationary_target": "no",
+      "stationary_target": "yes",
       "stationary_sniper_target": "no",
       "competitive_context": "no",
       "victory": "no",
@@ -10134,7 +10089,7 @@
     "base_score": 0.35175,
     "final_score": 0.5339068296415689,
     "confidence": 0.35,
-    "score_explanation": "primary spray kill, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent"
+    "score_explanation": "primary spray kill, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent, stationary target"
   },
   {
     "filename": "teacher-ranked-162.mp4",
@@ -10157,7 +10112,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
       "rotation_traversal",
       "sniper_kill"
     ],
@@ -10180,7 +10134,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -10217,7 +10171,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
@@ -10245,7 +10198,7 @@
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -10285,9 +10238,7 @@
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
-      "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -10297,7 +10248,7 @@
       "combat_visible": "yes",
       "enemy_visible": "yes",
       "elimination_or_knock": "yes",
-      "high_damage_hit": "yes",
+      "high_damage_hit": "no",
       "flick_shot": "no",
       "no_scope": "no",
       "trickshot": "no",
@@ -10309,7 +10260,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "yes",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -10352,7 +10303,6 @@
       "enemy_visible",
       "multi_kill",
       "no_scope",
-      "pistol_kill",
       "sniper_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -10374,7 +10324,7 @@
       "sniper_kill": "yes",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -10416,8 +10366,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
-      "sniper_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -10435,7 +10384,7 @@
       "cleanup_kill": "no",
       "downed_finish": "yes",
       "spray_kill": "no",
-      "sniper_kill": "yes",
+      "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
@@ -10482,8 +10431,7 @@
       "enemy_visible",
       "fast_edit",
       "high_damage_hit",
-      "multi_kill",
-      "shotgun_kill"
+      "multi_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -10502,7 +10450,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "yes",
@@ -10520,8 +10468,8 @@
       "confidence": 0.95,
       "evidence": []
     },
-    "base_score": 0.57175,
-    "final_score": 0.3828857257015461,
+    "base_score": 0.55175,
+    "final_score": 0.3778857257015461,
     "confidence": 0.35,
     "score_explanation": "primary high damage hit, multi kill, good clip length, matches build_fight, combat_visible, enemy_visible, quiet/low energy penalty"
   },
@@ -10780,8 +10728,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "high_damage_hit",
-      "multi_kill",
-      "shotgun_kill"
+      "multi_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -10800,7 +10747,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "yes",
@@ -10844,8 +10791,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "high_damage_hit",
-      "multi_kill",
-      "shotgun_kill"
+      "multi_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -10864,7 +10810,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "yes",
@@ -10972,8 +10918,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "high_damage_hit",
-      "multi_kill",
-      "shotgun_kill"
+      "multi_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -10992,7 +10937,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "yes",
@@ -11523,8 +11468,7 @@
       "enemy_visible",
       "high_damage_hit",
       "looting_or_menu",
-      "multi_kill",
-      "shotgun_kill"
+      "multi_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -11543,7 +11487,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "yes",
@@ -12147,8 +12091,7 @@
     "extraction_confidence": 0.35,
     "tags": [
       "combat_visible",
-      "enemy_visible",
-      "stationary_target"
+      "enemy_visible"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -12173,7 +12116,7 @@
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
-      "stationary_target": "yes",
+      "stationary_target": "no",
       "stationary_sniper_target": "no",
       "competitive_context": "no",
       "victory": "no",
@@ -12188,7 +12131,7 @@
     "base_score": 0.32175,
     "final_score": 0.2891100681997373,
     "confidence": 0.35,
-    "score_explanation": "good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, stationary target"
+    "score_explanation": "good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
     "filename": "teacher-ranked-195.mp4",
@@ -12998,7 +12941,6 @@
       "high_damage_hit",
       "multi_kill",
       "pistol_kill",
-      "shotgun_kill",
       "victory"
     ],
     "thumbnail_variant": "ridge",
@@ -13018,7 +12960,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -13321,8 +13263,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -13341,7 +13282,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -13385,8 +13326,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -13405,7 +13345,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -13449,8 +13389,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -13469,7 +13408,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -13513,8 +13452,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -13533,7 +13471,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -13577,8 +13515,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -13597,7 +13534,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -13641,8 +13578,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -13661,7 +13597,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -15358,69 +15294,6 @@
     "path": "snapshot://teacher-ranked-246.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
-    "duration_sec": 28.001233,
-    "width": 1920,
-    "height": 1080,
-    "fps": 60.0,
-    "size_bytes": 158076973,
-    "motion_score": 0.2125,
-    "audio_peak_score": 0.25,
-    "silence_ratio": 0.65,
-    "action_density": 0.2708333333333333,
-    "extraction_confidence": 0.35,
-    "tags": [
-      "combat_visible",
-      "elimination_or_knock",
-      "enemy_visible",
-      "high_damage_hit",
-      "shotgun_kill",
-      "shotgun_one_pump"
-    ],
-    "thumbnail_variant": "ridge",
-    "teacher_provider": "fireworks",
-    "teacher_model": "precomputed-submission-snapshot",
-    "teacher_labels": {
-      "combat_visible": "yes",
-      "enemy_visible": "yes",
-      "elimination_or_knock": "yes",
-      "high_damage_hit": "yes",
-      "flick_shot": "no",
-      "no_scope": "no",
-      "trickshot": "no",
-      "build_fight": "no",
-      "clutch": "no",
-      "cleanup_kill": "no",
-      "downed_finish": "no",
-      "spray_kill": "no",
-      "sniper_kill": "no",
-      "shotgun_kill": "yes",
-      "shotgun_one_pump": "yes",
-      "pistol_kill": "no",
-      "automatic_kill": "no",
-      "other_weapon_kill": "no",
-      "opponent_likely_bot": "no",
-      "stationary_target": "no",
-      "stationary_sniper_target": "no",
-      "competitive_context": "no",
-      "victory": "no",
-      "multi_kill": "no",
-      "fast_edit": "no",
-      "rotation_traversal": "no",
-      "looting_or_menu": "no",
-      "downtime": "no",
-      "confidence": 0.95,
-      "evidence": []
-    },
-    "base_score": 0.49175,
-    "final_score": 0.21879298518016585,
-    "confidence": 0.35,
-    "score_explanation": "primary shotgun one pump, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
-  },
-  {
-    "filename": "teacher-ranked-247.mp4",
-    "path": "snapshot://teacher-ranked-247.mp4",
-    "source": "supervised",
-    "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 24.451189,
     "width": 1920,
     "height": 1080,
@@ -15480,8 +15353,8 @@
     "score_explanation": "primary shotgun one pump, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-248.mp4",
-    "path": "snapshot://teacher-ranked-248.mp4",
+    "filename": "teacher-ranked-247.mp4",
+    "path": "snapshot://teacher-ranked-247.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 19.9992,
@@ -15546,8 +15419,8 @@
     "score_explanation": "primary shotgun one pump, multi kill, good clip length, matches build_fight, combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-249.mp4",
-    "path": "snapshot://teacher-ranked-249.mp4",
+    "filename": "teacher-ranked-248.mp4",
+    "path": "snapshot://teacher-ranked-248.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.270979,
@@ -15612,8 +15485,8 @@
     "score_explanation": "primary shotgun one pump, multi kill, good clip length, matches build_fight, combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-250.mp4",
-    "path": "snapshot://teacher-ranked-250.mp4",
+    "filename": "teacher-ranked-249.mp4",
+    "path": "snapshot://teacher-ranked-249.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 22.034178,
@@ -15633,8 +15506,7 @@
       "high_damage_hit",
       "looting_or_menu",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -15653,7 +15525,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -15677,8 +15549,8 @@
     "score_explanation": "primary high damage hit, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty"
   },
   {
-    "filename": "teacher-ranked-251.mp4",
-    "path": "snapshot://teacher-ranked-251.mp4",
+    "filename": "teacher-ranked-250.mp4",
+    "path": "snapshot://teacher-ranked-250.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 15.102542,
@@ -15740,8 +15612,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, victory, quiet/low energy penalty, low-action tag penalty"
   },
   {
-    "filename": "teacher-ranked-252.mp4",
-    "path": "snapshot://teacher-ranked-252.mp4",
+    "filename": "teacher-ranked-251.mp4",
+    "path": "snapshot://teacher-ranked-251.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.166889,
@@ -15759,7 +15631,8 @@
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
-      "opponent_likely_bot"
+      "opponent_likely_bot",
+      "stationary_target"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -15784,7 +15657,7 @@
       "automatic_kill": "yes",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "yes",
-      "stationary_target": "no",
+      "stationary_target": "yes",
       "stationary_sniper_target": "no",
       "competitive_context": "no",
       "victory": "no",
@@ -15799,11 +15672,11 @@
     "base_score": 0.3317499999999999,
     "final_score": 0.21121278070557123,
     "confidence": 0.35,
-    "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent"
+    "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent, stationary target"
   },
   {
-    "filename": "teacher-ranked-253.mp4",
-    "path": "snapshot://teacher-ranked-253.mp4",
+    "filename": "teacher-ranked-252.mp4",
+    "path": "snapshot://teacher-ranked-252.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 14.998333,
@@ -15823,8 +15696,7 @@
       "high_damage_hit",
       "looting_or_menu",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -15843,7 +15715,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -15867,8 +15739,8 @@
     "score_explanation": "primary high damage hit, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty"
   },
   {
-    "filename": "teacher-ranked-254.mp4",
-    "path": "snapshot://teacher-ranked-254.mp4",
+    "filename": "teacher-ranked-253.mp4",
+    "path": "snapshot://teacher-ranked-253.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.416438,
@@ -15929,8 +15801,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-255.mp4",
-    "path": "snapshot://teacher-ranked-255.mp4",
+    "filename": "teacher-ranked-254.mp4",
+    "path": "snapshot://teacher-ranked-254.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.284178,
@@ -15991,8 +15863,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-256.mp4",
-    "path": "snapshot://teacher-ranked-256.mp4",
+    "filename": "teacher-ranked-255.mp4",
+    "path": "snapshot://teacher-ranked-255.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.116822,
@@ -16053,8 +15925,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-257.mp4",
-    "path": "snapshot://teacher-ranked-257.mp4",
+    "filename": "teacher-ranked-256.mp4",
+    "path": "snapshot://teacher-ranked-256.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.000822,
@@ -16115,8 +15987,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-258.mp4",
-    "path": "snapshot://teacher-ranked-258.mp4",
+    "filename": "teacher-ranked-257.mp4",
+    "path": "snapshot://teacher-ranked-257.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.365689,
@@ -16177,8 +16049,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-259.mp4",
-    "path": "snapshot://teacher-ranked-259.mp4",
+    "filename": "teacher-ranked-258.mp4",
+    "path": "snapshot://teacher-ranked-258.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.216633,
@@ -16239,8 +16111,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-260.mp4",
-    "path": "snapshot://teacher-ranked-260.mp4",
+    "filename": "teacher-ranked-259.mp4",
+    "path": "snapshot://teacher-ranked-259.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.459458,
@@ -16301,8 +16173,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-261.mp4",
-    "path": "snapshot://teacher-ranked-261.mp4",
+    "filename": "teacher-ranked-260.mp4",
+    "path": "snapshot://teacher-ranked-260.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.032911,
@@ -16363,8 +16235,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-262.mp4",
-    "path": "snapshot://teacher-ranked-262.mp4",
+    "filename": "teacher-ranked-261.mp4",
+    "path": "snapshot://teacher-ranked-261.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.415978,
@@ -16425,8 +16297,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-263.mp4",
-    "path": "snapshot://teacher-ranked-263.mp4",
+    "filename": "teacher-ranked-262.mp4",
+    "path": "snapshot://teacher-ranked-262.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.083922,
@@ -16487,8 +16359,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-264.mp4",
-    "path": "snapshot://teacher-ranked-264.mp4",
+    "filename": "teacher-ranked-263.mp4",
+    "path": "snapshot://teacher-ranked-263.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 23.084444,
@@ -16549,8 +16421,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-265.mp4",
-    "path": "snapshot://teacher-ranked-265.mp4",
+    "filename": "teacher-ranked-264.mp4",
+    "path": "snapshot://teacher-ranked-264.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.399956,
@@ -16611,8 +16483,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-266.mp4",
-    "path": "snapshot://teacher-ranked-266.mp4",
+    "filename": "teacher-ranked-265.mp4",
+    "path": "snapshot://teacher-ranked-265.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.334189,
@@ -16673,8 +16545,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-267.mp4",
-    "path": "snapshot://teacher-ranked-267.mp4",
+    "filename": "teacher-ranked-266.mp4",
+    "path": "snapshot://teacher-ranked-266.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.066456,
@@ -16735,8 +16607,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-268.mp4",
-    "path": "snapshot://teacher-ranked-268.mp4",
+    "filename": "teacher-ranked-267.mp4",
+    "path": "snapshot://teacher-ranked-267.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.081867,
@@ -16797,8 +16669,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-269.mp4",
-    "path": "snapshot://teacher-ranked-269.mp4",
+    "filename": "teacher-ranked-268.mp4",
+    "path": "snapshot://teacher-ranked-268.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.249556,
@@ -16859,8 +16731,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-270.mp4",
-    "path": "snapshot://teacher-ranked-270.mp4",
+    "filename": "teacher-ranked-269.mp4",
+    "path": "snapshot://teacher-ranked-269.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.010771,
@@ -16921,8 +16793,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-271.mp4",
-    "path": "snapshot://teacher-ranked-271.mp4",
+    "filename": "teacher-ranked-270.mp4",
+    "path": "snapshot://teacher-ranked-270.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.080578,
@@ -16983,8 +16855,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-272.mp4",
-    "path": "snapshot://teacher-ranked-272.mp4",
+    "filename": "teacher-ranked-271.mp4",
+    "path": "snapshot://teacher-ranked-271.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.467111,
@@ -17045,8 +16917,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-273.mp4",
-    "path": "snapshot://teacher-ranked-273.mp4",
+    "filename": "teacher-ranked-272.mp4",
+    "path": "snapshot://teacher-ranked-272.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.117125,
@@ -17107,8 +16979,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-274.mp4",
-    "path": "snapshot://teacher-ranked-274.mp4",
+    "filename": "teacher-ranked-273.mp4",
+    "path": "snapshot://teacher-ranked-273.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.199956,
@@ -17170,8 +17042,8 @@
     "score_explanation": "primary active finish, good clip length, matches build_fight, combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-275.mp4",
-    "path": "snapshot://teacher-ranked-275.mp4",
+    "filename": "teacher-ranked-274.mp4",
+    "path": "snapshot://teacher-ranked-274.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.048889,
@@ -17233,8 +17105,8 @@
     "score_explanation": "primary active finish, good clip length, matches build_fight, combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-276.mp4",
-    "path": "snapshot://teacher-ranked-276.mp4",
+    "filename": "teacher-ranked-275.mp4",
+    "path": "snapshot://teacher-ranked-275.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.133056,
@@ -17294,6 +17166,70 @@
     "final_score": 0.20595762342425836,
     "confidence": 0.35,
     "score_explanation": "primary active finish, good clip length, matches build_fight, combat_visible, enemy_visible, quiet/low energy penalty"
+  },
+  {
+    "filename": "teacher-ranked-276.mp4",
+    "path": "snapshot://teacher-ranked-276.mp4",
+    "source": "supervised",
+    "feature_source": "sanitized_submission_snapshot",
+    "duration_sec": 28.001233,
+    "width": 1920,
+    "height": 1080,
+    "fps": 60.0,
+    "size_bytes": 158076973,
+    "motion_score": 0.2125,
+    "audio_peak_score": 0.25,
+    "silence_ratio": 0.65,
+    "action_density": 0.2708333333333333,
+    "extraction_confidence": 0.35,
+    "tags": [
+      "combat_visible",
+      "elimination_or_knock",
+      "enemy_visible",
+      "high_damage_hit",
+      "opponent_likely_bot",
+      "shotgun_kill",
+      "shotgun_one_pump"
+    ],
+    "thumbnail_variant": "ridge",
+    "teacher_provider": "fireworks",
+    "teacher_model": "precomputed-submission-snapshot",
+    "teacher_labels": {
+      "combat_visible": "yes",
+      "enemy_visible": "yes",
+      "elimination_or_knock": "yes",
+      "high_damage_hit": "yes",
+      "flick_shot": "no",
+      "no_scope": "no",
+      "trickshot": "no",
+      "build_fight": "no",
+      "clutch": "no",
+      "cleanup_kill": "no",
+      "downed_finish": "no",
+      "spray_kill": "no",
+      "sniper_kill": "no",
+      "shotgun_kill": "yes",
+      "shotgun_one_pump": "yes",
+      "pistol_kill": "no",
+      "automatic_kill": "no",
+      "other_weapon_kill": "no",
+      "opponent_likely_bot": "yes",
+      "stationary_target": "no",
+      "stationary_sniper_target": "no",
+      "competitive_context": "no",
+      "victory": "no",
+      "multi_kill": "no",
+      "fast_edit": "no",
+      "rotation_traversal": "no",
+      "looting_or_menu": "no",
+      "downtime": "no",
+      "confidence": 0.95,
+      "evidence": []
+    },
+    "base_score": 0.43174999999999997,
+    "final_score": 0.20379298518016584,
+    "confidence": 0.35,
+    "score_explanation": "primary shotgun one pump, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent"
   },
   {
     "filename": "teacher-ranked-277.mp4",
@@ -20361,70 +20297,6 @@
     "path": "snapshot://teacher-ranked-326.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
-    "duration_sec": 22.167211,
-    "width": 1920,
-    "height": 1080,
-    "fps": 60.0,
-    "size_bytes": 42547521,
-    "motion_score": 0.2125,
-    "audio_peak_score": 0.25,
-    "silence_ratio": 0.65,
-    "action_density": 0.2708333333333333,
-    "extraction_confidence": 0.35,
-    "tags": [
-      "combat_visible",
-      "elimination_or_knock",
-      "enemy_visible",
-      "high_damage_hit",
-      "multi_kill",
-      "shotgun_kill",
-      "shotgun_one_pump"
-    ],
-    "thumbnail_variant": "ridge",
-    "teacher_provider": "fireworks",
-    "teacher_model": "precomputed-submission-snapshot",
-    "teacher_labels": {
-      "combat_visible": "yes",
-      "enemy_visible": "yes",
-      "elimination_or_knock": "yes",
-      "high_damage_hit": "yes",
-      "flick_shot": "no",
-      "no_scope": "no",
-      "trickshot": "no",
-      "build_fight": "no",
-      "clutch": "no",
-      "cleanup_kill": "no",
-      "downed_finish": "no",
-      "spray_kill": "no",
-      "sniper_kill": "no",
-      "shotgun_kill": "yes",
-      "shotgun_one_pump": "yes",
-      "pistol_kill": "no",
-      "automatic_kill": "no",
-      "other_weapon_kill": "no",
-      "opponent_likely_bot": "no",
-      "stationary_target": "no",
-      "stationary_sniper_target": "no",
-      "competitive_context": "no",
-      "victory": "no",
-      "multi_kill": "yes",
-      "fast_edit": "no",
-      "rotation_traversal": "no",
-      "looting_or_menu": "no",
-      "downtime": "no",
-      "confidence": 0.98,
-      "evidence": []
-    },
-    "base_score": 0.54175,
-    "final_score": 0.1773846264091959,
-    "confidence": 0.35,
-    "score_explanation": "primary shotgun one pump, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
-  },
-  {
-    "filename": "teacher-ranked-327.mp4",
-    "path": "snapshot://teacher-ranked-327.mp4",
-    "source": "supervised",
-    "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.3485,
     "width": 1920,
     "height": 1080,
@@ -20484,8 +20356,8 @@
     "score_explanation": "primary spray kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty"
   },
   {
-    "filename": "teacher-ranked-328.mp4",
-    "path": "snapshot://teacher-ranked-328.mp4",
+    "filename": "teacher-ranked-327.mp4",
+    "path": "snapshot://teacher-ranked-327.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.2495,
@@ -20545,8 +20417,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-329.mp4",
-    "path": "snapshot://teacher-ranked-329.mp4",
+    "filename": "teacher-ranked-328.mp4",
+    "path": "snapshot://teacher-ranked-328.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 19.999056,
@@ -20606,8 +20478,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-330.mp4",
-    "path": "snapshot://teacher-ranked-330.mp4",
+    "filename": "teacher-ranked-329.mp4",
+    "path": "snapshot://teacher-ranked-329.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.4174,
@@ -20667,8 +20539,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-331.mp4",
-    "path": "snapshot://teacher-ranked-331.mp4",
+    "filename": "teacher-ranked-330.mp4",
+    "path": "snapshot://teacher-ranked-330.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.0511,
@@ -20728,8 +20600,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-332.mp4",
-    "path": "snapshot://teacher-ranked-332.mp4",
+    "filename": "teacher-ranked-331.mp4",
+    "path": "snapshot://teacher-ranked-331.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.449622,
@@ -20789,8 +20661,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-333.mp4",
-    "path": "snapshot://teacher-ranked-333.mp4",
+    "filename": "teacher-ranked-332.mp4",
+    "path": "snapshot://teacher-ranked-332.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.181104,
@@ -20850,8 +20722,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-334.mp4",
-    "path": "snapshot://teacher-ranked-334.mp4",
+    "filename": "teacher-ranked-333.mp4",
+    "path": "snapshot://teacher-ranked-333.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.383678,
@@ -20911,8 +20783,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-335.mp4",
-    "path": "snapshot://teacher-ranked-335.mp4",
+    "filename": "teacher-ranked-334.mp4",
+    "path": "snapshot://teacher-ranked-334.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 19.999056,
@@ -20972,8 +20844,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-336.mp4",
-    "path": "snapshot://teacher-ranked-336.mp4",
+    "filename": "teacher-ranked-335.mp4",
+    "path": "snapshot://teacher-ranked-335.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.036044,
@@ -21033,8 +20905,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-337.mp4",
-    "path": "snapshot://teacher-ranked-337.mp4",
+    "filename": "teacher-ranked-336.mp4",
+    "path": "snapshot://teacher-ranked-336.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 15.1993,
@@ -21094,8 +20966,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-338.mp4",
-    "path": "snapshot://teacher-ranked-338.mp4",
+    "filename": "teacher-ranked-337.mp4",
+    "path": "snapshot://teacher-ranked-337.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 19.998656,
@@ -21155,8 +21027,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-339.mp4",
-    "path": "snapshot://teacher-ranked-339.mp4",
+    "filename": "teacher-ranked-338.mp4",
+    "path": "snapshot://teacher-ranked-338.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.299389,
@@ -21216,8 +21088,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-340.mp4",
-    "path": "snapshot://teacher-ranked-340.mp4",
+    "filename": "teacher-ranked-339.mp4",
+    "path": "snapshot://teacher-ranked-339.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.131789,
@@ -21277,8 +21149,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-341.mp4",
-    "path": "snapshot://teacher-ranked-341.mp4",
+    "filename": "teacher-ranked-340.mp4",
+    "path": "snapshot://teacher-ranked-340.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.200567,
@@ -21338,8 +21210,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-342.mp4",
-    "path": "snapshot://teacher-ranked-342.mp4",
+    "filename": "teacher-ranked-341.mp4",
+    "path": "snapshot://teacher-ranked-341.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.333044,
@@ -21399,8 +21271,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-343.mp4",
-    "path": "snapshot://teacher-ranked-343.mp4",
+    "filename": "teacher-ranked-342.mp4",
+    "path": "snapshot://teacher-ranked-342.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.165411,
@@ -21460,8 +21332,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-344.mp4",
-    "path": "snapshot://teacher-ranked-344.mp4",
+    "filename": "teacher-ranked-343.mp4",
+    "path": "snapshot://teacher-ranked-343.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.201089,
@@ -21521,8 +21393,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-345.mp4",
-    "path": "snapshot://teacher-ranked-345.mp4",
+    "filename": "teacher-ranked-344.mp4",
+    "path": "snapshot://teacher-ranked-344.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.432456,
@@ -21582,8 +21454,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-346.mp4",
-    "path": "snapshot://teacher-ranked-346.mp4",
+    "filename": "teacher-ranked-345.mp4",
+    "path": "snapshot://teacher-ranked-345.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 15.381958,
@@ -21643,8 +21515,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-347.mp4",
-    "path": "snapshot://teacher-ranked-347.mp4",
+    "filename": "teacher-ranked-346.mp4",
+    "path": "snapshot://teacher-ranked-346.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.466956,
@@ -21704,8 +21576,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-348.mp4",
-    "path": "snapshot://teacher-ranked-348.mp4",
+    "filename": "teacher-ranked-347.mp4",
+    "path": "snapshot://teacher-ranked-347.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.1502,
@@ -21765,8 +21637,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-349.mp4",
-    "path": "snapshot://teacher-ranked-349.mp4",
+    "filename": "teacher-ranked-348.mp4",
+    "path": "snapshot://teacher-ranked-348.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.199189,
@@ -21826,8 +21698,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-350.mp4",
-    "path": "snapshot://teacher-ranked-350.mp4",
+    "filename": "teacher-ranked-349.mp4",
+    "path": "snapshot://teacher-ranked-349.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 24.150133,
@@ -21887,8 +21759,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-351.mp4",
-    "path": "snapshot://teacher-ranked-351.mp4",
+    "filename": "teacher-ranked-350.mp4",
+    "path": "snapshot://teacher-ranked-350.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.398933,
@@ -21948,8 +21820,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-352.mp4",
-    "path": "snapshot://teacher-ranked-352.mp4",
+    "filename": "teacher-ranked-351.mp4",
+    "path": "snapshot://teacher-ranked-351.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.351958,
@@ -22009,8 +21881,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-353.mp4",
-    "path": "snapshot://teacher-ranked-353.mp4",
+    "filename": "teacher-ranked-352.mp4",
+    "path": "snapshot://teacher-ranked-352.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 22.998011,
@@ -22070,8 +21942,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-354.mp4",
-    "path": "snapshot://teacher-ranked-354.mp4",
+    "filename": "teacher-ranked-353.mp4",
+    "path": "snapshot://teacher-ranked-353.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.1009,
@@ -22131,8 +22003,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-355.mp4",
-    "path": "snapshot://teacher-ranked-355.mp4",
+    "filename": "teacher-ranked-354.mp4",
+    "path": "snapshot://teacher-ranked-354.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.348533,
@@ -22192,8 +22064,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-356.mp4",
-    "path": "snapshot://teacher-ranked-356.mp4",
+    "filename": "teacher-ranked-355.mp4",
+    "path": "snapshot://teacher-ranked-355.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.232833,
@@ -22253,8 +22125,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-357.mp4",
-    "path": "snapshot://teacher-ranked-357.mp4",
+    "filename": "teacher-ranked-356.mp4",
+    "path": "snapshot://teacher-ranked-356.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.182933,
@@ -22314,8 +22186,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-358.mp4",
-    "path": "snapshot://teacher-ranked-358.mp4",
+    "filename": "teacher-ranked-357.mp4",
+    "path": "snapshot://teacher-ranked-357.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.016289,
@@ -22375,8 +22247,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-359.mp4",
-    "path": "snapshot://teacher-ranked-359.mp4",
+    "filename": "teacher-ranked-358.mp4",
+    "path": "snapshot://teacher-ranked-358.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.282844,
@@ -22436,8 +22308,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-360.mp4",
-    "path": "snapshot://teacher-ranked-360.mp4",
+    "filename": "teacher-ranked-359.mp4",
+    "path": "snapshot://teacher-ranked-359.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.084233,
@@ -22497,8 +22369,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-361.mp4",
-    "path": "snapshot://teacher-ranked-361.mp4",
+    "filename": "teacher-ranked-360.mp4",
+    "path": "snapshot://teacher-ranked-360.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.300511,
@@ -22558,8 +22430,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-362.mp4",
-    "path": "snapshot://teacher-ranked-362.mp4",
+    "filename": "teacher-ranked-361.mp4",
+    "path": "snapshot://teacher-ranked-361.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.01575,
@@ -22619,8 +22491,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-363.mp4",
-    "path": "snapshot://teacher-ranked-363.mp4",
+    "filename": "teacher-ranked-362.mp4",
+    "path": "snapshot://teacher-ranked-362.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.216533,
@@ -22680,8 +22552,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-364.mp4",
-    "path": "snapshot://teacher-ranked-364.mp4",
+    "filename": "teacher-ranked-363.mp4",
+    "path": "snapshot://teacher-ranked-363.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 19.998889,
@@ -22741,8 +22613,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-365.mp4",
-    "path": "snapshot://teacher-ranked-365.mp4",
+    "filename": "teacher-ranked-364.mp4",
+    "path": "snapshot://teacher-ranked-364.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.081,
@@ -22802,8 +22674,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-366.mp4",
-    "path": "snapshot://teacher-ranked-366.mp4",
+    "filename": "teacher-ranked-365.mp4",
+    "path": "snapshot://teacher-ranked-365.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.3002,
@@ -22863,8 +22735,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-367.mp4",
-    "path": "snapshot://teacher-ranked-367.mp4",
+    "filename": "teacher-ranked-366.mp4",
+    "path": "snapshot://teacher-ranked-366.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.366433,
@@ -22924,8 +22796,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-368.mp4",
-    "path": "snapshot://teacher-ranked-368.mp4",
+    "filename": "teacher-ranked-367.mp4",
+    "path": "snapshot://teacher-ranked-367.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.133789,
@@ -22985,8 +22857,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-369.mp4",
-    "path": "snapshot://teacher-ranked-369.mp4",
+    "filename": "teacher-ranked-368.mp4",
+    "path": "snapshot://teacher-ranked-368.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.016544,
@@ -23046,8 +22918,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-370.mp4",
-    "path": "snapshot://teacher-ranked-370.mp4",
+    "filename": "teacher-ranked-369.mp4",
+    "path": "snapshot://teacher-ranked-369.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.232311,
@@ -23107,8 +22979,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-371.mp4",
-    "path": "snapshot://teacher-ranked-371.mp4",
+    "filename": "teacher-ranked-370.mp4",
+    "path": "snapshot://teacher-ranked-370.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.251156,
@@ -23168,8 +23040,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-372.mp4",
-    "path": "snapshot://teacher-ranked-372.mp4",
+    "filename": "teacher-ranked-371.mp4",
+    "path": "snapshot://teacher-ranked-371.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 24.247589,
@@ -23229,8 +23101,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-373.mp4",
-    "path": "snapshot://teacher-ranked-373.mp4",
+    "filename": "teacher-ranked-372.mp4",
+    "path": "snapshot://teacher-ranked-372.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.036089,
@@ -23290,8 +23162,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-374.mp4",
-    "path": "snapshot://teacher-ranked-374.mp4",
+    "filename": "teacher-ranked-373.mp4",
+    "path": "snapshot://teacher-ranked-373.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.374063,
@@ -23351,8 +23223,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-375.mp4",
-    "path": "snapshot://teacher-ranked-375.mp4",
+    "filename": "teacher-ranked-374.mp4",
+    "path": "snapshot://teacher-ranked-374.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.016478,
@@ -23412,8 +23284,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-376.mp4",
-    "path": "snapshot://teacher-ranked-376.mp4",
+    "filename": "teacher-ranked-375.mp4",
+    "path": "snapshot://teacher-ranked-375.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.250444,
@@ -23473,8 +23345,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-377.mp4",
-    "path": "snapshot://teacher-ranked-377.mp4",
+    "filename": "teacher-ranked-376.mp4",
+    "path": "snapshot://teacher-ranked-376.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.200178,
@@ -23534,8 +23406,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-378.mp4",
-    "path": "snapshot://teacher-ranked-378.mp4",
+    "filename": "teacher-ranked-377.mp4",
+    "path": "snapshot://teacher-ranked-377.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.031189,
@@ -23595,8 +23467,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-379.mp4",
-    "path": "snapshot://teacher-ranked-379.mp4",
+    "filename": "teacher-ranked-378.mp4",
+    "path": "snapshot://teacher-ranked-378.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.484,
@@ -23656,8 +23528,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-380.mp4",
-    "path": "snapshot://teacher-ranked-380.mp4",
+    "filename": "teacher-ranked-379.mp4",
+    "path": "snapshot://teacher-ranked-379.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.398522,
@@ -23717,8 +23589,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-381.mp4",
-    "path": "snapshot://teacher-ranked-381.mp4",
+    "filename": "teacher-ranked-380.mp4",
+    "path": "snapshot://teacher-ranked-380.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.231067,
@@ -23778,8 +23650,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-382.mp4",
-    "path": "snapshot://teacher-ranked-382.mp4",
+    "filename": "teacher-ranked-381.mp4",
+    "path": "snapshot://teacher-ranked-381.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.050933,
@@ -23839,8 +23711,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-383.mp4",
-    "path": "snapshot://teacher-ranked-383.mp4",
+    "filename": "teacher-ranked-382.mp4",
+    "path": "snapshot://teacher-ranked-382.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.203688,
@@ -23900,8 +23772,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-384.mp4",
-    "path": "snapshot://teacher-ranked-384.mp4",
+    "filename": "teacher-ranked-383.mp4",
+    "path": "snapshot://teacher-ranked-383.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 19.997922,
@@ -23961,8 +23833,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-385.mp4",
-    "path": "snapshot://teacher-ranked-385.mp4",
+    "filename": "teacher-ranked-384.mp4",
+    "path": "snapshot://teacher-ranked-384.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.151011,
@@ -24022,8 +23894,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-386.mp4",
-    "path": "snapshot://teacher-ranked-386.mp4",
+    "filename": "teacher-ranked-385.mp4",
+    "path": "snapshot://teacher-ranked-385.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.466589,
@@ -24083,8 +23955,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-387.mp4",
-    "path": "snapshot://teacher-ranked-387.mp4",
+    "filename": "teacher-ranked-386.mp4",
+    "path": "snapshot://teacher-ranked-386.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.1671,
@@ -24144,8 +24016,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-388.mp4",
-    "path": "snapshot://teacher-ranked-388.mp4",
+    "filename": "teacher-ranked-387.mp4",
+    "path": "snapshot://teacher-ranked-387.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.217222,
@@ -24205,8 +24077,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-389.mp4",
-    "path": "snapshot://teacher-ranked-389.mp4",
+    "filename": "teacher-ranked-388.mp4",
+    "path": "snapshot://teacher-ranked-388.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.317522,
@@ -24266,8 +24138,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-390.mp4",
-    "path": "snapshot://teacher-ranked-390.mp4",
+    "filename": "teacher-ranked-389.mp4",
+    "path": "snapshot://teacher-ranked-389.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.284811,
@@ -24327,8 +24199,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-391.mp4",
-    "path": "snapshot://teacher-ranked-391.mp4",
+    "filename": "teacher-ranked-390.mp4",
+    "path": "snapshot://teacher-ranked-390.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.301967,
@@ -24388,8 +24260,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-392.mp4",
-    "path": "snapshot://teacher-ranked-392.mp4",
+    "filename": "teacher-ranked-391.mp4",
+    "path": "snapshot://teacher-ranked-391.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.100456,
@@ -24449,8 +24321,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-393.mp4",
-    "path": "snapshot://teacher-ranked-393.mp4",
+    "filename": "teacher-ranked-392.mp4",
+    "path": "snapshot://teacher-ranked-392.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.265133,
@@ -24513,8 +24385,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent, stationary target"
   },
   {
-    "filename": "teacher-ranked-394.mp4",
-    "path": "snapshot://teacher-ranked-394.mp4",
+    "filename": "teacher-ranked-393.mp4",
+    "path": "snapshot://teacher-ranked-393.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 23.466979,
@@ -24575,8 +24447,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-395.mp4",
-    "path": "snapshot://teacher-ranked-395.mp4",
+    "filename": "teacher-ranked-394.mp4",
+    "path": "snapshot://teacher-ranked-394.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 24.400033,
@@ -24637,8 +24509,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-396.mp4",
-    "path": "snapshot://teacher-ranked-396.mp4",
+    "filename": "teacher-ranked-395.mp4",
+    "path": "snapshot://teacher-ranked-395.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.400111,
@@ -24699,8 +24571,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-397.mp4",
-    "path": "snapshot://teacher-ranked-397.mp4",
+    "filename": "teacher-ranked-396.mp4",
+    "path": "snapshot://teacher-ranked-396.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 15.383611,
@@ -24761,8 +24633,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-398.mp4",
-    "path": "snapshot://teacher-ranked-398.mp4",
+    "filename": "teacher-ranked-397.mp4",
+    "path": "snapshot://teacher-ranked-397.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.0826,
@@ -24823,8 +24695,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-399.mp4",
-    "path": "snapshot://teacher-ranked-399.mp4",
+    "filename": "teacher-ranked-398.mp4",
+    "path": "snapshot://teacher-ranked-398.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.449922,
@@ -24885,8 +24757,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-400.mp4",
-    "path": "snapshot://teacher-ranked-400.mp4",
+    "filename": "teacher-ranked-399.mp4",
+    "path": "snapshot://teacher-ranked-399.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 23.048867,
@@ -24947,8 +24819,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-401.mp4",
-    "path": "snapshot://teacher-ranked-401.mp4",
+    "filename": "teacher-ranked-400.mp4",
+    "path": "snapshot://teacher-ranked-400.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.330978,
@@ -25009,8 +24881,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-402.mp4",
-    "path": "snapshot://teacher-ranked-402.mp4",
+    "filename": "teacher-ranked-401.mp4",
+    "path": "snapshot://teacher-ranked-401.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 24.349944,
@@ -25071,8 +24943,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-403.mp4",
-    "path": "snapshot://teacher-ranked-403.mp4",
+    "filename": "teacher-ranked-402.mp4",
+    "path": "snapshot://teacher-ranked-402.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.250822,
@@ -25133,8 +25005,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-404.mp4",
-    "path": "snapshot://teacher-ranked-404.mp4",
+    "filename": "teacher-ranked-403.mp4",
+    "path": "snapshot://teacher-ranked-403.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 26.465478,
@@ -25195,8 +25067,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-405.mp4",
-    "path": "snapshot://teacher-ranked-405.mp4",
+    "filename": "teacher-ranked-404.mp4",
+    "path": "snapshot://teacher-ranked-404.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 26.265967,
@@ -25257,8 +25129,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-406.mp4",
-    "path": "snapshot://teacher-ranked-406.mp4",
+    "filename": "teacher-ranked-405.mp4",
+    "path": "snapshot://teacher-ranked-405.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.300933,
@@ -25319,8 +25191,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-407.mp4",
-    "path": "snapshot://teacher-ranked-407.mp4",
+    "filename": "teacher-ranked-406.mp4",
+    "path": "snapshot://teacher-ranked-406.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.449678,
@@ -25381,8 +25253,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-408.mp4",
-    "path": "snapshot://teacher-ranked-408.mp4",
+    "filename": "teacher-ranked-407.mp4",
+    "path": "snapshot://teacher-ranked-407.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 19.984111,
@@ -25443,8 +25315,8 @@
     "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
   },
   {
-    "filename": "teacher-ranked-409.mp4",
-    "path": "snapshot://teacher-ranked-409.mp4",
+    "filename": "teacher-ranked-408.mp4",
+    "path": "snapshot://teacher-ranked-408.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.385644,
@@ -25506,8 +25378,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty"
   },
   {
-    "filename": "teacher-ranked-410.mp4",
-    "path": "snapshot://teacher-ranked-410.mp4",
+    "filename": "teacher-ranked-409.mp4",
+    "path": "snapshot://teacher-ranked-409.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.267522,
@@ -25569,8 +25441,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty"
   },
   {
-    "filename": "teacher-ranked-411.mp4",
-    "path": "snapshot://teacher-ranked-411.mp4",
+    "filename": "teacher-ranked-410.mp4",
+    "path": "snapshot://teacher-ranked-410.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.400422,
@@ -25632,8 +25504,8 @@
     "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty"
   },
   {
-    "filename": "teacher-ranked-412.mp4",
-    "path": "snapshot://teacher-ranked-412.mp4",
+    "filename": "teacher-ranked-411.mp4",
+    "path": "snapshot://teacher-ranked-411.mp4",
     "source": "supervised",
     "feature_source": "sanitized_submission_snapshot",
     "duration_sec": 20.167322,
@@ -25652,7 +25524,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "other_weapon_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -25677,7 +25548,7 @@
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
       "automatic_kill": "no",
-      "other_weapon_kill": "yes",
+      "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
       "stationary_sniper_target": "no",
@@ -25695,6 +25566,71 @@
     "final_score": 0.16641754559662802,
     "confidence": 0.35,
     "score_explanation": "primary shotgun one pump, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty"
+  },
+  {
+    "filename": "teacher-ranked-412.mp4",
+    "path": "snapshot://teacher-ranked-412.mp4",
+    "source": "supervised",
+    "feature_source": "sanitized_submission_snapshot",
+    "duration_sec": 22.167211,
+    "width": 1920,
+    "height": 1080,
+    "fps": 60.0,
+    "size_bytes": 42547521,
+    "motion_score": 0.2125,
+    "audio_peak_score": 0.25,
+    "silence_ratio": 0.65,
+    "action_density": 0.2708333333333333,
+    "extraction_confidence": 0.35,
+    "tags": [
+      "combat_visible",
+      "elimination_or_knock",
+      "enemy_visible",
+      "high_damage_hit",
+      "multi_kill",
+      "opponent_likely_bot",
+      "shotgun_kill",
+      "shotgun_one_pump"
+    ],
+    "thumbnail_variant": "ridge",
+    "teacher_provider": "fireworks",
+    "teacher_model": "precomputed-submission-snapshot",
+    "teacher_labels": {
+      "combat_visible": "yes",
+      "enemy_visible": "yes",
+      "elimination_or_knock": "yes",
+      "high_damage_hit": "yes",
+      "flick_shot": "no",
+      "no_scope": "no",
+      "trickshot": "no",
+      "build_fight": "no",
+      "clutch": "no",
+      "cleanup_kill": "no",
+      "downed_finish": "no",
+      "spray_kill": "no",
+      "sniper_kill": "no",
+      "shotgun_kill": "yes",
+      "shotgun_one_pump": "yes",
+      "pistol_kill": "no",
+      "automatic_kill": "no",
+      "other_weapon_kill": "no",
+      "opponent_likely_bot": "yes",
+      "stationary_target": "no",
+      "stationary_sniper_target": "no",
+      "competitive_context": "no",
+      "victory": "no",
+      "multi_kill": "yes",
+      "fast_edit": "no",
+      "rotation_traversal": "no",
+      "looting_or_menu": "no",
+      "downtime": "no",
+      "confidence": 0.98,
+      "evidence": []
+    },
+    "base_score": 0.48175,
+    "final_score": 0.1623846264091959,
+    "confidence": 0.35,
+    "score_explanation": "primary shotgun one pump, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent"
   },
   {
     "filename": "teacher-ranked-413.mp4",
@@ -25720,7 +25656,6 @@
       "fast_edit",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -25743,7 +25678,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -25780,7 +25715,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "build_fight",
       "combat_visible",
       "downed_finish",
@@ -25813,7 +25747,7 @@
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -26098,7 +26032,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
@@ -26125,7 +26058,7 @@
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -26353,7 +26286,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -26376,7 +26308,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -26413,7 +26345,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
@@ -26440,7 +26371,7 @@
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -26476,7 +26407,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
@@ -26503,7 +26433,7 @@
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -26543,8 +26473,7 @@
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
-      "multi_kill",
-      "pistol_kill"
+      "multi_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -26565,7 +26494,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "yes",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -26602,7 +26531,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
@@ -26629,7 +26557,7 @@
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -26665,7 +26593,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
@@ -26692,7 +26619,7 @@
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -26733,7 +26660,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -26755,7 +26681,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "yes",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -26797,7 +26723,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -26819,7 +26744,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "yes",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -26861,7 +26786,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -26883,7 +26807,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "yes",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -26926,7 +26850,8 @@
       "looting_or_menu",
       "opponent_likely_bot",
       "pistol_kill",
-      "rotation_traversal"
+      "rotation_traversal",
+      "stationary_target"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -26951,7 +26876,7 @@
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "yes",
-      "stationary_target": "no",
+      "stationary_target": "yes",
       "stationary_sniper_target": "no",
       "competitive_context": "no",
       "victory": "no",
@@ -26966,7 +26891,7 @@
     "base_score": 0.2117499999999999,
     "final_score": 0.1405627015528644,
     "confidence": 0.35,
-    "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent"
+    "score_explanation": "primary active finish, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent, stationary target"
   },
   {
     "filename": "teacher-ranked-433.mp4",
@@ -26989,8 +26914,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "other_weapon_kill",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -27013,9 +26936,9 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
-      "other_weapon_kill": "yes",
+      "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
       "stationary_sniper_target": "no",
@@ -27120,7 +27043,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -27143,7 +27065,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -27185,7 +27107,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -27208,7 +27129,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -27250,7 +27171,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -27273,7 +27193,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -27310,15 +27230,13 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
       "shotgun_kill",
-      "shotgun_one_pump",
-      "spray_kill"
+      "shotgun_one_pump"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -27335,12 +27253,12 @@
       "clutch": "no",
       "cleanup_kill": "no",
       "downed_finish": "no",
-      "spray_kill": "yes",
+      "spray_kill": "no",
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -27376,15 +27294,13 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
       "shotgun_kill",
-      "shotgun_one_pump",
-      "spray_kill"
+      "shotgun_one_pump"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -27401,12 +27317,12 @@
       "clutch": "no",
       "cleanup_kill": "no",
       "downed_finish": "no",
-      "spray_kill": "yes",
+      "spray_kill": "no",
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -27512,7 +27428,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -27535,7 +27450,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -27572,7 +27487,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "downed_finish",
       "elimination_or_knock",
@@ -27580,8 +27494,7 @@
       "high_damage_hit",
       "multi_kill",
       "shotgun_kill",
-      "shotgun_one_pump",
-      "spray_kill"
+      "shotgun_one_pump"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -27598,12 +27511,12 @@
       "clutch": "no",
       "cleanup_kill": "no",
       "downed_finish": "yes",
-      "spray_kill": "yes",
+      "spray_kill": "no",
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -27644,7 +27557,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -27667,7 +27579,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -27709,7 +27621,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -27732,7 +27643,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -27769,7 +27680,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "downed_finish",
       "elimination_or_knock",
@@ -27777,8 +27687,7 @@
       "high_damage_hit",
       "multi_kill",
       "shotgun_kill",
-      "shotgun_one_pump",
-      "spray_kill"
+      "shotgun_one_pump"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -27795,12 +27704,12 @@
       "clutch": "no",
       "cleanup_kill": "no",
       "downed_finish": "yes",
-      "spray_kill": "yes",
+      "spray_kill": "no",
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -27842,7 +27751,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump"
     ],
@@ -27865,7 +27773,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -27902,7 +27810,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
@@ -27931,7 +27838,7 @@
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
       "pistol_kill": "no",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -28032,13 +27939,13 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
       "opponent_likely_bot",
-      "pistol_kill"
+      "pistol_kill",
+      "stationary_target"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -28060,10 +27967,10 @@
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "yes",
-      "stationary_target": "no",
+      "stationary_target": "yes",
       "stationary_sniper_target": "no",
       "competitive_context": "no",
       "victory": "no",
@@ -28078,7 +27985,7 @@
     "base_score": 0.3817499999999999,
     "final_score": 0.1256169121740069,
     "confidence": 0.35,
-    "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent"
+    "score_explanation": "primary active finish, multi kill, good clip length, matches combat_visible, enemy_visible, quiet/low energy penalty, low-action tag penalty, likely bot opponent, stationary target"
   },
   {
     "filename": "teacher-ranked-450.mp4",
@@ -28096,14 +28003,12 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
       "opponent_likely_bot",
-      "pistol_kill",
       "shotgun_kill",
       "shotgun_one_pump",
       "stationary_target"
@@ -28127,8 +28032,8 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
-      "automatic_kill": "yes",
+      "pistol_kill": "no",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "yes",
       "stationary_target": "yes",
@@ -28170,7 +28075,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -28192,7 +28096,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "yes",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -28234,7 +28138,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "shotgun_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -28254,7 +28157,7 @@
       "downed_finish": "no",
       "spray_kill": "yes",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "yes",
@@ -28426,7 +28329,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "shotgun_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -28446,7 +28348,7 @@
       "downed_finish": "no",
       "spray_kill": "yes",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "yes",
@@ -28618,7 +28520,6 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
       "rotation_traversal",
       "shotgun_kill",
       "shotgun_one_pump"
@@ -28642,7 +28543,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -29001,7 +28902,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "shotgun_kill",
       "spray_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -29021,7 +28921,7 @@
       "downed_finish": "no",
       "spray_kill": "yes",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "yes",
@@ -29066,8 +28966,7 @@
       "enemy_visible",
       "high_damage_hit",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -29086,7 +28985,7 @@
       "downed_finish": "yes",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -29129,8 +29028,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -29149,7 +29047,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -29192,8 +29090,7 @@
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
-      "multi_kill",
-      "shotgun_kill"
+      "multi_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -29212,7 +29109,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "yes",
@@ -29315,7 +29212,6 @@
     "action_density": 0.2708333333333333,
     "extraction_confidence": 0.35,
     "tags": [
-      "automatic_kill",
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
@@ -29342,7 +29238,7 @@
       "shotgun_kill": "yes",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
-      "automatic_kill": "yes",
+      "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
       "stationary_target": "no",
@@ -29568,8 +29464,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -29588,7 +29483,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -29693,7 +29588,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
       "shotgun_kill"
     ],
     "thumbnail_variant": "ridge",
@@ -29715,7 +29609,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -29820,8 +29714,7 @@
       "downed_finish",
       "elimination_or_knock",
       "enemy_visible",
-      "multi_kill",
-      "pistol_kill"
+      "multi_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -29842,7 +29735,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "no",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "yes",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -29883,8 +29776,7 @@
       "combat_visible",
       "elimination_or_knock",
       "enemy_visible",
-      "multi_kill",
-      "shotgun_kill"
+      "multi_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -29903,7 +29795,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "no",
       "automatic_kill": "yes",
@@ -30009,8 +29901,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -30029,7 +29920,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -30073,8 +29964,7 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
-      "shotgun_kill"
+      "pistol_kill"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -30093,7 +29983,7 @@
       "downed_finish": "yes",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -32998,8 +32888,7 @@
       "enemy_visible",
       "multi_kill",
       "pistol_kill",
-      "rotation_traversal",
-      "shotgun_kill"
+      "rotation_traversal"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -33018,7 +32907,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -33124,7 +33013,6 @@
       "elimination_or_knock",
       "enemy_visible",
       "multi_kill",
-      "pistol_kill",
       "rotation_traversal",
       "shotgun_kill"
     ],
@@ -33147,7 +33035,7 @@
       "sniper_kill": "no",
       "shotgun_kill": "yes",
       "shotgun_one_pump": "no",
-      "pistol_kill": "yes",
+      "pistol_kill": "no",
       "automatic_kill": "no",
       "other_weapon_kill": "no",
       "opponent_likely_bot": "no",
@@ -34065,8 +33953,7 @@
       "looting_or_menu",
       "multi_kill",
       "pistol_kill",
-      "rotation_traversal",
-      "shotgun_kill"
+      "rotation_traversal"
     ],
     "thumbnail_variant": "ridge",
     "teacher_provider": "fireworks",
@@ -34085,7 +33972,7 @@
       "downed_finish": "no",
       "spray_kill": "no",
       "sniper_kill": "no",
-      "shotgun_kill": "yes",
+      "shotgun_kill": "no",
       "shotgun_one_pump": "no",
       "pistol_kill": "yes",
       "automatic_kill": "no",
@@ -34661,75 +34548,6 @@
     "score_explanation": "primary shotgun one pump, multi kill, audio spikes, good clip length, matches combat_visible, enemy_visible"
   },
   {
-    "filename": "Fortnite 2026.07.08 - 11.14.53.96.Elimination.DVR.mp4",
-    "path": "/app/sample-clips/Fortnite 2026.07.08 - 11.14.53.96.Elimination.DVR.mp4",
-    "source": "local",
-    "feature_source": "precomputed_local_student",
-    "duration_sec": 20.434333,
-    "width": 1920,
-    "height": 1080,
-    "fps": 60.0,
-    "size_bytes": 49571151,
-    "motion_score": 0.6085579028931358,
-    "audio_peak_score": 0.5229110114580202,
-    "silence_ratio": 0.3770889885419798,
-    "action_density": 0.5847933086030587,
-    "extraction_confidence": 0.5,
-    "tags": [
-      "combat_visible",
-      "elimination_or_knock",
-      "enemy_visible",
-      "high_damage_hit",
-      "multi_kill",
-      "pistol_kill",
-      "shotgun_kill",
-      "shotgun_one_pump"
-    ],
-    "teacher_provider": "local",
-    "teacher_model": "precomputed-local-student",
-    "teacher_labels": {
-      "combat_visible": "yes",
-      "enemy_visible": "yes",
-      "elimination_or_knock": "yes",
-      "high_damage_hit": "yes",
-      "flick_shot": "no",
-      "no_scope": "no",
-      "trickshot": "no",
-      "build_fight": "no",
-      "clutch": "no",
-      "cleanup_kill": "no",
-      "downed_finish": "no",
-      "spray_kill": "no",
-      "sniper_kill": "no",
-      "shotgun_kill": "yes",
-      "shotgun_one_pump": "yes",
-      "pistol_kill": "yes",
-      "automatic_kill": "no",
-      "other_weapon_kill": "no",
-      "opponent_likely_bot": "no",
-      "stationary_target": "no",
-      "stationary_sniper_target": "no",
-      "competitive_context": "no",
-      "victory": "no",
-      "multi_kill": "yes",
-      "fast_edit": "no",
-      "rotation_traversal": "no",
-      "looting_or_menu": "no",
-      "downtime": "no",
-      "confidence": 0.5,
-      "evidence": []
-    },
-    "teacher_events": {
-      "decision_schema_version": "highlight-audit-v1",
-      "highlight_description": "0:16 - shotgun knocks an active opponent for 139 damage. A later pistol knocks an active opponent for 160 damage."
-    },
-    "teacher_event_status": "attributed",
-    "base_score": 0.8559986099742036,
-    "final_score": 0.8559986099742036,
-    "confidence": 0.5,
-    "score_explanation": "primary shotgun one pump, multi kill, high motion, audio spikes, good clip length, matches combat_visible, enemy_visible"
-  },
-  {
     "filename": "Fortnite 2026.07.09 - 11.37.31.111.Down.DVR.mp4",
     "path": "/app/sample-clips/Fortnite 2026.07.09 - 11.37.31.111.Down.DVR.mp4",
     "source": "local",
@@ -35258,5 +35076,73 @@
     "final_score": 0.6919014185995382,
     "confidence": 0.5,
     "score_explanation": "primary high damage hit, good clip length, matches combat_visible, enemy_visible"
+  },
+  {
+    "filename": "Fortnite 2026.07.08 - 11.14.53.96.Elimination.DVR.mp4",
+    "path": "/app/sample-clips/Fortnite 2026.07.08 - 11.14.53.96.Elimination.DVR.mp4",
+    "source": "local",
+    "feature_source": "precomputed_local_student",
+    "duration_sec": 20.434333,
+    "width": 1920,
+    "height": 1080,
+    "fps": 60.0,
+    "size_bytes": 49571151,
+    "motion_score": 0.6085579028931358,
+    "audio_peak_score": 0.5229110114580202,
+    "silence_ratio": 0.3770889885419798,
+    "action_density": 0.5847933086030587,
+    "extraction_confidence": 0.5,
+    "tags": [
+      "combat_visible",
+      "elimination_or_knock",
+      "enemy_visible",
+      "high_damage_hit",
+      "multi_kill",
+      "shotgun_kill",
+      "shotgun_one_pump"
+    ],
+    "teacher_provider": "local",
+    "teacher_model": "precomputed-local-student",
+    "teacher_labels": {
+      "combat_visible": "yes",
+      "enemy_visible": "yes",
+      "elimination_or_knock": "yes",
+      "high_damage_hit": "yes",
+      "flick_shot": "no",
+      "no_scope": "no",
+      "trickshot": "no",
+      "build_fight": "no",
+      "clutch": "no",
+      "cleanup_kill": "no",
+      "downed_finish": "no",
+      "spray_kill": "no",
+      "sniper_kill": "no",
+      "shotgun_kill": "yes",
+      "shotgun_one_pump": "yes",
+      "pistol_kill": "no",
+      "automatic_kill": "no",
+      "other_weapon_kill": "no",
+      "opponent_likely_bot": "no",
+      "stationary_target": "no",
+      "stationary_sniper_target": "no",
+      "competitive_context": "no",
+      "victory": "no",
+      "multi_kill": "yes",
+      "fast_edit": "no",
+      "rotation_traversal": "no",
+      "looting_or_menu": "no",
+      "downtime": "no",
+      "confidence": 0.5,
+      "evidence": []
+    },
+    "teacher_events": {
+      "decision_schema_version": "highlight-audit-v1",
+      "highlight_description": "0:16 - shotgun knocks an active opponent for 139 damage. A later pistol knocks an active opponent for 160 damage."
+    },
+    "teacher_event_status": "attributed",
+    "base_score": 0.8559986099742036,
+    "final_score": 0.2139996524935509,
+    "confidence": 0.5,
+    "score_explanation": "primary shotgun one pump, multi kill, high motion, audio spikes, good clip length, matches combat_visible, enemy_visible"
   }
 ]

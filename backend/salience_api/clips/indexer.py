@@ -3,7 +3,7 @@ from pathlib import Path, PureWindowsPath
 import json
 import sqlite3
 
-from salience_api.clips.media_probe import safe_probe_media
+from salience_media.probe import safe_probe_media
 from salience_api.features.basic import (
     BasicFeatures,
     duration_quality,
@@ -814,6 +814,68 @@ def rescore_all_clips(conn: sqlite3.Connection) -> None:
         """,
         (len(training_weights), positives, negatives, _now()),
     )
+
+
+def rescore_clips_preserving_personalization(
+    conn: sqlite3.Connection, clip_ids: list[int]
+) -> None:
+    """Recompute changed clip facts without retraining user taste scores."""
+    ids = sorted(set(int(clip_id) for clip_id in clip_ids))
+    if not ids:
+        return
+    placeholders = ",".join("?" for _ in ids)
+    events_by_clip = _latest_teacher_events_by_clip(conn)
+    rows = conn.execute(
+        f"""
+        select
+            c.id as clip_id,
+            c.duration_sec,
+            cf.motion_score,
+            cf.audio_peak_score,
+            cf.silence_ratio,
+            cf.action_density,
+            cf.extraction_confidence,
+            cf.feature_json,
+            cs.personal_score,
+            tl.label_json as teacher_label_json
+        from clips c
+        join clip_features cf on cf.clip_id = c.id
+        join clip_scores cs on cs.clip_id = c.id
+        left join teacher_labels tl on tl.id = coalesce(
+            (select label_row_id from live_teacher_assignments where clip_id = c.id),
+            (
+                select id from teacher_labels
+                where clip_id = c.id
+                  and (schema_version like ? or schema_version like ?)
+                order by case when schema_version like ? then 1 else 0 end desc,
+                         id desc
+                limit 1
+            )
+        )
+        where c.id in ({placeholders})
+        """,
+        (
+            f"{TEACHER_SCHEMA_VERSION}:%",
+            f"{TEACHER_FALLBACK_SCHEMA_VERSION}:%",
+            f"{TEACHER_SCHEMA_VERSION}:%",
+            *ids,
+        ),
+    ).fetchall()
+    for row in rows:
+        clip_id = int(row["clip_id"])
+        _upsert_score(
+            conn,
+            clip_id,
+            _features_from_row(row),
+            personal_score=(
+                float(row["personal_score"])
+                if row["personal_score"] is not None
+                else None
+            ),
+            highlight_profile=_highlight_profile_from_event_data(
+                events_by_clip.get(clip_id)
+            ),
+        )
 
 
 def training_status(conn: sqlite3.Connection) -> dict:

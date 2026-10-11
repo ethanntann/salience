@@ -1,23 +1,35 @@
 from dataclasses import dataclass
-from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from fractions import Fraction
 from functools import lru_cache
 import math
-import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-from typing import TypeVar
+
+from salience_media.ffmpeg import extract_frame, parallel_map
 
 
-_T = TypeVar("_T")
-_U = TypeVar("_U")
 _BATCH_DECODE_MAX_DURATION_SEC = 60.0
 _OCR_FILTER = (
     "crop=w=iw*0.48:h=ih*0.26:x=iw*0.32:y=ih*0.70,"
     "scale=1440:-2:flags=lanczos,unsharp=5:5:0.8:3:3:0.4"
+)
+_TIMELINE_FILTER = "scale=w=960:h=-2:force_original_aspect_ratio=decrease"
+# Event composite: full frame | action crop | enlarged weapon HUD, hstacked to
+# 1680x432. Widths are load-bearing -- schema.COMPOSITE_HUD_LEFT_RATIO slices the
+# HUD panel back out at 1280/1680, and the student was trained on this exact layout.
+_EVENT_COMPOSITE_FILTER = (
+    "split=3[full][action][hud];"
+    "[full]scale=640:360:force_original_aspect_ratio=decrease,"
+    "pad=640:432:(ow-iw)/2:(oh-ih)[fullout];"
+    "[action]crop=w=iw*0.72:h=ih*0.72:x=iw*0.14:y=ih*0.12,"
+    "scale=640:432:force_original_aspect_ratio=decrease,"
+    "pad=640:432:(ow-iw)/2:(oh-ih)[actionout];"
+    "[hud]crop=w=iw*0.56:h=ih*0.40:x=iw*0.42:y=ih*0.58,"
+    "scale=400:432:force_original_aspect_ratio=decrease,"
+    "pad=400:432:(ow-iw)/2:(oh-ih)[hudout];"
+    "[fullout][actionout][hudout]hstack=inputs=3"
 )
 
 
@@ -29,30 +41,6 @@ class Keyframe:
     event_index: int | None = None
     event_center_sec: float | None = None
     ocr_path: Path | None = None
-
-
-def _ffmpeg_worker_count() -> int:
-    """Return a bounded extraction pool size with a sequential override."""
-    configured = os.getenv("SALIENCE_FFMPEG_WORKERS")
-    if configured:
-        try:
-            return max(1, min(8, int(configured)))
-        except ValueError:
-            pass
-    cpu_count = getattr(os, "process_cpu_count", os.cpu_count)() or 1
-    return max(1, min(4, cpu_count))
-
-
-def _parallel_map(items: list[_T], worker: Callable[[_T], _U]) -> list[_U]:
-    """Run independent FFmpeg jobs concurrently while preserving input order."""
-    workers = _ffmpeg_worker_count()
-    if workers <= 1 or len(items) <= 1:
-        return [worker(item) for item in items]
-    with ThreadPoolExecutor(
-        max_workers=min(workers, len(items)),
-        thread_name_prefix="salience-ffmpeg",
-    ) as executor:
-        return list(executor.map(worker, items))
 
 
 @lru_cache(maxsize=64)
@@ -141,6 +129,77 @@ def _extract_many(
         shutil.rmtree(output_dir, ignore_errors=True)
 
 
+def _frame_indices(timestamps: list[float], fps: float) -> tuple[list[int], list[int]]:
+    """Map timestamps to CFR frame indices, plus the sorted unique set."""
+    indices = [max(0, math.ceil(timestamp * fps - 1e-9)) for timestamp in timestamps]
+    return indices, sorted(set(indices))
+
+
+def _extract_many_variants(
+    path: Path,
+    timestamps: list[float],
+    variants: list[tuple[str, list[Path]]],
+    fps: float | None,
+) -> bool:
+    """Decode selected CFR frames once and emit every requested filter variant.
+
+    ``select`` still walks the whole stream, so N filter graphs over the same
+    timestamps previously cost N decodes. Fanning the selected frames out through
+    ``split`` collapses that to one pass while keeping each graph byte-identical
+    to its single-variant form.
+    """
+    if not timestamps or fps is None or len(variants) < 2:
+        return False
+    if any(len(outputs) != len(timestamps) for _, outputs in variants):
+        return False
+
+    indices, unique_indices = _frame_indices(timestamps, fps)
+    select_expression = "+".join(f"eq(n\\,{index})" for index in unique_indices)
+    stage_dirs = [Path(tempfile.mkdtemp(prefix="salience-batch-")) for _ in variants]
+    try:
+        labels = "".join(f"[s{position}]" for position in range(len(variants)))
+        chains = [f"[0:v]select='{select_expression}',split={len(variants)}{labels}"]
+        chains += [
+            f"[s{position}]{filter_graph}[out{position}]"
+            for position, (filter_graph, _) in enumerate(variants)
+        ]
+        command = ["ffmpeg", "-y", "-i", str(path), "-filter_complex", ";".join(chains)]
+        for position, stage_dir in enumerate(stage_dirs):
+            command += [
+                "-map",
+                f"[out{position}]",
+                "-vsync",
+                "0",
+                "-an",
+                "-q:v",
+                "3",
+                str(stage_dir / "frame-%06d.jpg"),
+            ]
+        completed = subprocess.run(command, capture_output=True, text=True)
+        if completed.returncode != 0:
+            return False
+
+        # Validate every variant before copying so a late failure cannot leave
+        # callers with a half-written frame set.
+        staged: list[list[Path]] = []
+        for stage_dir in stage_dirs:
+            extracted = sorted(stage_dir.glob("frame-*.jpg"))
+            if len(extracted) != len(unique_indices):
+                return False
+            staged.append(extracted)
+
+        for extracted, (_, outputs) in zip(staged, variants, strict=True):
+            by_index = dict(zip(unique_indices, extracted, strict=True))
+            for index, output in zip(indices, outputs, strict=True):
+                shutil.copyfile(by_index[index], output)
+        return True
+    except (OSError, shutil.Error):
+        return False
+    finally:
+        for stage_dir in stage_dirs:
+            shutil.rmtree(stage_dir, ignore_errors=True)
+
+
 def keyframe_timestamps(
     duration_sec: float | None, *, count: int | None = None
 ) -> list[float]:
@@ -190,31 +249,6 @@ def event_window_timestamps(
     return windows
 
 
-def _extract_frame(
-    path: Path, timestamp: float, output: Path, filter_graph: str
-) -> bool:
-    completed = subprocess.run(
-        [
-            "ffmpeg",
-            "-y",
-            "-ss",
-            str(timestamp),
-            "-i",
-            str(path),
-            "-vf",
-            filter_graph,
-            "-frames:v",
-            "1",
-            "-q:v",
-            "3",
-            str(output),
-        ],
-        capture_output=True,
-        text=True,
-    )
-    return completed.returncode == 0 and output.exists()
-
-
 def extract_timeline_keyframes(
     path: Path,
     duration_sec: float | None,
@@ -234,12 +268,7 @@ def extract_timeline_keyframes(
 
     def extract(spec: tuple[int, float, Path]) -> bool:
         _, timestamp, output = spec
-        return _extract_frame(
-            path,
-            timestamp,
-            output,
-            "scale=w=960:h=-2:force_original_aspect_ratio=decrease",
-        )
+        return extract_frame(path, timestamp, output, _TIMELINE_FILTER)
 
     timestamps = [timestamp for _, timestamp, _ in specs]
     outputs = [output for _, _, output in specs]
@@ -249,15 +278,9 @@ def extract_timeline_keyframes(
         and duration_sec <= _BATCH_DECODE_MAX_DURATION_SEC
         else None
     )
-    batched = _extract_many(
-        path,
-        timestamps,
-        outputs,
-        "scale=w=960:h=-2:force_original_aspect_ratio=decrease",
-        fps,
-    )
+    batched = _extract_many(path, timestamps, outputs, _TIMELINE_FILTER, fps)
     extracted_results = (
-        [True] * len(specs) if batched else _parallel_map(specs, extract)
+        [True] * len(specs) if batched else parallel_map(specs, extract)
     )
 
     for (index, timestamp, output), extracted in zip(
@@ -285,18 +308,7 @@ def extract_event_keyframes(
         return []
     output_dir = Path(tempfile.mkdtemp(prefix="salience-events-"))
     frames: list[Keyframe] = []
-    filter_graph = (
-        "split=3[full][action][hud];"
-        "[full]scale=640:360:force_original_aspect_ratio=decrease,"
-        "pad=640:432:(ow-iw)/2:(oh-ih)[fullout];"
-        "[action]crop=w=iw*0.72:h=ih*0.72:x=iw*0.14:y=ih*0.12,"
-        "scale=640:432:force_original_aspect_ratio=decrease,"
-        "pad=640:432:(ow-iw)/2:(oh-ih)[actionout];"
-        "[hud]crop=w=iw*0.56:h=ih*0.40:x=iw*0.42:y=ih*0.58,"
-        "scale=400:432:force_original_aspect_ratio=decrease,"
-        "pad=400:432:(ow-iw)/2:(oh-ih)[hudout];"
-        "[fullout][actionout][hudout]hstack=inputs=3"
-    )
+    filter_graph = _EVENT_COMPOSITE_FILTER
     specs: list[tuple[int, int, float, Path, Path]] = []
     for frame_index, (event_index, timestamp) in enumerate(
         event_window_timestamps(duration_sec, event_timestamps)
@@ -313,11 +325,11 @@ def extract_event_keyframes(
 
     def extract_full(spec: tuple[int, int, float, Path, Path]) -> bool:
         _, _, timestamp, output, _ = spec
-        return _extract_frame(path, timestamp, output, filter_graph)
+        return extract_frame(path, timestamp, output, filter_graph)
 
     def extract_ocr(spec: tuple[int, int, float, Path, Path]) -> bool:
         _, _, timestamp, _, ocr_output = spec
-        return _extract_frame(path, timestamp, ocr_output, _OCR_FILTER)
+        return extract_frame(path, timestamp, ocr_output, _OCR_FILTER)
 
     timestamps = [timestamp for _, _, timestamp, _, _ in specs]
     full_outputs = [output for _, _, _, output, _ in specs]
@@ -328,19 +340,29 @@ def extract_event_keyframes(
         and duration_sec <= _BATCH_DECODE_MAX_DURATION_SEC
         else None
     )
-    full_batched = _extract_many(
+    # Both variants read the same timestamps, so one fused decode replaces two
+    # full passes. Degrade to the per-variant batch, then per-frame seeks.
+    fused = _extract_many_variants(
+        path,
+        timestamps,
+        [(filter_graph, full_outputs), (_OCR_FILTER, ocr_outputs)],
+        fps,
+    )
+    full_batched = fused or _extract_many(
         path, timestamps, full_outputs, filter_graph, fps
     )
-    ocr_batched = _extract_many(path, timestamps, ocr_outputs, _OCR_FILTER, fps)
+    ocr_batched = fused or _extract_many(
+        path, timestamps, ocr_outputs, _OCR_FILTER, fps
+    )
     full_results = (
         [True] * len(specs)
         if full_batched
-        else _parallel_map(specs, extract_full)
+        else parallel_map(specs, extract_full)
     )
     ocr_results = (
         [True] * len(specs)
         if ocr_batched
-        else _parallel_map(specs, extract_ocr)
+        else parallel_map(specs, extract_ocr)
     )
 
     for (

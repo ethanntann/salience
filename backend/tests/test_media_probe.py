@@ -1,4 +1,4 @@
-from salience_api.clips.media_probe import parse_ffprobe
+from salience_media.probe import parse_ffprobe
 
 
 def test_parse_ffprobe_extracts_video_metadata():

@@ -1,3 +1,4 @@
+# LEGACY V1 DEMO: not the active v2 runtime. See README.md.
 FROM node:22-slim AS frontend
 
 WORKDIR /app/frontend

@@ -15,11 +15,15 @@ import sqlite3
 from salience_api.clips.indexer import (
     record_teacher_events,
     record_teacher_labels,
-    rescore_all_clips,
+    rescore_clips_preserving_personalization,
 )
 from salience_api.features.fireworks_teacher import WeaponAttribution
 from salience_api.features.teacher_labels import normalize_teacher_payload
-from salience_api.ranking.highlights import attach_event_audit, build_highlight_profile
+from salience_api.ranking.highlights import (
+    attach_event_audit,
+    build_teacher_decision,
+    project_teacher_event_labels,
+)
 
 
 WEAPON_LABELS = (
@@ -64,31 +68,9 @@ def _prefer_strong_local_ocr(events: list[dict]) -> list[dict]:
 
 
 def _reconciled_labels(label_payload: dict, events: list[dict]) -> dict:
-    profile = build_highlight_profile(events)
-    active_events = [
-        event
-        for event in (profile.primary, *profile.secondary)
-        if event is not None and event.active
-    ]
-    downed_events = [
-        event
-        for event in (profile.primary, *profile.secondary)
-        if event is not None and event.downed
-    ]
-    active_labels = {
-        label for event in active_events for label in event.labels
-    }
+    decision = build_teacher_decision(events)
     reconciled = dict(label_payload)
-    for key in WEAPON_LABELS:
-        reconciled[key] = "yes" if key in active_labels else "no"
-    reconciled["elimination_or_knock"] = "yes" if active_events else "no"
-    reconciled["downed_finish"] = "yes" if downed_events else "no"
-    reconciled["multi_kill"] = "yes" if profile.multi_kill else "no"
-    reconciled["high_damage_hit"] = (
-        "yes" if "high_damage_hit" in active_labels else "no"
-    )
-    if reconciled["sniper_kill"] != "yes":
-        reconciled["stationary_sniper_target"] = "no"
+    reconciled.update(project_teacher_event_labels(decision))
     return normalize_teacher_payload(reconciled).model_dump()
 
 
@@ -116,6 +98,7 @@ def reconcile(database: Path, *, dry_run: bool = False) -> dict[str, int]:
         "sniper_removed": 0,
         "multi_weapon_reduced": 0,
     }
+    changed_clip_ids: list[int] = []
     try:
         for row in rows:
             original = json.loads(row["label_json"] or "{}")
@@ -130,6 +113,7 @@ def reconcile(database: Path, *, dry_run: bool = False) -> dict[str, int]:
                 continue
 
             stats["changed"] += 1
+            changed_clip_ids.append(int(row["clip_id"]))
             if original_normalized.get("sniper_kill") == "yes" and reconciled.get(
                 "sniper_kill"
             ) != "yes":
@@ -179,7 +163,9 @@ def reconcile(database: Path, *, dry_run: bool = False) -> dict[str, int]:
         if dry_run:
             connection.rollback()
         else:
-            rescore_all_clips(connection)
+            rescore_clips_preserving_personalization(
+                connection, changed_clip_ids
+            )
             connection.commit()
         return stats
     except Exception:

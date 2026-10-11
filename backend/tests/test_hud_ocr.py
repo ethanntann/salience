@@ -3,6 +3,18 @@ from salience_api.clips.keyframes import Keyframe
 from salience_api.features.hud_ocr import RapidHudOcr
 
 
+def test_weapon_category_survives_ocr_dropping_the_space():
+    """Stylised HUD fonts often read as one word; those are not 'unknown'."""
+    assert weapon_category_from_text("HUNTINGRIFLE") == "sniper_or_hunting"
+    assert weapon_category_from_text("MYTHIC HUNTINGRIFLE") == "sniper_or_hunting"
+    assert weapon_category_from_text("ASSAULTRIFLE") == "automatic"
+    assert weapon_category_from_text("HANDCANNON") == "pistol"
+    assert weapon_category_from_text("MARKSMANRIFLE") == "sniper_or_hunting"
+    # Still nothing to match on.
+    assert weapon_category_from_text("143") == "unknown"
+    assert weapon_category_from_text("") == "unknown"
+
+
 def test_weapon_category_from_fortnite_hud_text():
     assert weapon_category_from_text("LEGENDARY STRIKER PUMP SHOTGUN") == "shotgun"
     assert weapon_category_from_text("Hunting Rifle") == "sniper_or_hunting"
@@ -17,12 +29,14 @@ def test_ocr_frame_selection_prefers_shot_phase_over_finish(monkeypatch, tmp_pat
     seen: list[float] = []
     engine = RapidHudOcr()
     monkeypatch.setattr(engine, "_get_engine", lambda: object())
+    # Panels are read in batches, so record what each batch was asked to read.
     monkeypatch.setattr(
         engine,
-        "_recognize_weapon_panel",
-        lambda _engine, _path, *, event_index, timestamp, dedicated_crop: (
-            seen.append(timestamp) or []
-        ),
+        "_recognize_panels",
+        lambda _engine, batch: [
+            (event_index, seen.append(frame.timestamp_sec) or [])
+            for event_index, frame in batch
+        ],
     )
     frames = [
         Keyframe(
@@ -37,6 +51,45 @@ def test_ocr_frame_selection_prefers_shot_phase_over_finish(monkeypatch, tmp_pat
     engine.recognize_event_frames(frames)
 
     assert seen == [9.25, 9.625]
+
+
+def test_unresolved_events_fall_through_to_their_second_choice(monkeypatch, tmp_path):
+    """An event that reads a weapon on its first frame must not read a second."""
+    batches: list[list[float]] = []
+    engine = RapidHudOcr()
+    monkeypatch.setattr(engine, "_get_engine", lambda: object())
+
+    def fake_panels(_engine, batch):
+        batches.append([frame.timestamp_sec for _, frame in batch])
+        results = []
+        for event_index, frame in batch:
+            # Event 0 resolves immediately; event 1 never does.
+            found = event_index == 0
+            results.append((
+                event_index,
+                [{"weapon_category": "shotgun" if found else "unknown",
+                  "confidence": 0.9, "text": "pump shotgun"}],
+            ))
+        return results
+
+    monkeypatch.setattr(engine, "_recognize_panels", fake_panels)
+    frames = []
+    for event_index, centre in ((0, 10.0), (1, 20.0)):
+        for offset in (-0.75, -0.375, 0.0):
+            frames.append(
+                Keyframe(
+                    path=tmp_path / f"{event_index}-{offset}.jpg",
+                    timestamp_sec=centre + offset,
+                    event_index=event_index,
+                    event_center_sec=centre,
+                )
+            )
+
+    engine.recognize_event_frames(frames)
+
+    assert len(batches) == 2, "two phases: first choices, then unresolved events"
+    assert batches[0] == [9.25, 19.25], "phase one reads both events"
+    assert batches[1] == [19.625], "only the unresolved event pays for a second read"
 
 
 def test_stable_weapon_ocr_wins_across_nearby_pre_event_frames():

@@ -30,7 +30,6 @@ import numpy as np
 
 from salience_api.student.event_heads import EventHeadPrediction
 from salience_api.student.backbone import (
-    ARTIFACT_VERSION,
     CONTEXT_HEADS,
     SUPPORTED_ARTIFACT_VERSIONS,
 )

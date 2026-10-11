@@ -22,8 +22,9 @@ from salience_api.features.weapon_ontology import (
     weapon_category_from_text,
 )
 from salience_api.ranking.highlights import (
+    build_teacher_decision,
     dedupe_verified_finishes,
-    resolve_no_scope_for_events,
+    project_teacher_event_labels,
 )
 
 
@@ -698,43 +699,18 @@ def resolve_event_summaries(payload: dict) -> WeaponAttribution:
     for event in events:
         _sanitize_event_damage(event)
 
-    labels = {key: "no" for key in _WEAPON_LABELS}
-    attributable = dedupe_verified_finishes(events)
-    if not attributable:
-        labels = {key: "uncertain" for key in _WEAPON_LABELS}
-    for event in attributable:
-        if event["target_was_downed"] or not event["target_was_active"]:
-            continue
-        weapon = event["resolved_weapon"]
-        if weapon == "sniper_or_hunting":
-            labels["sniper_kill"] = "yes"
-        elif weapon == "shotgun":
-            labels["shotgun_kill"] = "yes"
-            damage = event["single_shot_damage"]
-            if (
-                event["damage_hit_count"] == 1
-                and damage is not None
-                and damage >= 100
-                and not event["damage_display_is_cumulative"]
-            ):
-                labels["shotgun_one_pump"] = "yes"
-        elif weapon == "pistol":
-            labels["pistol_kill"] = "yes"
-        elif weapon == "automatic":
-            labels["automatic_kill"] = "yes"
-            if event["damage_hit_count"] >= 3:
-                labels["spray_kill"] = "yes"
-        elif weapon == "other":
-            labels["other_weapon_kill"] = "yes"
-    if labels.get("sniper_kill") == "yes" and resolve_no_scope_for_events(events):
-        labels["no_scope"] = "yes"
+    decision = build_teacher_decision(events)
+    projected = project_teacher_event_labels(
+        decision, unresolved=not decision.verified_finishes
+    )
+    labels = {key: projected[key] for key in _WEAPON_LABELS}
 
     evidence = payload.get("evidence", [])
     if isinstance(evidence, str):
         evidence = [evidence]
     if not isinstance(evidence, list):
         evidence = []
-    if attributable:
+    if decision.verified_finishes:
         status = "attributed"
     elif any(event["status"] == "no_visual_causality" for event in events):
         status = "no_visual_causality"
@@ -1027,93 +1003,14 @@ def merge_event_labels(
             merged[key] = "uncertain"
         return normalize_teacher_payload(merged)
 
-    verified_finishes = dedupe_verified_finishes(events)
-    active_finishes = [
-        event
-        for event in verified_finishes
-        if event.get("target_was_active", False)
-        and not event.get("target_was_downed", False)
-    ]
-    downed_finishes = [
-        event for event in verified_finishes if event.get("target_was_downed", False)
-    ]
-    active_action_events = [
-        event
-        for event in events
-        if event.get("visual_action_supported", False)
-        and event.get("target_was_active", False)
-        and not event.get("target_was_downed", False)
-    ]
+    decision = build_teacher_decision(events)
     unresolved = any(
         event.get("status") in {"low_confidence", "target_state_unknown"}
         for event in events
     )
-
-    # Active-target knocks/eliminations only. Downed finishes are tracked separately.
-    merged["elimination_or_knock"] = (
-        "yes" if active_finishes else "uncertain" if unresolved else "no"
-    )
-    merged["downed_finish"] = "yes" if downed_finishes else "no"
-    merged["multi_kill"] = "yes" if len(active_finishes) >= 2 else "no"
-
-    def aggregate_event_state(key: str, candidates: list[dict]) -> str:
-        values = {str(event.get(key, "unknown")) for event in candidates}
-        if "yes" in values:
-            return "yes"
-        return "uncertain" if "unknown" in values else "no"
-
-    def aggregate_negative_state(key: str, candidates: list[dict]) -> str:
-        values = [str(event.get(key, "unknown")) for event in candidates]
-        if not values:
-            return "no"
-        if all(value == "yes" for value in values):
-            return "yes"
-        if any(value == "no" for value in values):
-            return "no"
-        return "uncertain"
-
-    merged["flick_shot"] = aggregate_event_state("flick_shot", active_action_events)
-    merged["trickshot"] = aggregate_event_state("trickshot", active_finishes)
-    merged["cleanup_kill"] = aggregate_negative_state("cleanup_kill", active_finishes)
-    merged["opponent_likely_bot"] = aggregate_negative_state(
-        "opponent_likely_bot", active_finishes
-    )
-    merged["stationary_target"] = aggregate_negative_state(
-        "stationary_target", active_action_events
-    )
-
-    for key in _WEAPON_LABELS:
-        merged[key] = attribution.labels.get(key, "uncertain")
-
-    high_damage = any(
-        (event.get("single_shot_damage") or 0) >= 100
-        and not event.get("damage_display_is_cumulative", False)
-        and not event.get("target_was_downed", False)
-        and (
-            event.get("visual_action_supported", False)
-            or event.get("pov_shot_visible", False)
-        )
-        for event in events
-    )
-    merged["high_damage_hit"] = "yes" if high_damage else "no"
-
-    if not active_finishes:
-        for key in _WEAPON_LABELS:
-            if merged[key] == "yes":
-                merged[key] = "no"
-    if merged["sniper_kill"] != "yes":
-        merged["no_scope"] = "no"
-        merged["stationary_sniper_target"] = "no"
-    else:
-        merged["no_scope"] = "yes" if resolve_no_scope_for_events(events) else "no"
-        sniper_events = [
-            event
-            for event in active_action_events
-            if event.get("resolved_weapon") == "sniper_or_hunting"
-        ]
-        merged["stationary_sniper_target"] = aggregate_negative_state(
-            "stationary_target", sniper_events
-        )
+    projected = project_teacher_event_labels(decision, unresolved=unresolved)
+    for key in _EVENT_OWNED_LABELS:
+        merged[key] = projected[key]
     return normalize_teacher_payload(merged)
 
 
@@ -1326,44 +1223,16 @@ class OpenAICompatibleTeacherClient:
             focused_events: list[dict] = []
             full_prompt = str(content[0]["text"])
             for event_index in expected_event_indices:
-                positions = [
-                    index
-                    for index, value in enumerate(clip.image_event_indices)
-                    if value == event_index
-                ]
-                focused_clip = ClipTeacherInput(
-                    filename=clip.filename,
-                    duration_sec=clip.duration_sec,
-                    width=clip.width,
-                    height=clip.height,
-                    fps=clip.fps,
-                    tags=clip.tags,
-                    image_paths=[clip.image_paths[index] for index in positions],
-                    image_timestamps=[
-                        clip.image_timestamps[index] for index in positions
-                    ],
-                    image_views=[
-                        clip.image_views[index]
-                        if index < len(clip.image_views)
-                        else "event composite"
-                        for index in positions
-                    ],
-                    image_event_indices=[event_index for _ in positions],
-                    image_event_centers=[
-                        clip.image_event_centers[index]
-                        if index < len(clip.image_event_centers)
-                        else None
-                        for index in positions
-                    ],
-                )
-                focused_content = build_teacher_content(focused_clip)
+                focused_content = build_teacher_content(clip)
                 focused_content[0] = {
                     "type": "text",
                     "text": (
                         full_prompt.replace(
                             str(expected_event_indices), str([event_index]), 1
                         )
-                        + " Focus only on this one event and return its complete summary."
+                        + " All numbered event windows remain visible so setup damage, the final "
+                        "damaging shot, and later weapon swaps can still be compared chronologically. "
+                        "Return only this event's complete summary."
                     ),
                 }
                 value = extract_json_value(

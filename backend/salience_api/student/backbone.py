@@ -58,7 +58,6 @@ _MOBILENET_FEATURE_DIM = 576
 
 
 def build_feature_backbone():
-    import torch
     from torch import nn
     from torchvision.models import MobileNet_V3_Small_Weights, mobilenet_v3_small
 

@@ -21,7 +21,6 @@ from salience_api.clips.keyframes import (
     extract_timeline_keyframes,
 )
 from salience_api.features.fireworks_teacher import (
-    ClipTeacherInput,
     apply_weapon_ocr_to_event,
     max_event_candidates,
     merge_event_labels,
@@ -30,10 +29,7 @@ from salience_api.features.fireworks_teacher import (
 from salience_api.features.hud_ocr import RapidHudOcr, best_weapon_ocr
 from salience_api.features.teacher_labels import TEACHER_LABEL_KEYS, normalize_teacher_payload
 from salience_api.student.backbone import CONTEXT_HEADS, load_manifest
-from salience_api.student.event_heads import (
-    collapse_same_kill_finishes,
-    event_summary_from_heads,
-)
+from salience_api.student.event_heads import event_summary_from_heads
 from salience_api.student.eval_agreement import (
     aggregate_label_metrics,
     compare_labels,
@@ -42,7 +38,6 @@ from salience_api.student.eval_agreement import (
 from salience_api.student.local_teacher import load_frames_nchw, load_hud_frames_nchw
 from salience_api.student.locator import timestamps_from_frame_scores
 from salience_api.student.onnx_runtime import (
-    DEFAULT_SINGLE_SHOT_DAMAGE_CUTOFF,
     DEFAULT_THRESHOLDS,
     StudentOnnxModels,
     decode_context_logits,
@@ -287,8 +282,6 @@ def _decode_cached_clip(cached: _CachedClip, thresholds: dict[str, float]) -> di
             event_timestamp=meta["event_timestamp"],
         )
         events.append(summary)
-
-    events = collapse_same_kill_finishes(events)
 
     for event in events:
         ocr_evidence = best_weapon_ocr(
