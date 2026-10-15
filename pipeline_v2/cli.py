@@ -313,8 +313,31 @@ def _rebuild_embeddings(
         vectors = encoder.fit_transform([clip.summary for clip in clips])
         for clip, vector in zip(clips, vectors, strict=True):
             store.put_embedding(conn, clip.clip_sha, encoder.name, vector, variant)
-    print(f"\nembedded {len(clips)} clips with {encoder.name} ({len(vectors[0])} dims)")
+        spoken = _rebuild_speech_embeddings(conn)
+    print(f"\nembedded {len(clips)} clips with {encoder.name} ({len(vectors[0])} dims)"
+          + (f", speech in {spoken}" if spoken else ""))
     return 0
+
+
+def _rebuild_speech_embeddings(conn) -> int:
+    """What was said, as its own vectors -- never mixed into the description's.
+
+    Appending transcripts to the description text was measured on session 1:
+    held-out taste fell from 92.6% to 83.3%, because the player's callouts
+    drowned out what the picture said. Kept apart, `ranking` can weight speech
+    by how much it actually predicts this player's ratings, down to zero.
+    """
+    from pipeline_v2.ranking import SPEECH_VARIANT
+
+    said = store.transcripts(conn)
+    conn.execute("delete from embeddings where prompt_ver = ?", (SPEECH_VARIANT,))
+    if not said:
+        return 0
+    encoder = embed.TfidfEncoder()
+    shas = sorted(said)
+    for sha, vector in zip(shas, encoder.fit_transform([said[s] for s in shas]), strict=True):
+        store.put_embedding(conn, sha, encoder.name, vector, SPEECH_VARIANT)
+    return len(shas)
 
 
 def cmd_similar(args: argparse.Namespace) -> int:
@@ -661,7 +684,7 @@ def cmd_relink(args: argparse.Namespace) -> int:
 
 def cmd_review(args: argparse.Namespace) -> int:
     """Serve the local rating page. The only source of organic labels."""
-    review_mod.serve(port=args.port, variant=args.variant)
+    review_mod.serve(port=args.port, variant=args.variant, only=args.only)
     return 0
 
 
@@ -727,6 +750,10 @@ def main() -> int:
         "--variant", default=None,
         help="storage variant to rate and rank, e.g. "
              "v3.6-ownkills-window@minimax-m3 for native-recorder clips",
+    )
+    review_cmd.add_argument(
+        "--only", type=Path, default=None,
+        help="queue only clips under this folder, e.g. one recording session",
     )
     review_cmd.set_defaults(func=cmd_review)
 

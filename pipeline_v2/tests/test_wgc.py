@@ -68,7 +68,9 @@ def test_capture_is_throttled_at_the_source(monkeypatch, tmp_path, isolated_data
 
     wgc.WgcRecorder(tmp_path, fps=30).start()
 
-    assert seen["minimum_update_interval"] == 33      # ~30fps at the source
+    # Twice the output rate: equal to it, delivery quantises below 30fps on
+    # display refreshes and ~10% of frames during motion were repeats.
+    assert seen["minimum_update_interval"] == 17
     assert seen["cursor_capture"] is False
     assert seen["draw_border"] is False
 

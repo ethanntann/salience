@@ -10,6 +10,7 @@ game window ──WGC──▶ NVENC segments (+ game & mic audio)          duri
                      │
                      ▼                                              after stop
   8s coverage windows ─▶ 7 frames each ─▶ VLM description ─▶ embedding
+          mic track ─▶ Whisper (local) ─▶ what was said ─▶ speech vector
                                                                │
             your keep/skip ratings ─▶ taste ranker ◀───────────┘
                                           │
@@ -23,7 +24,7 @@ Windows, Python 3.11+, FFmpeg on PATH, an NVIDIA GPU, and a Fireworks API key in
 `.env` (`FIREWORKS_API_KEY`, `FIREWORKS_MODEL`).
 
 ```powershell
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,audio]"   # audio: local mic transcription
 python -m pipeline_v2.capture.record      # or double-click "Start Recording.cmd"
 ```
 
@@ -32,7 +33,7 @@ when ranking finishes. To teach it your taste, rate clips at
 http://localhost:8777/ (**K** keep, **J** skip, **W** description is wrong):
 
 ```powershell
-python -m pipeline_v2 review --variant v3.6-ownkills-window@minimax-m3
+python -m pipeline_v2 review --variant v3.7-wordbank-window@deepseek-v4p1-flash --only <session folder>
 python -m pipeline_v2.capture.highlights <session folder>   # re-rank with new ratings
 ```
 
@@ -49,21 +50,46 @@ python -m pipeline_v2.capture.highlights <session folder>   # re-rank with new r
   bursts, voice spikes). A seeded random-control experiment showed why that
   fails: the trigger overlapped **5 of 15** moments the player kept. Describing
   the whole session costs about **$0.001 per window, ~$0.25 per half hour**.
-- **Taste is learned from descriptions.** Each description is embedded and a
-  logistic ranker is trained on the player's ratings.
+- **Game vocabulary, not captions.** The describer gets a Fortnite word bank
+  (`pipeline_v2/games/fortnite.py`): each term with the visible cue that earns
+  it (a crack, a box, piece control, a third party) and a ban on scenery.
+- **Ranking is what happened, then taste.** A win, then eliminations, then
+  knocks; within each, a logistic ranker trained on the player's own ratings
+  of the descriptions. Taste alone lost to that order out of sample.
+- **What was said counts only if it matters to you.** The mic is transcribed
+  locally and kept as a separate signal. Its weight is chosen by
+  cross-validation on your own ratings, so funny-moment players get it and a
+  player whose talk is callouts does not. Mixing speech into the descriptions
+  measured 92.6% → 83.3% on session 1, which is why it is kept separate.
 
-## Measured (session 1: 31 minutes of real play, 146 rated clips)
+## Measured (out of sample)
 
-| Ordering | Agrees with the player, pairwise |
-|---|---|
-| Taste ranker, held-out minutes (time-blocked CV) | **~91%** |
-| Rule: eliminations, then knocks | 74% |
-| Which detector fired the clip | 57% |
-| Chance | 50% |
+Taste trained on session 1 (31 min, 146 ratings) and scored against the
+player's ratings of session 2 (43 min, a different evening; the 271 windows
+of actual gameplay). Three describers, same footage, same ratings:
 
-The player skipped some eliminations and kept moments with no kill, which is
-what a fixed rule cannot learn. Caveat: one session and 17 keeps. Whether taste
-learned on one session ranks the next is the open question.
+| | minimax-m3 | deepseek-v4p1-flash | **deepseek + word bank** (shipped) |
+|---|---|---|---|
+| What happened, then taste (pairwise) | 96.5% | 96.4% | **97.4%** |
+| Taste alone | 86.9% | 90.5% | 88.6% |
+| Ordering kills among themselves | 42.0% | 56.2% | 53.7% |
+| Kept moments in the top 10 / top 15 | 6 / 9 of 16 | 8 / 11 | 7 / 11 |
+| Summaries mentioning scenery | 112 / 320 | 103 / 320 | **73 / 320** |
+| Game terms per summary | 0.31 | 0.35 | **0.51** |
+
+Ten random picks cover about 2 of the 16 kept moments. Skipped before any of
+this: lobby, loading, the pre-game island and spectating (49 of 320 windows),
+identified from Fortnite's own log, none of them a keep.
+
+The describer was chosen by a bake-off of eight Fireworks vision models on the
+nine hardest windows (the player's "description wrong" flags and the cases two
+models disagreed on). minimax-m3 named the wrong weapon on five of nine and
+called a 106-damage shield crack a kill; deepseek matched kimi-k3, the most
+accurate, on eight of nine at a twentieth of its price (~$0.002 a window).
+
+What is not solved: **which kills** a player keeps. Most keeps are kills, but
+so are many skipped fights, and ordering kill windows among themselves is
+barely above chance (~54%, on ~30 windows). Also: two sessions, one player.
 
 ## Layout
 

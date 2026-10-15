@@ -6,15 +6,15 @@ describing, ranking -- was a command someone had to know to run, and the last
 one could not run at all on the recorder's own footage. This is that chain as
 one call, run automatically when a recording stops:
 
-    segments -> coverage.jsonl -> windows/ -> described + stored -> ranked
-             -> highlights/
+    segments -> coverage.jsonl -> windows/ -> mic transcribed -> described
+             + stored -> ranked -> highlights/
 
 **Coverage, not triggers, decides what is looked at.** The first version cut
 only where a detector fired (`triggers.jsonl -> clips/`). Session 1 showed the
 gate dropped most of what mattered: the input-burst trigger overlapped 5 of the
 14 moments the player kept. So by default every 8 seconds of the session is
 described and taste picks; `coverage=False` keeps the trigger-only path for
-comparison. At minimax-m3 prices that is about $0.0018 per window, ~$0.45 for
+comparison. At deepseek-v4p1-flash prices that is about $0.002 per window, ~$0.45 for
 half an hour.
 
 **Ranking by taste needs labels on footage like this.** The ranker learns only
@@ -39,11 +39,28 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from pipeline_v2.capture import clips as clips_mod
+from pipeline_v2.capture import gameplay as gameplay_mod
 
 # What the vision model saw, as a fallback order when there is no taste model.
 # Not a judgement of quality: a knock the player found boring still outranks a
 # rotation they loved. That is exactly why it is labelled as a fallback.
 _OUTCOME_ORDER = {"elimination": 2, "knock": 1}
+VICTORY_TIER = 3
+
+
+def event_tier(clip) -> int:
+    """What happened, coarsely: a win, then eliminations, knocks, the rest.
+
+    Ranking goes by this first and by taste within a tier. Measured out of
+    sample (taste trained on session 1, scored on session 2's 320 ratings),
+    taste alone agreed with the player 86.9% of the time, the tier alone
+    92.3%, the tier then taste 96.5%. A win is its own tier because the model
+    files the Victory Royale banner under `other`/`no_event`, and the player
+    kept it; that moved one more kept moment into the top 10.
+    """
+    if "victory royale" in (clip.summary or "").lower():
+        return VICTORY_TIER
+    return _OUTCOME_ORDER.get((clip.payload or {}).get("outcome"), 0)
 
 # What an exported highlight adds around its 8s coverage window: the approach
 # matters to a viewer even though the model only needed the window itself.
@@ -71,6 +88,7 @@ class Highlight:
     summary: str
     outcome: str
     trigger: str
+    said: str = ""
 
 
 def describe(clip_dir: Path, max_calls: int) -> None:
@@ -87,6 +105,69 @@ def describe(clip_dir: Path, max_calls: int) -> None:
         split_fights=False, from_feedback=None, limit=None,
         max_calls=max_calls, encoder=None,
     ))
+
+
+def find_gameplay(session: Path) -> dict:
+    """When the player was playing, from Fortnite's log (`gameplay`)."""
+    segments = clips_mod.read_segments(session)
+    if not segments:
+        return {"spans": None, "why": "no footage"}
+    return gameplay_mod.spans(session, max(s.end for s in segments))
+
+
+def listen(session: Path, clip_dir: Path) -> int:
+    """Transcribe the mic and attach what was said to each clip (`voice`).
+
+    Optional: without faster-whisper installed the session is ranked on what
+    was seen alone, which is all a player who never talks loses anyway.
+    """
+    from pipeline_v2.capture import voice
+
+    files = [p for p in clip_dir.glob("*") if p.suffix in (".mkv", ".mp4")]
+    try:
+        return voice.attach(session, sorted(files))
+    except ImportError:
+        print("  speech: skipped (pip install -e .[audio] to rank by what was said)")
+        return 0
+
+
+def undescribed(clip_dir: Path) -> int:
+    """How many clips in `clip_dir` have content with no stored description."""
+    from pipeline_v2 import cache, store
+
+    files = [p for p in clip_dir.glob("*") if p.suffix in (".mkv", ".mp4")]
+    conn = store.connect()
+    try:
+        described = {row[0] for row in conn.execute("select clip_sha from descriptions")}
+    finally:
+        conn.close()
+    return sum(cache.clip_sha(p) not in described for p in files)
+
+
+def reembed(clip_dir: Path) -> None:
+    """Rebuild embeddings when only the transcripts changed (nothing re-described)."""
+    from pipeline_v2 import cli, store
+
+    conn = store.connect()
+    try:
+        variant, _ = _session_clips(conn, clip_dir)
+    finally:
+        conn.close()
+    if variant:
+        cli._rebuild_embeddings(None, variant)
+
+
+def _configured_variant() -> str | None:
+    """The variant a capture window described with the current config lands in."""
+    from pipeline_v2 import config, prompt
+    from pipeline_v2.facts import ClipFacts
+
+    try:
+        cfg = config.load_config()
+    except Exception:  # noqa: BLE001 - a missing config falls back to the majority
+        return None
+    return prompt.storage_variant(
+        cfg.prompt_version, ClipFacts(event_source="capture_window"), cfg.model)
 
 
 def _session_clips(conn, clip_dir: Path) -> tuple[str | None, list]:
@@ -107,7 +188,10 @@ def _session_clips(conn, clip_dir: Path) -> tuple[str | None, list]:
     ).fetchall()
     if not rows:
         return None, []
-    variant = rows[0][0]
+    # A folder described by several models or prompts (a bake-off) holds one
+    # variant per arm; the configured one is what the product ranks by.
+    configured = _configured_variant()
+    variant = configured if configured in {r[0] for r in rows} else rows[0][0]
     # A re-cut (a changed window) writes new content to the same filename, so
     # the store can hold two clips for one path. Only the newest describes the
     # file now on disk; the older row's description is of footage that is gone.
@@ -133,7 +217,8 @@ def rank(conn, clip_dir: Path) -> tuple[str, list]:
         return "none", []
     wanted = {c.clip_sha for c in inside}
 
-    fights, labels = ranked_fights(conn, variant=variant)
+    info: dict = {}
+    fights, labels = ranked_fights(conn, variant=variant, info=info)
     # Once per clip: `ranked_fights` groups by path, so a stale row sharing a
     # re-cut window's filename yields a second "fight" whose best is that clip.
     best: dict[str, tuple[float, object]] = {}
@@ -143,8 +228,16 @@ def rank(conn, clip_dir: Path) -> tuple[str, list]:
             best[sha] = (fight.score, fight.best)
     scored = list(best.values())
     if scored:
-        scored.sort(key=lambda pair: -pair[0])
-        return f"taste ({labels} labels, {variant})", scored
+        scored.sort(key=lambda pair: (-event_tier(pair[1]), -pair[0]))
+        weight = info.get("speech_weight", 0.0)
+        tried = info.get("speech_cv") or {}
+        if weight:
+            heard = f", speech weighted {weight:g}"
+        elif tried:
+            heard = ", speech did not help this player's ratings"
+        else:
+            heard = ""
+        return f"what happened, then taste ({labels} labels, {variant}{heard})", scored
 
     def fallback(clip) -> tuple[float, float]:
         outcome = _OUTCOME_ORDER.get((clip.payload or {}).get("outcome"), 0)
@@ -213,9 +306,13 @@ def run(
     top: int = 10,
     prune_raw: bool = False,
     coverage: bool = True,
+    speech: bool = True,
     describe_fn=describe,
     harvest_fn=clips_mod.harvest,
     export_fn=None,
+    listen_fn=None,
+    reembed_fn=None,
+    undescribed_fn=None,
 ) -> dict:
     """Cut, describe, rank and keep the best `top` clips from one recording."""
     from pipeline_v2 import store
@@ -233,22 +330,47 @@ def run(
         return {"session": str(session), "highlights": [],
                 "basis": "none", "why": why}
 
+    played: dict = {"spans": None}
     if coverage:
+        played = find_gameplay(session)
+        half = clips_mod.COVERAGE_STRIDE / 2
+
+        def outside(request) -> bool:
+            # Lobby, loading and spectating: not described, never a highlight.
+            return played["spans"] is not None and not gameplay_mod.overlaps(
+                played["spans"], request.at - half, request.at + half)
+
         cut = harvest_fn(
             session, clip_dir, journal_name=clips_mod.COVERAGE_JOURNAL,
             analysis_span=clips_mod.COVERAGE_STRIDE,
-            lead=clips_mod.COVERAGE_STRIDE / 2, lag=clips_mod.COVERAGE_STRIDE / 2,
+            lead=half, lag=half, skip=outside,
         )
     else:
         cut = harvest_fn(session, clip_dir)
-    if cut:
-        describe_fn(clip_dir, max_calls=len(cut))
+    # Before describing, so the embeddings built at its end include speech.
+    heard = (listen_fn or listen)(session, clip_dir) if speech else 0
+    # `cut` includes windows already cut on an earlier run. Describing those
+    # again is free (cached) but not fast: 300s of frame extraction on
+    # session 1 to look up 235 answers it already had.
+    fresh = (undescribed_fn or undescribed)(clip_dir) if cut else 0
+    if fresh:
+        describe_fn(clip_dir, max_calls=fresh)
+    elif heard:
+        (reembed_fn or reembed)(clip_dir)
 
     conn = store.connect()
     try:
         basis, ordered = rank(conn, clip_dir)
+        said = store.transcripts(conn)
     finally:
         conn.close()
+    if played["spans"] is not None:
+        # Windows cut before gating existed are still on disk and in the store.
+        ordered = [
+            (score, clip) for score, clip in ordered
+            if (span := _span(clip)) is None
+            or gameplay_mod.overlaps(played["spans"], *span)
+        ]
 
     out = session / "highlights"
     if out.exists():
@@ -270,6 +392,7 @@ def run(
             rank=position, clip=source.name, score=round(score, 4),
             summary=clip.summary or "", outcome=str(payload.get("outcome")),
             trigger=str(_sidecar(source).get("trigger_source", "")),
+            said=said.get(clip.clip_sha, ""),
         ))
 
     manifest = {
@@ -279,6 +402,7 @@ def run(
         "journalled": len(journalled),
         "cut": len(cut),
         "ranked": len(ordered),
+        "gameplay": _gameplay_note(played, journalled),
         "highlights": [asdict(h) for h in kept],
     }
     write_json(out / "highlights.json", manifest)
@@ -293,13 +417,31 @@ def run(
     return manifest
 
 
+def _gameplay_note(played: dict, journalled: list) -> dict:
+    if played.get("spans") is None:
+        return {"source": "none", "why": played.get("why", "not looked up")}
+    half = clips_mod.COVERAGE_STRIDE / 2
+    excluded = sum(
+        not gameplay_mod.overlaps(played["spans"], r.at - half, r.at + half)
+        for r in journalled
+    )
+    return {"source": "fortnite log", "matches": played.get("matches"),
+            "excluded_windows": excluded, "origin": played.get("origin_source")}
+
+
 def report(manifest: dict) -> None:
     source = "windows" if manifest.get("mode") == "coverage" else "triggers"
     print(f"\nhighlights: {len(manifest['highlights'])} kept "
           f"({manifest.get('cut', 0)} cut from {manifest.get('journalled', 0)} {source})")
     print(f"  ranked by {manifest['basis']}")
+    played = manifest.get("gameplay") or {}
+    if played.get("source") == "fortnite log":
+        print(f"  gameplay from the Fortnite log: {played['excluded_windows']} lobby, "
+              "loading or spectating windows skipped")
     for h in manifest["highlights"]:
         print(f"  {h['rank']:2d}. [{h['outcome']}] {h['summary'][:100]}")
+        if h.get("said"):
+            print(f"      said: \"{h['said'][:100]}\"")
     if manifest.get("pruned_raw"):
         print("  raw segments deleted")
 
@@ -318,9 +460,13 @@ def main(argv: list[str] | None = None) -> int:
         "--triggers-only", dest="coverage", action="store_false",
         help="describe only where a detector fired (cheaper, misses most keeps)",
     )
+    parser.add_argument(
+        "--no-speech", dest="speech", action="store_false",
+        help="do not transcribe the mic (rank on what was seen only)",
+    )
     args = parser.parse_args(argv)
     report(run(args.session, top=args.top, prune_raw=args.prune_raw,
-               coverage=args.coverage))
+               coverage=args.coverage, speech=args.speech))
     return 0
 
 

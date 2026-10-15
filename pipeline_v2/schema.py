@@ -58,6 +58,11 @@ KILL_WEAPON_PROMPT_VERSION = "v3.5-killweapon"
 # literal, and not what the annotator meant by "the weapon that got the kill".
 OWN_KILLS_PROMPT_VERSION = "v3.6-ownkills"
 
+# v3.7 is v3.6 plus the game's word bank (`games.fortnite`): its terms, each
+# with the visible cue that earns it, extra mechanics tags, and a ban on
+# scenery. One change against v3.6, so a difference is attributable to it.
+WORD_BANK_PROMPT_VERSION = "v3.7-wordbank"
+
 # One registry for V2_ABLATE. config maps the variable to a version; prompt
 # branches on the version. Reading the environment in both places let the two
 # disagree about which prompt was being built.
@@ -67,6 +72,7 @@ ABLATIONS = {
     "attribution": ATTRIBUTION_PROMPT_VERSION,
     "killweapon": KILL_WEAPON_PROMPT_VERSION,
     "ownkills": OWN_KILLS_PROMPT_VERSION,
+    "wordbank": WORD_BANK_PROMPT_VERSION,
 }
 
 
@@ -74,6 +80,10 @@ def mechanics_for(prompt_version: str) -> tuple[str, ...]:
     """The tag vocabulary a description at this version could legally contain."""
     if prompt_version == ATTRIBUTION_PROMPT_VERSION:
         return ATTRIBUTION_MECHANICS
+    if prompt_version.startswith(WORD_BANK_PROMPT_VERSION):
+        from pipeline_v2.games import fortnite
+
+        return MECHANICS + fortnite.MECHANICS
     return MECHANICS
 
 

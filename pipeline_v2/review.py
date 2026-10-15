@@ -22,6 +22,7 @@ PAGE = """<!doctype html>
   video { width:min(94vw,900px); border-radius:10px; background:#000; }
   #summary { max-width:min(94vw,900px); font-size:17px; }
   #meta { color:#94a0ae; font-size:13px; }
+  #said { max-width:min(94vw,900px); color:#c9b98a; font-style:italic; }
   #progress { color:#94a0ae; font-size:13px; letter-spacing:.03em; }
   .keys { display:flex; gap:10px; }
   button { font:inherit; padding:9px 20px; border-radius:8px; border:1px solid #2a313a;
@@ -34,6 +35,7 @@ PAGE = """<!doctype html>
 <div id="progress"></div>
 <video id="v" controls autoplay muted></video>
 <div id="summary"></div>
+<div id="said"></div>
 <div id="meta"></div>
 <div class="keys">
   <button onclick="rate(0)">Skip &nbsp;<kbd>J</kbd></button>
@@ -69,6 +71,7 @@ async function load() {
   v.currentTime = Math.max(0, (d.event_sec || 0) - 4);
   v.onloadedmetadata = () => { v.currentTime = Math.max(0, (d.event_sec || 0) - 4); };
   document.getElementById('summary').textContent = d.summary;
+  document.getElementById('said').textContent = d.said ? 'Said: “' + d.said + '”' : '';
   document.getElementById('meta').textContent = d.name + (d.analysis_start_sec == null ? '' :
     ' · Description window: ' + d.analysis_start_sec.toFixed(1) + '–' + d.analysis_end_sec.toFixed(1) + 's');
 }
@@ -99,6 +102,9 @@ load();
 # suffix capture clips are stored under -- so without this, the only page that
 # writes v2 labels could not show a single clip from the native recorder.
 _VARIANT: str | None = None
+# Folder whose clips are queued for rating, or None for all. Set by `serve`, so
+# the session just played is not queued behind every older unrated window.
+_ONLY: str | None = None
 
 
 def _variant() -> str:
@@ -113,6 +119,20 @@ _CURRENT = (
 )
 
 
+def _said(conn: sqlite3.Connection, sha: str) -> str:
+    """What the mic heard during the clip, if it was transcribed."""
+    row = conn.execute("select text from transcripts where clip_sha = ?", (sha,)).fetchone()
+    return row[0] if row else ""
+
+
+def _within() -> str:
+    return " and c.path like ?" if _ONLY else ""
+
+
+def _within_args() -> tuple:
+    return (_ONLY + "%",) if _ONLY else ()
+
+
 def _next_clip(conn: sqlite3.Connection) -> dict:
     variant = _variant()
     rated = conn.execute("select count(*) from preferences").fetchone()[0]
@@ -120,23 +140,24 @@ def _next_clip(conn: sqlite3.Connection) -> dict:
         "select c.clip_sha, c.path, c.event_sec, c.facts_json, d.summary from clips c"
         " join descriptions d on d.clip_sha = c.clip_sha"
         " where c.clip_sha not in (select clip_sha from preferences)"
-        " and d.prompt_ver = ?" + _CURRENT +
+        " and d.prompt_ver = ?" + _CURRENT + _within() +
         " order by c.described_at, c.clip_sha limit 1",
-        (variant,),
+        (variant, *_within_args()),
     ).fetchone()
     if row is None:
         return {"done": True, "rated": rated}
     remaining = conn.execute(
         "select count(*) from clips c join descriptions d on d.clip_sha = c.clip_sha"
         " where c.clip_sha not in (select clip_sha from preferences)"
-        " and d.prompt_ver = ?" + _CURRENT,
-        (variant,),
+        " and d.prompt_ver = ?" + _CURRENT + _within(),
+        (variant, *_within_args()),
     ).fetchone()[0]
     return {
         "done": False,
         "sha": row["clip_sha"],
         "name": Path(row["path"]).name,
         "summary": row["summary"],
+        "said": _said(conn, row["clip_sha"]),
         "event_sec": row["event_sec"],
         "analysis_start_sec": json.loads(row["facts_json"]).get("analysis_start_sec"),
         "analysis_end_sec": json.loads(row["facts_json"]).get("analysis_end_sec"),
@@ -255,9 +276,10 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"ok": True})
 
 
-def serve(port: int = 8777, variant: str | None = None) -> None:
-    global _VARIANT
+def serve(port: int = 8777, variant: str | None = None, only: Path | None = None) -> None:
+    global _VARIANT, _ONLY
     _VARIANT = variant
+    _ONLY = str(Path(only).resolve()) if only else None
     conn = store.connect()
     pending = _next_clip(conn)
     conn.close()

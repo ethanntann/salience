@@ -10,8 +10,16 @@ removes that cost.
 WGC differs in the two ways that matter here:
 
 * it captures **one window**, not the whole desktop, and
-* ``minimum_update_interval`` throttles at the **source**, so a 30fps capture
-  composites half as many frames rather than merely encoding fewer of them.
+* ``minimum_update_interval`` throttles at the **source**, so it composites a
+  bounded number of frames rather than every one the game draws.
+
+The throttle is set to twice the output rate, not equal to it. WGC releases
+frames on display refreshes, so at an interval equal to the output period
+delivery quantises to *below* 30fps (24.9-28.8/s measured on a 180Hz panel)
+and the pacer repeats a frame every ~6: 6.9-10.5% of frames during motion, the
+stutter seen in session 2's recordings (10.4%). At twice the rate, delivery is
+~44/s, the pacer always has a fresh frame, and repeats fall to 0.9-1.1% for
+about a tenth of a core more (bench on a 120fps source, 2026-10-14).
 
 It also needs no OBS install, which rules the obs-websocket route out as an
 end-user dependency, and it never injects into the game.
@@ -80,8 +88,9 @@ class WgcStats:
     `written` exceeding `delivered` is normal and expected: the pacer repeats
     the last frame to hold a constant rate when the scene is static.
     `superseded` is the opposite case -- WGC delivered faster than the pacer
-    consumed, so a frame was overwritten before it was ever encoded, which
-    means the source throttle is looser than the output rate.
+    consumed, so a frame was overwritten before it was ever encoded. That is
+    by design since the source captures at twice the output rate: about a
+    third of deliveries are superseded, and it is what keeps repeats rare.
     """
 
     delivered: int = 0
@@ -122,9 +131,11 @@ class WgcRecorder:
         window_hwnd: int | None = None,
         audio: bool = False,
         mic_hint: str | None = None,
+        capture_fps: int | None = None,
     ) -> None:
         self.directory = directory
         self.fps = fps
+        self.capture_fps = capture_fps or fps * 2
         self.bitrate = bitrate
         self.encoder = encoder
         self.segment_seconds = segment_seconds
@@ -303,7 +314,7 @@ class WgcRecorder:
             draw_border=False,
             # Throttle at the source. This is the property DDA lacked: fewer
             # frames are composited, not just fewer encoded.
-            minimum_update_interval=max(1, round(1000 / self.fps)),
+            minimum_update_interval=max(1, round(1000 / self.capture_fps)),
             monitor_index=self.monitor_index,
             window_hwnd=self.window_hwnd,
         )

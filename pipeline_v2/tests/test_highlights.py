@@ -10,10 +10,20 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from pipeline_v2 import store
 from pipeline_v2.capture import clips, highlights
 
 VARIANT = "v3.6-ownkills-window@minimax-m3"
+
+
+@pytest.fixture(autouse=True)
+def _deaf(monkeypatch):
+    """No Whisper in unit tests; speech has its own tests in test_voice."""
+    monkeypatch.setattr(highlights, "listen", lambda session, clip_dir: 0)
+    # Nor the developer's real Fortnite log; gating has its own tests.
+    monkeypatch.setattr(highlights, "find_gameplay", lambda session: {"spans": None})
 
 
 def _session(tmp_path: Path, outcomes: list[str]) -> Path:
@@ -242,11 +252,96 @@ def test_each_clip_is_ranked_once_even_if_two_fights_name_it(tmp_path, isolated_
     conn = store.connect()
     _, inside = highlights._session_clips(conn, session / "clips")
     clip = inside[0]
-    monkeypatch.setattr(ranking, "ranked_fights", lambda c, variant=None: (
+    monkeypatch.setattr(ranking, "ranked_fights", lambda c, variant=None, info=None: (
         [SimpleNamespace(score=0.4, best=clip), SimpleNamespace(score=0.9, best=clip)], 12))
 
     basis, ordered = highlights.rank(conn, session / "clips")
     conn.close()
 
-    assert basis.startswith("taste")
+    assert "taste" in basis
     assert ordered == [(0.9, clip)]
+
+
+def test_speech_changes_without_new_cuts_rebuild_embeddings(tmp_path, isolated_data):
+    """A re-run that only heard new speech must still re-embed, or taste never sees it."""
+    session = _session(tmp_path, ["knock"])
+    rebuilt = []
+
+    highlights.run(
+        session, coverage=False, describe_fn=lambda *a, **k: None,
+        harvest_fn=lambda s, d: [], listen_fn=lambda s, d: 1,
+        reembed_fn=rebuilt.append,
+    )
+
+    assert rebuilt == [session / "clips"]
+
+
+def test_no_speech_skips_listening(tmp_path, isolated_data):
+    session = _session(tmp_path, ["knock"])
+    heard = []
+
+    highlights.run(
+        session, coverage=False, speech=False, describe_fn=lambda *a, **k: None,
+        harvest_fn=lambda s, d: [], listen_fn=lambda s, d: heard.append(s) or 0,
+    )
+
+    assert heard == []
+
+
+def test_highlight_carries_what_was_said(tmp_path, isolated_data):
+    session = _session(tmp_path, ["knock"])
+    conn = store.connect()
+    store.put_transcript(conn, f"sha{session.name}0", "no way that worked", "test")
+    conn.commit()
+    conn.close()
+
+    manifest = _run(session)
+
+    assert manifest["highlights"][0]["said"] == "no way that worked"
+
+
+def test_rerun_describes_only_when_something_is_new(tmp_path, isolated_data):
+    """Already-cut windows come back from harvest; re-describing them costs minutes."""
+    session = _session(tmp_path, ["knock"])
+    calls = []
+
+    for fresh in (0, 2):
+        highlights.run(
+            session, coverage=False,
+            describe_fn=lambda d, max_calls: calls.append(max_calls),
+            harvest_fn=lambda s, d: [{}], undescribed_fn=lambda d, n=fresh: n,
+        )
+
+    assert calls == [2]
+
+
+def test_windows_outside_gameplay_are_skipped_but_keep_their_numbers(tmp_path, isolated_data,
+                                                                      monkeypatch):
+    """Lobby and spectating are not described; ratings stay on the same filenames."""
+    session = _session(tmp_path, [])
+    monkeypatch.setattr(highlights, "find_gameplay",
+                        lambda s: {"spans": [(20.0, 60.0)], "matches": 1})
+    seen = {}
+
+    def harvest(s, d, **kwargs):
+        seen["skipped"] = [r.at for r in clips.read_journal(s / clips.COVERAGE_JOURNAL)
+                           if kwargs["skip"](r)]
+        return []
+
+    manifest = highlights.run(session, describe_fn=lambda *a, **k: None, harvest_fn=harvest)
+
+    assert seen["skipped"] == [4.0, 12.0, 68.0, 76.0, 84.0]
+    assert manifest["gameplay"]["excluded_windows"] == 5
+
+
+def test_a_win_outranks_kills_and_kills_outrank_taste():
+    """Out of sample, what happened then taste beat taste alone (96.5% vs 86.9%)."""
+    from types import SimpleNamespace
+
+    win = SimpleNamespace(summary="A Victory Royale banner appears", payload={"outcome": "other"})
+    kill = SimpleNamespace(summary="eliminates an opponent", payload={"outcome": "elimination"})
+    walk = SimpleNamespace(summary="runs across a field", payload={"outcome": "no_event"})
+
+    tiers = [highlights.event_tier(c) for c in (win, kill, walk)]
+
+    assert tiers == sorted(tiers, reverse=True) and len(set(tiers)) == 3

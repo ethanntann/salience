@@ -295,6 +295,10 @@ def storage_variant(
     return variant
 
 
+_DEFAULT_TAGS = """close_range, mid_range, long_range, headshot, build_fight, high_ground,
+vertical_movement, finish_downed, weapon_swap, multi_opponent, low_health
+"""
+
 _CENTRED = "The frames below are in chronological order and are centred on one event."
 _WINDOWED = (
     "The frames below are in chronological order from a uniformly sampled gameplay window. "
@@ -326,8 +330,9 @@ def build_prompt(clip_facts: ClipFacts, version: str | None = None) -> str:
     if version in (
         schema.KILL_WEAPON_PROMPT_VERSION,
         schema.OWN_KILLS_PROMPT_VERSION,
+        schema.WORD_BANK_PROMPT_VERSION,
     ):
-        own = version == schema.OWN_KILLS_PROMPT_VERSION
+        own = version != schema.KILL_WEAPON_PROMPT_VERSION
         template = _INSTRUCTIONS
         if clip_facts.event_source == "capture_window":
             template = template.replace(_CENTRED, _WINDOWED)
@@ -335,7 +340,15 @@ def build_prompt(clip_facts: ClipFacts, version: str | None = None) -> str:
             raise ValueError("could not find the v3.3 weapon_name line to replace")
         field = _OWN_KILL_FIELD if own else _KILL_WEAPON_FIELD
         rules = _OWN_KILL_RULES if own else _KILL_WEAPON_RULES
-        return template.replace(_V33_WEAPON_FIELD, field) + rules
+        built = template.replace(_V33_WEAPON_FIELD, field) + rules
+        if version == schema.WORD_BANK_PROMPT_VERSION:
+            from pipeline_v2.games import fortnite
+
+            if _DEFAULT_TAGS not in built:
+                raise ValueError("could not find the mechanics list to extend")
+            tags = _DEFAULT_TAGS.rstrip("\n") + ",\n" + ", ".join(fortnite.MECHANICS) + "\n"
+            built = built.replace(_DEFAULT_TAGS, tags) + fortnite.WORD_BANK
+        return built
 
     if clip_facts.event_source == "capture_window":
         return _INSTRUCTIONS.replace(_CENTRED, _WINDOWED)

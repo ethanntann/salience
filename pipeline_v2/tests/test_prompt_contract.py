@@ -209,3 +209,22 @@ def test_both_kill_list_arms_are_read_as_lists():
         assert groundtruth.asks_for_kill_weapons(version)
         assert groundtruth.asks_for_kill_weapons(f"{version}@kimi-k2p6")
     assert not groundtruth.asks_for_kill_weapons("v3.3")
+
+
+def test_v37_is_v36_plus_the_word_bank_and_nothing_else():
+    """One change against v3.6, so a measured difference is attributable to it."""
+    from pipeline_v2.facts import ClipFacts
+    from pipeline_v2.games import fortnite
+
+    window = ClipFacts(event_source="capture_window")
+    v36 = prompt.build_prompt(window, schema.OWN_KILLS_PROMPT_VERSION)
+    v37 = prompt.build_prompt(window, schema.WORD_BANK_PROMPT_VERSION)
+
+    assert v37.endswith(fortnite.WORD_BANK)
+    for tag in fortnite.MECHANICS:
+        assert tag in v37 and tag not in v36
+    restored = v37[: -len(fortnite.WORD_BANK)].replace(
+        ",\n" + ", ".join(fortnite.MECHANICS), "")
+    assert restored == v36
+    assert schema.mechanics_for("v3.7-wordbank-window@deepseek-v4p1-flash") == (
+        schema.MECHANICS + fortnite.MECHANICS)

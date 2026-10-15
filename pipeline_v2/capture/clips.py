@@ -327,6 +327,7 @@ def harvest(
     analysis_span: float = ANALYSIS_SPAN,
     runner=subprocess.run,
     probe_keyframes=None,
+    skip=None,
 ) -> list[dict]:
     """Cut every journalled trigger in a finished run. Never call during play.
 
@@ -335,6 +336,10 @@ def harvest(
     triggers. A control built by a different path would differ in clip length,
     analysis window or encoder settings, and any of those would bias the
     comparison it exists to make.
+
+    `skip(request)` leaves a request uncut but still numbered, so a window's
+    filename -- and the ratings stored against it -- does not shift when
+    another window is skipped.
     """
     from pipeline_v2.jsonio import write_json
 
@@ -351,6 +356,8 @@ def harvest(
 
     saved: list[dict] = []
     for index, request in enumerate(sorted(requests, key=lambda r: r.at)):
+        if skip is not None and skip(request):
+            continue
         start, end = available_window(segments, request.at, lead, lag)
         if interval:
             # A little extra lead, never a clip that starts on nothing.

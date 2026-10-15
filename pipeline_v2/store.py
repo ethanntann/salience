@@ -67,6 +67,16 @@ create table if not exists description_flags (
     decided_at real not null,
     primary key (clip_sha, prompt_ver)
 );
+
+-- What was said on the player's mic during a clip. Keyed by content hash
+-- with no foreign key: it is written before the clip is described, so the
+-- embedding built at the end of describing already includes it. Empty text
+-- records "listened, nobody spoke", which is different from "not listened".
+create table if not exists transcripts (
+    clip_sha text primary key,
+    text     text not null,
+    source   text not null
+);
 """
 
 
@@ -153,6 +163,26 @@ def put_embedding(
         " (clip_sha, prompt_ver, model, dims, vector) values (?, ?, ?, ?, ?)",
         (clip_sha, prompt_ver, model, len(vector), blob),
     )
+
+
+def put_transcript(conn: sqlite3.Connection, clip_sha: str, text: str, source: str) -> bool:
+    """Store what was said in a clip. True when the text that matters changed."""
+    row = conn.execute(
+        "select text from transcripts where clip_sha = ?", (clip_sha,)
+    ).fetchone()
+    conn.execute(
+        "insert or replace into transcripts (clip_sha, text, source) values (?, ?, ?)",
+        (clip_sha, text, source),
+    )
+    return (row["text"] if row else "") != text
+
+
+def transcripts(conn: sqlite3.Connection) -> dict[str, str]:
+    """Non-empty transcripts by clip."""
+    return {
+        row["clip_sha"]: row["text"]
+        for row in conn.execute("select clip_sha, text from transcripts where text != ''")
+    }
 
 
 def embeddings(

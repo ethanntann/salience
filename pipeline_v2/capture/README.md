@@ -3,13 +3,14 @@
 ```powershell
 python -m pipeline_v2.capture.record            # record, then make highlights
 python -m pipeline_v2.capture.highlights <run>  # re-run the post-session pipeline
-python -m pipeline_v2 review --variant v3.6-ownkills-window@minimax-m3
+python -m pipeline_v2 review --variant v3.7-wordbank-window@deepseek-v4p1-flash --only <session>
 ```
 
 ## During play: `record` → `wgc`, `audio_pump`, `input_activity`, `marks`
 
 - **Video:** Windows Graphics Capture of the Fortnite window (`--monitor` for
-  the whole screen), paced to a constant 30 fps, NVENC at 8 Mbps, 30s MKV
+  the whole screen), captured at up to 60 fps and paced to a constant 30 fps
+  (capturing at exactly 30 repeated ~10% of frames, see `wgc`), NVENC at 8 Mbps, 30s MKV
   segments listed in `segments.csv`. Keyframe every 2s (OBS's default), so
   windows can be cut later without re-encoding.
 - **Audio:** game loopback and microphone as two separate AAC tracks.
@@ -25,13 +26,23 @@ compatibility is a hard constraint.
 
 1. `coverage.jsonl`: one request per 8s of footage, so the analysis spans tile
    the session with no gap and no overlap.
+   Windows outside the player's own gameplay are skipped (`gameplay`): match
+   phases (pre-game island, Battle Bus, match), death and match end come from
+   Fortnite's own log, which the game always writes. Session 2: 49 of 320
+   windows (lobby, item shop, loading, pre-game island, spectating) skipped,
+   none of them a keep. No log, no gating.
 2. `windows/`: each 8s window cut (stream copy on 2s-keyframe footage), with a
    `.capture.json` sidecar placing it on the session timeline.
-3. Described (7 frames over the 8s, `index`), stored, embedded. Every paid
-   response is cached, so re-runs are free.
-4. Ranked by taste when there are ≥10 ratings of both kinds in the variant,
+3. `mic_transcript.json`: the mic track transcribed locally (faster-whisper
+   `small`, CPU), about 2s per 30s of footage, cached per segment
+   (`voice`). Each window gets what was said during it.
+4. Described (7 frames over the 8s, `index`), stored, embedded. Every paid
+   response is cached, and a re-run with nothing new skips this step.
+5. Ranked by taste when there are ≥10 ratings of both kinds in the variant,
    otherwise by an explicit fallback (`basis` in `highlights.json` says which).
-5. `highlights/`: the top 10, never two from one fight, each re-cut from the
+   Speech is weighed in only if it improves this player's held-out accuracy
+   (see below).
+6. `highlights/`: the top 10, never two from one fight, each re-cut from the
    raw footage with 8s of lead-in.
 
 `--prune-raw` deletes the raw segments once highlights exist. It refuses if any
@@ -54,7 +65,31 @@ problem: input bursts overlapped only 5 of the 15 moments the player kept, and
 the random arm found more keeps than either detector. With full coverage, the
 taste-ranked top 15 exports cover 9 of those 15, and taste orders windows the
 way the player rated the overlapping clips 86% of the time. That is in-sample
-(the ratings came from the same session); session 2 is the out-of-sample check.
+(the ratings came from the same session). Session 2 was the out-of-sample
+check, and taste alone did not hold up: 86.9% against 92.3% for "what
+happened" alone, 96.5% for the two combined, which is now the ranking (see
+the top-level README).
+
+## Speech: weighed per player, not assumed
+
+The vision model sees frames and hears nothing, so a moment that is funny for
+what was said looks like nothing happened. Session 1 (104 of 146 rated clips
+had speech), held-out taste, 60s / 120s blocks:
+
+| speech | pairwise |
+|---|---|
+| none (descriptions only) | 92.6% / 92.1% |
+| appended to the description text | 83.3% / 83.8% |
+| own vector, weight 1.0 | 86.2% / 91.3% |
+| own vector, weight 0.3 | 92.8% / 91.7% |
+
+This player's talk was callouts, and mixing it into the description drowned
+out the picture. So speech is kept as its own vector, and `ranking` picks its
+weight from {0, 0.3, 1} by cross-validation on the player's own ratings,
+using it only when it beats descriptions alone by a point. For session 1 it
+chose 0, so the ranking is unchanged. Whether it switches on for a player
+whose keeps are the funny moments is tested only on synthetic data
+(`test_speech_weight`); no such player has rated yet.
 
 ## Legacy
 

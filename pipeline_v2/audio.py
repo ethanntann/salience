@@ -112,6 +112,25 @@ class Transcriber:
         )
         return " ".join(segment.text.strip() for segment in segments).strip()
 
+    def timed(self, wav: Path) -> list[tuple[float, float, str]]:
+        """(start, end, text) per utterance, seconds from the start of the file.
+
+        Segments Whisper itself thinks are not speech are dropped: on a quiet
+        mic it otherwise invents stock phrases ("Thank you.") from breathing.
+        """
+        segments, _ = self._model.transcribe(
+            str(wav),
+            language="en",
+            vad_filter=True,
+            beam_size=1,
+            condition_on_previous_text=False,
+        )
+        return [
+            (float(s.start), float(s.end), s.text.strip())
+            for s in segments
+            if s.text.strip() and s.no_speech_prob < 0.6
+        ]
+
 
 def analyse(
     clip: Path, transcriber: Transcriber | None, out_dir: Path

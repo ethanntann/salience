@@ -16,6 +16,65 @@ from pipeline_v2 import config
 from pipeline_v2 import schema
 
 
+SPEECH_VARIANT = "speech"
+# Shares speech is tried at, against the description. 0.3 measured neutral on
+# a player whose talk was callouts; 1.0 is for a player whose keeps are mostly
+# what was said.
+SPEECH_WEIGHTS = (0.0, 0.3, 1.0)
+# Speech has to beat description-only by this much on held-out minutes. Below
+# it the difference is noise, and noise is not worth a less legible ranker.
+MIN_SPEECH_GAIN = 0.01
+# Held-out blocks for choosing the weight: neighbouring windows of one session
+# are near-duplicates, so they must fall in the same fold.
+CV_BLOCK_SECONDS = 120.0
+
+
+def _cv_group(clip, fallback: str) -> str:
+    """The session minute-block a capture clip belongs to, from its sidecar."""
+    import json
+
+    try:
+        sidecar = json.loads(
+            Path(clip.path).with_suffix(".capture.json").read_text(encoding="utf-8"))
+        block = int(float(sidecar["segment_start_sec"]) // CV_BLOCK_SECONDS)
+    except (OSError, ValueError, KeyError, TypeError):
+        return fallback
+    return f"{Path(clip.path).parent.parent}:{block}"
+
+
+def choose_speech_weight(
+    training: list, speech: dict, dims: int, groups: dict, mode: str
+) -> tuple[float, dict]:
+    """How much what was said should count, judged on this player's own ratings.
+
+    Returns (weight, held-out accuracy per weight tried). Zero unless speech
+    measurably helps: for a player who never talks, or whose talk does not
+    track what they keep, the ranking is exactly the description-only one.
+    """
+    from dataclasses import replace
+
+    voiced = sum(e.clip_sha in speech for e in training)
+    if not dims or voiced < 10:
+        return 0.0, {}
+    regrouped = [replace(e, engagement=groups.get(e.clip_sha, e.engagement)) for e in training]
+    tried: dict[float, float] = {}
+    for weight in SPEECH_WEIGHTS:
+        examples = [
+            replace(e, embedding=taste_mod.with_speech(
+                e.embedding, speech.get(e.clip_sha), weight, dims))
+            for e in regrouped
+        ]
+        accuracy, pairs = taste_mod.pairwise_accuracy(
+            examples, mode, folds=5, model="logistic")
+        if not pairs:
+            return 0.0, {}
+        tried[weight] = accuracy
+    best = max(SPEECH_WEIGHTS, key=lambda w: (tried[w], -w))
+    if tried[best] < tried[0.0] + MIN_SPEECH_GAIN:
+        return 0.0, tried
+    return best, tried
+
+
 @dataclass(frozen=True)
 class RankedFight:
     score: float
@@ -29,8 +88,12 @@ def ranked_fights(
     db_path: Path | None = None,
     variant: str | None = None,
     mode: str = config.DEFAULT_RANK_MODE,
+    info: dict | None = None,
 ) -> tuple[list[RankedFight], int]:
-    """Returns (fights ordered best first, number of labels trained on)."""
+    """Returns (fights ordered best first, number of labels trained on).
+
+    `info`, when given, is filled with how speech was weighed and why.
+    """
     cfg = config.load_config()
     variant = variant or prompt.active_variant(cfg)
     mechanics = schema.mechanics_for(variant)
@@ -81,8 +144,28 @@ def ranked_fights(
     if len(training) < 10 or len({e.label for e in training}) < 2:
         return [], len(training)
 
+    speech = store.embeddings(conn, SPEECH_VARIANT)
+    dims = len(next(iter(speech.values()), []))
+    by_sha = {clip.clip_sha: clip for clip in stored}
+    blocks = {
+        e.clip_sha: _cv_group(by_sha[e.clip_sha], e.engagement or e.clip_sha)
+        for e in training
+    }
+    weight, tried = choose_speech_weight(training, speech, dims, blocks, mode)
+    if info is not None:
+        info.update(speech_weight=weight, speech_cv=tried)
+
+    def heard(e: taste_mod.Example) -> taste_mod.Example:
+        if not weight:
+            return e
+        from dataclasses import replace
+
+        return replace(e, embedding=taste_mod.with_speech(
+            e.embedding, speech.get(e.clip_sha), weight, dims))
+
+    training = [heard(e) for e in training]
     ranker = taste_mod.LogisticRanker().fit(training, mode)
-    candidates = ((clip, example(clip, 0, 1.0)) for clip in stored)
+    candidates = ((clip, heard(example(clip, 0, 1.0))) for clip in stored)
     scores = {
         clip.clip_sha: ranker.score(candidate, mode)
         for clip, candidate in candidates

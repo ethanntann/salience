@@ -15,6 +15,20 @@ def _unit(vector: list[float]) -> list[float]:
     return [v / norm for v in vector] if norm else list(vector)
 
 
+def with_speech(
+    embedding: list[float], speech: list[float] | None, weight: float, dims: int
+) -> list[float]:
+    """The description's vector with what was said beside it, scaled by `weight`.
+
+    Each block is normalised first, so `weight` is the share speech gets
+    rather than an accident of how many dimensions each happens to have. A
+    silent clip gets zeros, which is "nobody spoke", not missing data.
+    """
+    if not weight or not dims:
+        return embedding
+    return _unit(embedding) + [weight * v for v in _unit(speech or [0.0] * dims)]
+
+
 @dataclass(frozen=True)
 class Example:
     clip_sha: str

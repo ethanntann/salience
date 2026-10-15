@@ -104,3 +104,18 @@ def test_rerating_without_the_flag_clears_it(server, conn):
     _rate(server, {"sha": "one", "label": 1})
 
     assert conn.execute("select count(*) from description_flags").fetchone()[0] == 0
+
+
+def test_only_queues_clips_under_one_folder(conn, tmp_path, monkeypatch):
+    """The session just played is not queued behind every older unrated window."""
+    old, new = tmp_path / "old" / "a.mp4", tmp_path / "new" / "b.mp4"
+    for media in (old, new):
+        media.parent.mkdir()
+        media.write_bytes(b"x")
+        add_clip(conn, media)
+    conn.commit()
+    monkeypatch.setattr(review, "_ONLY", str((tmp_path / "new").resolve()))
+
+    pending = review._next_clip(conn)
+
+    assert (pending["name"], pending["remaining"]) == ("b.mp4", 1)

@@ -50,11 +50,18 @@ _DEATH = re.compile(r"LogFortDeathCameraMode: Going to use death report")
 # is being watched. Confirmed by timing: a death at 19.22.58 is followed four
 # seconds later by this line carrying another player's name.
 _VIEWED = re.compile(r"LogPlayerKills: HandlePlayerStateChanged : (.+?)\s*$")
+# Setup -> Warmup (the pre-game island) -> Aircraft (the Battle Bus) ->
+# SafeZones (the match proper) -> EndGame. Confirmed on 2026-10-14: four
+# matches, each phase in that order, Warmup 21-43s long.
+_PHASE = re.compile(
+    r"HandleGamePhaseChanged\. OldPhase = EAthenaGamePhase::(\w+)\. "
+    r"NewPhase = EAthenaGamePhase::(\w+)"
+)
 
 
 @dataclass(frozen=True)
 class GameEvent:
-    kind: str  # match_start | match_end | death | viewing
+    kind: str  # match_start | match_end | death | viewing | phase (detail = new phase)
     at: datetime  # UTC
     detail: str = ""
     # For `viewing`: the player whose feed is on screen. Equal to the local
@@ -89,6 +96,14 @@ def parse_line(line: str) -> GameEvent | None:
             kind=kind,
             at=parse_timestamp(found.group("stamp"), found.group("ms")),
             detail=f"{previous}->{current}",
+        )
+
+    phase = _PHASE.search(body)
+    if phase is not None:
+        return GameEvent(
+            kind="phase",
+            at=parse_timestamp(found.group("stamp"), found.group("ms")),
+            detail=phase.group(2),
         )
 
     viewed = _VIEWED.search(body)

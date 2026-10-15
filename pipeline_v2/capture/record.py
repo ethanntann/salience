@@ -8,11 +8,10 @@ game window, audio is WASAPI loopback plus the microphone, input is
 screen recorder.
 
 While the game runs, nothing but capture happens. Detectors only *journal*
-moments (free); cutting means re-encoding, because the encoder emits one
-keyframe per 30s chunk, and re-encoding is the contention every capture
-measurement has been fighting. When recording stops, the whole session is
-described and ranked by the player's taste (`highlights.run`), and the
-highlights folder opens.
+moments (free). When recording stops, the whole session is cut into 8s
+windows (stream copy, on the encoder's 2s keyframes), the mic is transcribed
+locally, every window is described, and the lot is ranked by the player's
+taste (`highlights.run`). Then the highlights folder opens.
 """
 
 from __future__ import annotations
@@ -53,9 +52,46 @@ def _parser() -> argparse.ArgumentParser:
                         help="how many highlights to keep (default 10)")
     parser.add_argument("--no-triggers", dest="triggers", action="store_false",
                         help="record without journalling detector moments")
+    parser.add_argument("--no-speech", dest="speech", action="store_false",
+                        help="do not transcribe the mic when ranking highlights")
     parser.add_argument("--no-open", dest="open", action="store_false",
                         help="do not open the highlights folder when done")
     return parser
+
+
+def _summary(stats) -> str:
+    """The line printed when recording stops.
+
+    Written frames above captured ones are the pacer holding 30fps through
+    static scenes, not loss; superseded ones are captures overwritten before
+    encoding. (This once read fields `WgcStats` does not have, and the crash in
+    the `finally` skipped making highlights.)
+    """
+    return (f"\n  recorded {stats.written} frames from {stats.delivered} captured "
+            f"({stats.superseded_rate:.1%} superseded)")
+
+
+def _save_stats(session: Path, stats, error: str | None) -> None:
+    """What the capture produced, kept beside the footage: the console that
+    printed it is usually closed before anyone reads it."""
+    from dataclasses import asdict
+
+    from pipeline_v2.jsonio import write_json
+
+    record = {k: v for k, v in asdict(stats).items() if k != "first_frame_at"}
+    record.update(superseded_rate=stats.superseded_rate, error=error)
+    if stats.first_frame_at is not None:
+        # Wall-clock t=0 of the video, which `gameplay` lines Fortnite's log up
+        # against. `first_frame_at` is monotonic and means nothing once the
+        # process exits, so it is converted while both clocks are at hand.
+        from datetime import datetime, timezone
+
+        started = time.time() - (time.monotonic() - stats.first_frame_at)
+        record["first_frame_utc"] = datetime.fromtimestamp(started, tz=timezone.utc).isoformat()
+    try:
+        write_json(session / "capture_stats.json", record)
+    except OSError:
+        pass  # never lose the highlights step over a stats file
 
 
 def _wait_for_game(wait: float):
@@ -151,7 +187,8 @@ def main(argv: list[str] | None = None) -> int:
         keeps = sum(1 for m in marks if m.kind == "keep")
         if marks:
             print(f"  marks : {keeps} keep, {len(marks) - keeps} dull -> marks.json")
-        print(f"\n  recorded {s.written} frames, dropped {s.dropped} ({s.drop_rate:.1%})")
+        print(_summary(s))
+        _save_stats(session, s, rec.error)
         if rec.error:
             print(f"  error: {rec.error}")
 
@@ -169,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
     print("\nmaking highlights (Ctrl+C to stop; resume later with")
     print(f"  python -m pipeline_v2.capture.highlights {session})")
     try:
-        highlights.report(highlights.run(session, top=args.top))
+        highlights.report(highlights.run(session, top=args.top, speech=args.speech))
     except KeyboardInterrupt:
         print("  stopped; nothing lost")
         return 0
