@@ -1,16 +1,19 @@
 # Salience
 
 Salience records your Fortnite sessions and keeps the clips *you* would have kept.
-You play; when you stop recording, it watches the whole session, describes every
-8 seconds with a vision model, and ranks the moments by a taste model trained on
-your own keep/skip ratings. No OBS, and nothing touches the game process.
+You play; while you play, it describes every 8 seconds of your matches with a
+vision model, and when you stop it ranks the moments by a taste model trained
+on your own keep/skip ratings, so the highlights are ready seconds later. No
+OBS, and nothing touches the game process.
 
 ```
 game window ──WGC──▶ NVENC segments (+ game & mic audio)          during play
-                     │
-                     ▼                                              after stop
-  8s coverage windows ─▶ 7 frames each ─▶ VLM description ─▶ embedding
-          mic track ─▶ Whisper (local) ─▶ what was said ─▶ speech vector
+                     │  each finished 30s segment, inside a match:
+                     ▼
+  8s coverage windows ─▶ 7 frames each ─▶ VLM description
+          mic track ─▶ Whisper (local, between matches) ─▶ what was said
+                                                               │   after stop
+                                        embeddings + speech vector
                                                                │
             your keep/skip ratings ─▶ taste ranker ◀───────────┘
                                           │
@@ -42,14 +45,24 @@ python -m pipeline_v2.capture.highlights <session folder>   # re-rank with new r
 - **Capture is passive.** Windows Graphics Capture of the game window, WASAPI
   loopback plus microphone as separate tracks, keyboard state by polling. An
   anti-cheat sees an ordinary screen recorder, which was a hard requirement.
-- **Nothing heavy runs while you play.** The encoder writes 30s segments with a
-  keyframe every 2s. All cutting and describing happens after you stop, and
-  windows are stream-copied rather than re-encoded (0.2s each instead of 2.4s).
+- **Described while you play, so there is no wait.** The encoder writes 30s
+  segments with a keyframe every 2s. As each one closes, its windows inside a
+  match (per Fortnite's log) are stream-copied out (0.2s each, no re-encode)
+  and sent to the describer. Frames are decoded on the GPU's video decoder,
+  which the game does not use (72% less CPU, byte-identical frames), one at a
+  time. That mattered: as a burst of CPU decoders it dipped a 165fps game to
+  100–120 every 30s; as a trickle it holds ~160, the same as capture alone.
+  Replaying session 2 this way: 8s from stop to highlights. Whisper runs only between matches. Describing
+  after the fact, one call at a time, had been 4.6s per window (about 20
+  minutes a session); 16 calls in flight brought that to 0.8s
+  (`--no-live` still works that way).
 - **Every moment is looked at, not just the ones a detector flagged.** The
   first design described only where a live detector fired (button-mashing
   bursts, voice spikes). A seeded random-control experiment showed why that
   fails: the trigger overlapped **5 of 15** moments the player kept. Describing
-  the whole session costs about **$0.001 per window, ~$0.25 per half hour**.
+  the whole session costs about **$0.002 per window, ~$0.35 per half hour of
+  matches**. Most of that is the 7 frames; 4 frames cut tokens by a third but
+  missed kills (agreement 97.3% → 94.5%), so 7 stays.
 - **Game vocabulary, not captions.** The describer gets a Fortnite word bank
   (`pipeline_v2/games/fortnite.py`): each term with the visible cue that earns
   it (a crack, a box, piece control, a third party) and a ban on scenery.

@@ -23,6 +23,9 @@ from pipeline_v2.prompt import SYSTEM, build_content
 from pipeline_v2.schema import ClipDescription, VlmResult
 
 
+USER_AGENT = "salience/0.2 (+https://github.com/ethanntann/salience)"
+
+
 class BudgetExceeded(RuntimeError):
     """A call limit or already-recorded spend threshold prevents another call."""
 
@@ -142,6 +145,9 @@ def _post(cfg: Config, content: list[dict]) -> dict:
             headers={
                 "Authorization": f"Bearer {cfg.api_key}",
                 "Content-Type": "application/json",
+                # urllib's default ("Python-urllib/3.x") is what Cloudflare's
+                # 1010 block matches, not the request rate.
+                "User-Agent": USER_AGENT,
             },
             method="POST",
         )

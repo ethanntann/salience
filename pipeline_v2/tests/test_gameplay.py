@@ -102,3 +102,11 @@ def test_the_phase_line_is_parsed():
         "OldPhase = EAthenaGamePhase::Warmup. NewPhase = EAthenaGamePhase::Aircraft")
 
     assert (event.kind, event.detail) == ("phase", "Aircraft")
+
+
+def test_still_on_the_island_is_not_gameplay_yet():
+    """Live, the pre-game island has no end in the log until the bus leaves."""
+    events = [_e("match_start", 100), GameEvent("phase", ORIGIN + timedelta(seconds=100),
+                                                 detail="Warmup")]
+
+    assert gameplay.play_spans(events, ORIGIN, 300) == []

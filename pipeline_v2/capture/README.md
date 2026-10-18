@@ -6,7 +6,7 @@ python -m pipeline_v2.capture.highlights <run>  # re-run the post-session pipeli
 python -m pipeline_v2 review --variant v3.7-wordbank-window@deepseek-v4p1-flash --only <session>
 ```
 
-## During play: `record` → `wgc`, `audio_pump`, `input_activity`, `marks`
+## During play: `record` → `wgc`, `audio_pump`, `input_activity`, `marks`, `live`
 
 - **Video:** Windows Graphics Capture of the Fortnite window (`--monitor` for
   the whole screen), captured at up to 60 fps and paced to a constant 30 fps
@@ -22,6 +22,15 @@ python -m pipeline_v2 review --variant v3.7-wordbank-window@deepseek-v4p1-flash 
 No hooks, no injection, nothing read from the game's memory: anti-cheat
 compatibility is a hard constraint.
 
+- **Live describing (`live`):** every 30s, the windows that are fully on disk
+  and that the log places inside a match are cut and described, one window
+  and one frame at a time, GPU-decoded, below normal priority (a burst of CPU
+  decoders cost ~50fps; the trickle costs none measurable). `--live-between`
+  waits for the lobby instead. Between matches the mic is
+  transcribed too. It does only what step 2–4 below would do, the same way, so
+  the final run finds them done; anything it missed (the last segment, a
+  failed call, no log) is left to that run. `--no-live` turns it off.
+
 ## After play: `highlights` → `clips`
 
 1. `coverage.jsonl`: one request per 8s of footage, so the analysis spans tile
@@ -36,8 +45,10 @@ compatibility is a hard constraint.
 3. `mic_transcript.json`: the mic track transcribed locally (faster-whisper
    `small`, CPU), about 2s per 30s of footage, cached per segment
    (`voice`). Each window gets what was said during it.
-4. Described (7 frames over the 8s, `index`), stored, embedded. Every paid
-   response is cached, and a re-run with nothing new skips this step.
+4. Described (7 frames over the 8s, `index`, 16 calls in flight), stored,
+   embedded. Every paid response is cached, and only windows with no
+   description are looked at, so after a live session this is the last
+   segment or two.
 5. Ranked by taste when there are ≥10 ratings of both kinds in the variant,
    otherwise by an explicit fallback (`basis` in `highlights.json` says which).
    Speech is weighed in only if it improves this player's held-out accuracy

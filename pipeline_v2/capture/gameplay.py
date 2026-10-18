@@ -105,6 +105,10 @@ def _warmups(events, at) -> list[tuple[float, float]]:
         elif began is not None:
             found.append((began, at(event)))
             began = None
+    if began is not None:
+        # Still on the island when the log ends: while the session is live
+        # (`live`), or a recording stopped before the bus.
+        found.append((began, float("inf")))
     return found
 
 

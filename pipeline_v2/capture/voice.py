@@ -12,9 +12,10 @@ was laughing gets speech weighed in, and someone playing in silence, or whose
 talk is only callouts, gets the ranking they had before. A fixed list of "funny" phrases was the alternative, and
 `speech.py` records why a fixed vocabulary measured badly.
 
-Local (faster-whisper on the CPU), after the session, and cached per raw
-segment in `mic_transcript.json`, so a re-run and a pruned session both keep
-what was heard.
+Local (faster-whisper on the CPU), cached per raw segment in
+`mic_transcript.json`, so a re-run and a pruned session both keep what was
+heard. `live` transcribes between matches, when the CPU is the game's least;
+the session's end does the rest.
 """
 
 from __future__ import annotations
@@ -93,13 +94,15 @@ def _place(chunk: list, heard: list) -> dict[str, list]:
 
 
 def transcribe_session(
-    session: Path, *, transcriber=None, runner=subprocess.run
+    session: Path, *, transcriber=None, runner=subprocess.run, limit: int | None = None
 ) -> list[Utterance]:
-    """Every utterance on the mic, transcribing only segments not yet cached."""
+    """Every utterance on the mic, transcribing only segments not yet cached
+    (at most `limit` of them, so a caller between matches can stop early)."""
     cache_path = session / CACHE_NAME
     cache = _read_cache(cache_path)
     segments = clips_mod.read_segments(session)
     todo = [s for s in segments if s.path.name not in cache and s.path.is_file()]
+    todo = todo[:limit] if limit is not None else todo
     if todo:
         if transcriber is None:
             from pipeline_v2.audio import Transcriber

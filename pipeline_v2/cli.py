@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from contextlib import closing
 import json
-import time
+import os
 from pathlib import Path
 import sys
 
@@ -157,6 +157,88 @@ def cmd_process(args: argparse.Namespace) -> int:
     return 0
 
 
+# Calls in flight at once. One at a time, with a 1.5s pause after each, was
+# 4.6s per window: about 20 minutes for a 40-minute session. The pause was
+# there because back-to-back calls tripped Cloudflare's 1010 block, which is
+# the block for a client signature (urllib's default User-Agent), not for
+# rate; `vlm` now sends its own, and a real rate limit comes back as a 429,
+# which `vlm` already retries with backoff.
+WORKERS = int(os.environ.get("V2_WORKERS", "16") or 16)
+
+
+def describe_many(cfg, clips: list[Path], max_calls: int | None, workers: int = WORKERS):
+    """Yield (clip, outcome) for each clip, in order, describing `workers` at once.
+
+    `outcome` is (duration, facts, VlmResult), None when no frames could be cut,
+    or the exception a clip raised (`BudgetExceeded`, or a parse error). Each
+    call is budgeted before it starts, so at most `max_calls` are ever paid.
+    Callers store as results arrive, so a run that dies keeps what it got.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+
+    lock = threading.Lock()
+    left = [max_calls if max_calls is not None else len(clips)]
+
+    def one(clip: Path):
+        duration, clip_facts, window = _prepare(clip)
+        if not window:
+            return None
+        frames = [f.path for f in window]
+        try:
+            # A cached answer costs nothing, so it never touches the allowance.
+            return duration, clip_facts, vlm.describe(
+                cfg, clip, clip_facts, frames, allow_call=False)
+        except vlm.BudgetExceeded:
+            pass
+        except (ValueError, TypeError) as exc:
+            return exc
+        with lock:
+            allowed = left[0] > 0
+            left[0] -= allowed
+        try:
+            return duration, clip_facts, vlm.describe(
+                cfg, clip, clip_facts, frames, allow_call=allowed)
+        except (vlm.BudgetExceeded, ValueError, TypeError) as exc:
+            return exc
+
+    pool = ThreadPoolExecutor(max_workers=max(1, workers))
+    try:
+        yield from zip(clips, pool.map(one, clips))
+    finally:
+        # A caller that stops early (the recorder stopping) waits for the calls
+        # in flight, never for the queue behind them.
+        pool.shutdown(wait=True, cancel_futures=True)
+
+
+def store_described(conn, cfg, clip: Path, duration, clip_facts, result) -> str:
+    """Store one described clip and commit; returns the variant it landed in."""
+    engagement_at = engagements.clip_time(clip)
+    variant = prompt_mod.storage_variant(cfg.prompt_version, clip_facts, cfg.model)
+    store.upsert_clip(
+        conn,
+        clip_sha=cache.clip_sha(clip),
+        path=clip,
+        engagement=engagement_at.isoformat() if engagement_at else None,
+        duration_sec=duration,
+        event_sec=clip_facts.event_sec,
+        event_source=clip_facts.event_source,
+        facts={
+            "source_event": clip_facts.source_event,
+            "capture_session": clip_facts.capture_session,
+            "analysis_start_sec": clip_facts.analysis_start_sec,
+            "analysis_end_sec": clip_facts.analysis_end_sec,
+        },
+        summary=result.description.embed_text,
+        payload=result.description.model_dump(),
+        prompt_version=variant,
+    )
+    # Commit per clip, not per batch. A 150-clip run inside one transaction
+    # holds a write lock throughout and loses everything if it dies partway.
+    conn.commit()
+    return variant
+
+
 def cmd_index(args: argparse.Namespace) -> int:
     """Describe clips (cache-first), store them, then rebuild embeddings."""
     # Without this the command that describes the whole library is the one
@@ -210,71 +292,39 @@ def cmd_index(args: argparse.Namespace) -> int:
         )
     else:
         clips, skipped = (_clips(Path(args.target), args.limit), 0)
+    if getattr(args, "only_new", False):
+        # Looking up a cached answer still extracts its frames (they are part
+        # of the cache key): 300s on a 235-window session that needed nothing.
+        with closing(store.connect()) as conn0:
+            described = {r[0] for r in conn0.execute("select clip_sha from descriptions")}
+        clips = [c for c in clips if cache.clip_sha(c) not in described]
     if skipped:
         print(f"{skipped} duplicate clip(s) skipped\n")
 
-    calls_left = args.max_calls
     # A run can describe auto-clipped files and capture windows together; they
     # are different prompts and must be embedded as separate corpora.
     written: set[str] = set()
     unparsed: list[str] = []
     conn = store.connect()
     try:
-        for clip in clips:
-            duration, clip_facts, window = _prepare(clip)
-            if not window:
+        for clip, outcome in describe_many(
+            cfg, clips, args.max_calls, getattr(args, "workers", None) or WORKERS
+        ):
+            if outcome is None:
                 continue
-            try:
-                result = vlm.describe(
-                    cfg,
-                    clip,
-                    clip_facts,
-                    [f.path for f in window],
-                    allow_call=calls_left > 0,
-                )
-            except vlm.BudgetExceeded as exc:
-                print(f"stopped: {exc}")
+            if isinstance(outcome, vlm.BudgetExceeded):
+                print(f"stopped: {outcome}")
                 break
-            except (ValueError, TypeError) as exc:
+            if isinstance(outcome, (ValueError, TypeError)):
                 # A malformed or unexpected response is one clip's problem. It
                 # once aborted a 50-clip run at clip 20, losing the embedding
                 # step and leaving 30 clips undescribed. The raw text is already
                 # cached, so a later retry costs nothing.
                 unparsed.append(clip.name)
-                print(f"  unparsed {clip.name}: {type(exc).__name__} {exc}")
+                print(f"  unparsed {clip.name}: {type(outcome).__name__} {outcome}")
                 continue
-            if not result.cached:
-                calls_left -= 1
-                # Pace paid calls. Firing them back to back trips Cloudflare bot
-                # protection (403/1010) partway through a batch.
-                time.sleep(1.5)
-            engagement_at = engagements.clip_time(clip)
-            variant = prompt_mod.storage_variant(
-                cfg.prompt_version, clip_facts, cfg.model
-            )
-            written.add(variant)
-            store.upsert_clip(
-                conn,
-                clip_sha=cache.clip_sha(clip),
-                path=clip,
-                engagement=engagement_at.isoformat() if engagement_at else None,
-                duration_sec=duration,
-                event_sec=clip_facts.event_sec,
-                event_source=clip_facts.event_source,
-                facts={
-                    "source_event": clip_facts.source_event,
-                    "capture_session": clip_facts.capture_session,
-                    "analysis_start_sec": clip_facts.analysis_start_sec,
-                    "analysis_end_sec": clip_facts.analysis_end_sec,
-                },
-                summary=result.description.embed_text,
-                payload=result.description.model_dump(),
-                prompt_version=variant,
-            )
-            # Commit per clip, not per batch. A 150-clip run inside one
-            # transaction holds a write lock throughout and loses everything if
-            # it dies partway.
-            conn.commit()
+            duration, clip_facts, result = outcome
+            written.add(store_described(conn, cfg, clip, duration, clip_facts, result))
             print(f"  stored {clip.name}" + ("" if result.cached else "  (paid)"))
 
     finally:
@@ -783,6 +833,8 @@ def main() -> int:
     )
     index_cmd.add_argument("--limit", type=int, default=None)
     index_cmd.add_argument("--max-calls", type=int, default=0)
+    index_cmd.add_argument("--workers", type=int, default=None,
+                           help=f"calls in flight at once (default {WORKERS}, V2_WORKERS)")
     index_cmd.add_argument(
         "--encoder", default=None, help="tfidf to force the baseline"
     )

@@ -7,11 +7,12 @@ game window, audio is WASAPI loopback plus the microphone, input is
 `GetAsyncKeyState`/`GetLastInputInfo` polling. Anti-cheat sees an ordinary
 screen recorder.
 
-While the game runs, nothing but capture happens. Detectors only *journal*
-moments (free). When recording stops, the whole session is cut into 8s
-windows (stream copy, on the encoder's 2s keyframes), the mic is transcribed
-locally, every window is described, and the lot is ranked by the player's
-taste (`highlights.run`). Then the highlights folder opens.
+While the game runs, each finished 30s segment is cut into 8s windows (stream
+copy, on the encoder's 2s keyframes) and the ones inside a match are described
+(`live`), so describing is done by the time the player stops. Detectors only
+*journal* moments (free). When recording stops, the mic is transcribed locally,
+anything live did not reach is described, and the lot is ranked by the
+player's taste (`highlights.run`). Then the highlights folder opens.
 """
 
 from __future__ import annotations
@@ -52,6 +53,17 @@ def _parser() -> argparse.ArgumentParser:
                         help="how many highlights to keep (default 10)")
     parser.add_argument("--no-triggers", dest="triggers", action="store_false",
                         help="record without journalling detector moments")
+    parser.add_argument("--no-live", dest="live", action="store_false",
+                        help="describe only after recording stops, not during play")
+    # Measured 2026-10-18 on a 165fps game: mid-match frame extraction as a
+    # burst (16 CPU decoders) dipped it to 100-120 every 30s; as a trickle (one
+    # frame at a time, GPU-decoded) it held ~160, the same as capture alone.
+    parser.add_argument("--live-between", dest="live_between", action="store_true",
+                        help="describe only between matches, never mid-match")
+    parser.add_argument("--live-during", dest="live_between", action="store_false",
+                        help=argparse.SUPPRESS)
+    parser.add_argument("--capture-fps", type=int, default=None,
+                        help="how often to grab the game window (default 2x --fps)")
     parser.add_argument("--no-speech", dest="speech", action="store_false",
                         help="do not transcribe the mic when ranking highlights")
     parser.add_argument("--no-open", dest="open", action="store_false",
@@ -129,7 +141,8 @@ def main(argv: list[str] | None = None) -> int:
     session = args.out / time.strftime("%Y%m%d-%H%M%S")
     rec = WgcRecorder(session, fps=args.fps, bitrate=args.bitrate,
                       monitor_index=None if hwnd else 1, window_hwnd=hwnd,
-                      audio=args.audio, mic_hint=args.mic or None)
+                      audio=args.audio, mic_hint=args.mic or None,
+                      capture_fps=args.capture_fps)
     rec.start()
     marker = MarkRecorder(journal=session / "marks.tsv").start()
     activity = ActivitySampler(journal=session / "input.tsv").start()
@@ -145,6 +158,15 @@ def main(argv: list[str] | None = None) -> int:
     bus = TriggerBus(detectors_for(args.game)) if args.triggers else None
     journal = session / clips.JOURNAL_NAME
 
+    live = None
+    if args.highlights and args.live:
+        from pipeline_v2.capture.live import LiveDescriber
+
+        live = LiveDescriber(session, speech=args.speech,
+                             between_only=args.live_between).start()
+        print("  live  : describing " + ("between matches" if args.live_between
+                                         else "each finished 30s segment during play"))
+
     stop = False
 
     def handle(*_):
@@ -157,9 +179,15 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, handle)
     signal.signal(signal.SIGTERM, handle)
     seen_samples = 0
+    origin_saved = False
     try:
         while not stop:
             time.sleep(0.5)
+            if not origin_saved and rec.stats.first_frame_at is not None:
+                # Written now rather than at stop: `live` lines the game log up
+                # with the video while it is still recording.
+                _save_stats(session, rec.stats, None)
+                origin_saved = True
             if bus is None:
                 continue
             fresh = activity.samples[seen_samples:]
@@ -180,7 +208,13 @@ def main(argv: list[str] | None = None) -> int:
                     continue  # no frame encoded yet, so nothing to cut from
                 clips.append(journal, clips.ClipRequest.from_trigger(fired, origin))
     finally:
+        # It used to stop in silence while live finished its queue, and a second
+        # Ctrl+C then landed in (and cancelled) the highlights step.
+        print("\nstopping -- a few seconds, no need to press Ctrl+C again")
         s = rec.stop()
+        if live is not None:
+            print(f"  live  : {live.stop()} window(s) described during play"
+                  + (f" (last error: {live.error})" if live.error else ""))
         activity.stop()
         marks = marker.stop()
         marker.save(session / "marks.json")
@@ -197,18 +231,18 @@ def main(argv: list[str] | None = None) -> int:
               f"  python -m pipeline_v2.capture.highlights {session}")
         return 1 if rec.error else 0
 
-    # Runs after capture has fully stopped, so cutting (GPU) and describing
-    # (cloud) never compete with the game. Interrupting loses nothing: cutting
-    # resumes, and every paid description is cached.
+    # What live did not reach (the last segment, or everything with --no-live)
+    # is described here. Interrupting loses nothing: cutting resumes, and every
+    # paid description is cached.
     from pipeline_v2.capture import highlights
 
     signal.signal(signal.SIGINT, signal.default_int_handler)
-    print("\nmaking highlights (Ctrl+C to stop; resume later with")
-    print(f"  python -m pipeline_v2.capture.highlights {session})")
+    print("\nmaking highlights, usually under a minute (Ctrl+C here postpones them)")
     try:
         highlights.report(highlights.run(session, top=args.top, speech=args.speech))
     except KeyboardInterrupt:
-        print("  stopped; nothing lost")
+        print("  postponed; nothing lost. Finish them with:\n"
+              f"  python -m pipeline_v2.capture.highlights {session}")
         return 0
     out = session / "highlights"
     print(f"  -> {out}")

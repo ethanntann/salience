@@ -35,6 +35,9 @@ from salience_media.probe import safe_probe_media
 # V2_FRAME_WIDTH overrides for experiments. Input tokens scale roughly with
 # pixel count: ~4.2k at 960, ~8.6k at 1440, ~15k at 1920.
 FRAME_WIDTH = int(os.environ.get("V2_FRAME_WIDTH", "1440"))
+# Frames per window. V2_FRAME_COUNT overrides for experiments; frames are most
+# of the input tokens, so this is the main cost lever.
+FRAME_COUNT = int(os.environ.get("V2_FRAME_COUNT", "7"))
 FRAME_FILTER = f"scale=w={FRAME_WIDTH}:h=-2:force_original_aspect_ratio=decrease"
 
 
@@ -78,7 +81,7 @@ def window_frames(
     *,
     pre_sec: float = WINDOW_PRE_SEC,
     post_sec: float = WINDOW_POST_SEC,
-    samples: int = 7,
+    samples: int | None = None,
     out_dir: Path,
 ) -> list[Frame]:
     """Frames tightly packed around the located event -- what the VLM sees.
@@ -87,6 +90,7 @@ def window_frames(
     appears after the shot that caused it, so the interesting action is behind
     that mark rather than ahead of it.
     """
+    samples = samples or FRAME_COUNT
     duration = max(duration_sec or 0.0, 1.0)
     step = (pre_sec + post_sec) / max(samples - 1, 1)
     timestamps = sorted(

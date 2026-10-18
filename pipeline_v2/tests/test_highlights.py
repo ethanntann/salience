@@ -24,6 +24,7 @@ def _deaf(monkeypatch):
     monkeypatch.setattr(highlights, "listen", lambda session, clip_dir: 0)
     # Nor the developer's real Fortnite log; gating has its own tests.
     monkeypatch.setattr(highlights, "find_gameplay", lambda session: {"spans": None})
+    monkeypatch.setattr(highlights, "unembedded", lambda clip_dir: 0)
 
 
 def _session(tmp_path: Path, outcomes: list[str]) -> Path:

@@ -103,7 +103,7 @@ def describe(clip_dir: Path, max_calls: int) -> None:
     cli.cmd_index(argparse.Namespace(
         target=str(clip_dir), from_plan=None, restore_stored=False,
         split_fights=False, from_feedback=None, limit=None,
-        max_calls=max_calls, encoder=None,
+        max_calls=max_calls, encoder=None, only_new=True,
     ))
 
 
@@ -124,6 +124,7 @@ def listen(session: Path, clip_dir: Path) -> int:
     from pipeline_v2.capture import voice
 
     files = [p for p in clip_dir.glob("*") if p.suffix in (".mkv", ".mp4")]
+    print("  speech: transcribing what the mic heard...", flush=True)
     try:
         return voice.attach(session, sorted(files))
     except ImportError:
@@ -142,6 +143,27 @@ def undescribed(clip_dir: Path) -> int:
     finally:
         conn.close()
     return sum(cache.clip_sha(p) not in described for p in files)
+
+
+def unembedded(clip_dir: Path) -> int:
+    """How many of this folder's described clips have no embedding yet.
+
+    Non-zero after a live session (`live`): it stores descriptions as they
+    arrive and leaves embedding to this run, which needs the whole corpus.
+    """
+    from pipeline_v2 import store
+
+    conn = store.connect()
+    try:
+        return conn.execute(
+            "select count(*) from descriptions d join clips c using (clip_sha)"
+            " left join embeddings e on e.clip_sha = d.clip_sha"
+            " and e.prompt_ver = d.prompt_ver"
+            " where c.path like ? and e.clip_sha is null",
+            (str(clip_dir) + "%",),
+        ).fetchone()[0]
+    finally:
+        conn.close()
 
 
 def reembed(clip_dir: Path) -> None:
@@ -313,6 +335,7 @@ def run(
     listen_fn=None,
     reembed_fn=None,
     undescribed_fn=None,
+    unembedded_fn=None,
 ) -> dict:
     """Cut, describe, rank and keep the best `top` clips from one recording."""
     from pipeline_v2 import store
@@ -355,7 +378,7 @@ def run(
     fresh = (undescribed_fn or undescribed)(clip_dir) if cut else 0
     if fresh:
         describe_fn(clip_dir, max_calls=fresh)
-    elif heard:
+    elif heard or (unembedded_fn or unembedded)(clip_dir):
         (reembed_fn or reembed)(clip_dir)
 
     conn = store.connect()
