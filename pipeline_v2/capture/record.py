@@ -119,13 +119,111 @@ def _wait_for_game(wait: float):
     return hwnd
 
 
-def main(argv: list[str] | None = None) -> int:
-    from pipeline_v2.capture import clips
-    from pipeline_v2.capture.input_activity import ActivitySampler
-    from pipeline_v2.capture.marks import MarkRecorder
-    from pipeline_v2.capture.triggers import TriggerBus, detectors_for
-    from pipeline_v2.capture.wgc import WgcRecorder
+class Session:
+    """One recording: capture, marks, input, detectors and live describing.
 
+    `start`, then `tick` about every 0.5s, then `stop`. The terminal command
+    drives it from a Ctrl+C loop and the tray app from a thread, so neither
+    owns the other's signal handling.
+    """
+
+    def __init__(self, args: argparse.Namespace, hwnd=None, root: Path | None = None):
+        self.args = args
+        self.hwnd = hwnd
+        self.path = (root or args.out) / time.strftime("%Y%m%d-%H%M%S")
+        self.live = None
+        self._seen_samples = 0
+        self._origin_saved = False
+
+    def start(self) -> "Session":
+        from pipeline_v2.capture import clips
+        from pipeline_v2.capture.input_activity import ActivitySampler
+        from pipeline_v2.capture.marks import MarkRecorder
+        from pipeline_v2.capture.triggers import TriggerBus, detectors_for
+        from pipeline_v2.capture.wgc import WgcRecorder
+
+        args, session = self.args, self.path
+        self.rec = WgcRecorder(session, fps=args.fps, bitrate=args.bitrate,
+                               monitor_index=None if self.hwnd else 1, window_hwnd=self.hwnd,
+                               audio=args.audio, mic_hint=args.mic or None,
+                               capture_fps=args.capture_fps)
+        self.rec.start()
+        self.marker = MarkRecorder(journal=session / "marks.tsv").start()
+        self.activity = ActivitySampler(journal=session / "input.tsv").start()
+        print(f"recording -> {session}")
+        print(f"  target: {'game window' if self.hwnd else 'monitor 1'} @ {args.fps}fps {args.bitrate}")
+        print(f"  audio : {'game + mic' if args.audio else 'OFF'}")
+        print("  F9    = mark this moment as worth keeping")
+        print("  F10   = mark it as nothing happening")
+        # Detector moments are journalled as a hint and for measurement; with
+        # full coverage they no longer decide what gets described.
+        self.bus = TriggerBus(detectors_for(args.game)) if args.triggers else None
+        self.journal = session / clips.JOURNAL_NAME
+        if args.highlights and args.live:
+            from pipeline_v2.capture.live import LiveDescriber
+
+            self.live = LiveDescriber(session, speech=args.speech,
+                                      between_only=args.live_between).start()
+            print("  live  : describing " + ("between matches" if args.live_between
+                                             else "each finished 30s segment during play"))
+        return self
+
+    @property
+    def error(self) -> str | None:
+        return self.rec.error
+
+    def tick(self) -> None:
+        from pipeline_v2.capture import clips
+
+        rec = self.rec
+        if not self._origin_saved and rec.stats.first_frame_at is not None:
+            # Written now rather than at stop: `live` lines the game log up
+            # with the video while it is still recording.
+            _save_stats(self.path, rec.stats, None)
+            self._origin_saved = True
+        if self.bus is None:
+            return
+        fresh = self.activity.samples[self._seen_samples:]
+        self._seen_samples += len(fresh)
+        mic = rec.mic_level()
+        # Triggers are placed on the *video's* timeline, whose t=0 is the
+        # first frame the encoder received -- not when the sampler started.
+        origin = rec.stats.first_frame_at
+        for sample in fresh:
+            # Stamped with the sample's own time, not whenever this loop
+            # woke: a 0.5s sleep hands over several windows at once, and
+            # stamping them all "now" collapses the rolling baseline.
+            fired = self.bus.observe(
+                press_rate=sample.rate, mic_db=mic,
+                now=self.activity.started + sample.at,
+            )
+            if fired is None or origin is None:
+                continue  # no frame encoded yet, so nothing to cut from
+            clips.append(self.journal, clips.ClipRequest.from_trigger(fired, origin))
+
+    def stop(self):
+        """Stop everything and save what was recorded; the capture stats."""
+        # It used to stop in silence while live finished its queue, and a second
+        # Ctrl+C then landed in (and cancelled) the highlights step.
+        print("\nstopping -- a few seconds, no need to press Ctrl+C again")
+        s = self.rec.stop()
+        if self.live is not None:
+            print(f"  live  : {self.live.stop()} window(s) described during play"
+                  + (f" (last error: {self.live.error})" if self.live.error else ""))
+        self.activity.stop()
+        marks = self.marker.stop()
+        self.marker.save(self.path / "marks.json")
+        keeps = sum(1 for m in marks if m.kind == "keep")
+        if marks:
+            print(f"  marks : {keeps} keep, {len(marks) - keeps} dull -> marks.json")
+        print(_summary(s))
+        _save_stats(self.path, s, self.rec.error)
+        if self.rec.error:
+            print(f"  error: {self.rec.error}")
+        return s
+
+
+def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
 
     hwnd = None
@@ -138,35 +236,9 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("Fortnite window not found -- start the game first, "
                              "or pass --monitor to record the whole screen")
 
-    session = args.out / time.strftime("%Y%m%d-%H%M%S")
-    rec = WgcRecorder(session, fps=args.fps, bitrate=args.bitrate,
-                      monitor_index=None if hwnd else 1, window_hwnd=hwnd,
-                      audio=args.audio, mic_hint=args.mic or None,
-                      capture_fps=args.capture_fps)
-    rec.start()
-    marker = MarkRecorder(journal=session / "marks.tsv").start()
-    activity = ActivitySampler(journal=session / "input.tsv").start()
-    print(f"recording -> {session}")
-    print(f"  target: {'game window' if hwnd else 'monitor 1'} @ {args.fps}fps {args.bitrate}")
-    print(f"  audio : {'game + mic' if args.audio else 'OFF'}")
-    print("  F9    = mark this moment as worth keeping")
-    print("  F10   = mark it as nothing happening")
+    recording = Session(args, hwnd).start()
+    session = recording.path
     print("  Ctrl+C to stop")
-
-    # Detector moments are journalled as a hint and for measurement; with full
-    # coverage they no longer decide what gets described.
-    bus = TriggerBus(detectors_for(args.game)) if args.triggers else None
-    journal = session / clips.JOURNAL_NAME
-
-    live = None
-    if args.highlights and args.live:
-        from pipeline_v2.capture.live import LiveDescriber
-
-        live = LiveDescriber(session, speech=args.speech,
-                             between_only=args.live_between).start()
-        print("  live  : describing " + ("between matches" if args.live_between
-                                         else "each finished 30s segment during play"))
-
     stop = False
 
     def handle(*_):
@@ -178,58 +250,17 @@ def main(argv: list[str] | None = None) -> int:
     # marks and the audio statistics for that round.
     signal.signal(signal.SIGINT, handle)
     signal.signal(signal.SIGTERM, handle)
-    seen_samples = 0
-    origin_saved = False
     try:
         while not stop:
             time.sleep(0.5)
-            if not origin_saved and rec.stats.first_frame_at is not None:
-                # Written now rather than at stop: `live` lines the game log up
-                # with the video while it is still recording.
-                _save_stats(session, rec.stats, None)
-                origin_saved = True
-            if bus is None:
-                continue
-            fresh = activity.samples[seen_samples:]
-            seen_samples += len(fresh)
-            mic = rec.mic_level()
-            # Triggers are placed on the *video's* timeline, whose t=0 is the
-            # first frame the encoder received -- not when the sampler started.
-            origin = rec.stats.first_frame_at
-            for sample in fresh:
-                # Stamped with the sample's own time, not whenever this loop
-                # woke: a 0.5s sleep hands over several windows at once, and
-                # stamping them all "now" collapses the rolling baseline.
-                fired = bus.observe(
-                    press_rate=sample.rate, mic_db=mic,
-                    now=activity.started + sample.at,
-                )
-                if fired is None or origin is None:
-                    continue  # no frame encoded yet, so nothing to cut from
-                clips.append(journal, clips.ClipRequest.from_trigger(fired, origin))
+            recording.tick()
     finally:
-        # It used to stop in silence while live finished its queue, and a second
-        # Ctrl+C then landed in (and cancelled) the highlights step.
-        print("\nstopping -- a few seconds, no need to press Ctrl+C again")
-        s = rec.stop()
-        if live is not None:
-            print(f"  live  : {live.stop()} window(s) described during play"
-                  + (f" (last error: {live.error})" if live.error else ""))
-        activity.stop()
-        marks = marker.stop()
-        marker.save(session / "marks.json")
-        keeps = sum(1 for m in marks if m.kind == "keep")
-        if marks:
-            print(f"  marks : {keeps} keep, {len(marks) - keeps} dull -> marks.json")
-        print(_summary(s))
-        _save_stats(session, s, rec.error)
-        if rec.error:
-            print(f"  error: {rec.error}")
+        recording.stop()
 
-    if not args.highlights or rec.error:
+    if not args.highlights or recording.error:
         print(f"  make highlights later with:\n"
               f"  python -m pipeline_v2.capture.highlights {session}")
-        return 1 if rec.error else 0
+        return 1 if recording.error else 0
 
     # What live did not reach (the last segment, or everything with --no-live)
     # is described here. Interrupting loses nothing: cutting resumes, and every

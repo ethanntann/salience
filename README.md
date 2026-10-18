@@ -27,12 +27,17 @@ Windows, Python 3.11+, FFmpeg on PATH, an NVIDIA GPU, and a Fireworks API key in
 `.env` (`FIREWORKS_API_KEY`, `FIREWORKS_MODEL`).
 
 ```powershell
-python -m pip install -e ".[dev,audio]"   # audio: local mic transcription
-python -m pipeline_v2.capture.record      # or double-click "Start Recording.cmd"
+python -m pip install -e ".[dev,audio,app]"   # audio: mic transcription; app: tray
 ```
 
-Start Fortnite, play, press **Ctrl+C** when done. The highlights folder opens
-when ranking finishes. To teach it your taste, rate clips at
+Double-click **`Salience.cmd`**. It asks once for your Fireworks key (bring
+your own: it stays on your PC, in `%APPDATA%\Salience\settings.env`) and sits
+in the tray. It starts recording when Fortnite opens and, when you quit the
+game, makes the highlights and opens the folder. The tray menu can stop a
+recording early, pause auto-recording, open the rating page for the latest
+session, and start Salience with Windows.
+
+Without the tray: `python -m pipeline_v2.capture.record`, Ctrl+C when done. To teach it your taste, rate clips at
 http://localhost:8777/ (**K** keep, **J** skip, **W** description is wrong):
 
 ```powershell
@@ -106,7 +111,7 @@ barely above chance (~54%, on ~30 windows). Also: two sessions, one player.
 
 ## Layout
 
-- [`pipeline_v2/capture/`](pipeline_v2/capture/): recorder (`record`, `wgc`,
+- [`pipeline_v2/capture/`](pipeline_v2/capture/): the tray app (`app`), recorder (`record`, `wgc`,
   `audio_pump`, `input_activity`), cutting (`clips`), the post-session pipeline
   (`highlights`), and the detector experiments (`triggers`, `detector_control`).
 - [`pipeline_v2/`](pipeline_v2/README.md): describe (`vlm`, `prompt`), store,

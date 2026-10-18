@@ -20,6 +20,8 @@ capture = ["soundcard>=0.4", "windows-capture>=2.0"]
 # needed this and nothing declared it.
 obs = ["obsws-python>=1.6"]
 audio = ["soundfile>=0.12", "faster-whisper>=1"]
+# The tray app (`pipeline_v2.capture.app`): icon and menu. Its dialogs are tkinter.
+app = ["pystray>=0.19", "pillow>=10"]
 
 [project.scripts]
 salience = "pipeline_v2.cli:main"
