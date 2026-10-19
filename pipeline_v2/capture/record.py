@@ -130,12 +130,17 @@ class Session:
         from pipeline_v2.capture.input_activity import ActivitySampler
         from pipeline_v2.capture.marks import MarkRecorder
         from pipeline_v2.capture.triggers import TriggerBus, detectors_for
+        from pipeline_v2.capture import gfx
         from pipeline_v2.capture.wgc import WgcRecorder
 
         args, session = self.args, self.path
-        self.rec = WgcRecorder(session, fps=args.fps, bitrate=args.bitrate,
-                               monitor_index=None if self.hwnd else 1, window_hwnd=self.hwnd,
-                               audio=args.audio, mic_hint=args.mic or None)
+        # Inside FFmpeg where it can (frames stay on the GPU: 3% of a core
+        # against 63-112% through Python); the Python path for an FFmpeg
+        # older than 8, which has no `gfxcapture`.
+        recorder = gfx.GfxRecorder if gfx.available() else WgcRecorder
+        self.rec = recorder(session, fps=args.fps, bitrate=args.bitrate,
+                            monitor_index=None if self.hwnd else 1, window_hwnd=self.hwnd,
+                            audio=args.audio, mic_hint=args.mic or None)
         self.rec.start()
         self.marker = MarkRecorder(journal=session / "marks.tsv").start()
         self.activity = ActivitySampler(journal=session / "input.tsv").start()

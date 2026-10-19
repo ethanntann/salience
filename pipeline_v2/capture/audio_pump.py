@@ -247,9 +247,14 @@ class TrackPump:
                     self.stats.latest_db = to_db(loudest)
                     if loudest < 1e-5:
                         self.stats.silent_blocks += 1
-                    if self._timeline is not None:
+                    # None: no video yet to hold to. FFmpeg that captures
+                    # its own video (`gfx`) counts no frames until audio
+                    # flows, so holding audio back then would wait forever;
+                    # the startup excess is cut once frames are counted.
+                    target = self._timeline() if self._timeline is not None else None
+                    if target is not None:
                         pad, cut = correction(self._written, len(block),
-                                              int(self._timeline() * SAMPLE_RATE))
+                                              int(target * SAMPLE_RATE))
                         if pad:
                             block = np.concatenate(
                                 [np.zeros((pad, block.shape[1]), np.float32), block])
@@ -297,7 +302,7 @@ class TrackPump:
 
 
 def mux_command(
-    video_size: str,
+    video_size: str | None,
     fps: int,
     bitrate: str,
     encoder: str,
@@ -305,8 +310,15 @@ def mux_command(
     pattern: Path,
     segment_list: Path,
     audio_pipes: list[str],
+    *,
+    gpu_source: str | None = None,
+    gpu_vendor: str | None = None,
 ) -> list[str]:
     """FFmpeg taking BGRA video on stdin and one raw PCM input per audio track.
+
+    With `gpu_source` (a `gfxcapture` filter, see `gfx`), the video is
+    captured inside FFmpeg instead, on the GPU of `gpu_vendor`, and its frame
+    count is reported on stdout (`-progress`).
 
     Each track is mapped to its own output stream rather than mixed, and
     `-shortest` is deliberately absent: a track that starts late or drops out
@@ -315,28 +327,50 @@ def mux_command(
     command = [
         "ffmpeg",
         "-hide_banner",
-        "-loglevel", "warning",
+        "-loglevel", "warning" if gpu_source is None else "info",
         "-y",
-        "-f", "rawvideo",
-        "-pixel_format", "bgra",
-        "-video_size", video_size,
-        "-framerate", str(fps),
-        "-i", "pipe:0",
     ]
+    if gpu_source is None:
+        command += [
+            "-f", "rawvideo",
+            "-pixel_format", "bgra",
+            "-video_size", video_size,
+            "-framerate", str(fps),
+            "-i", "pipe:0",
+        ]
+    else:
+        command += [
+            "-progress", "pipe:1", "-stats_period", "0.1", "-nostats",
+            "-init_hw_device", f"d3d11va=gpu:,vendor_id={gpu_vendor}",
+            "-filter_hw_device", "gpu",
+            # `showinfo` logs each frame as it is captured, before encoding
+            # or muxing: when frame 0's line arrives is when the video starts
+            # (`gfx.Progress.logged`). A side branch ending in `nullsink`
+            # would log only frame 0, but crashes FFmpeg 9's scheduler.
+            "-filter_complex", f"{gpu_source},showinfo,fps={fps}[video]",
+        ]
+    first_audio = 1 if gpu_source is None else 0
     for pipe in audio_pipes:
+        if gpu_source is not None:
+            # Opened before the first frame exists; read no more than needed.
+            command += ["-probesize", "32", "-analyzeduration", "0"]
         command += [
             "-f", "f32le",
             "-ar", str(SAMPLE_RATE),
             "-ac", str(CHANNELS),
             "-i", pipe,
         ]
-    command += ["-map", "0:v:0"]
+    command += ["-map", "0:v:0" if gpu_source is None else "[video]"]
     for index in range(len(audio_pipes)):
-        command += ["-map", f"{index + 1}:a:0"]
+        command += ["-map", f"{index + first_audio}:a:0"]
     command += [
         "-c:v", encoder,
         "-preset", "p1" if encoder == "h264_nvenc" else "veryfast",
-        "-pix_fmt", "yuv420p",
+    ]
+    if gpu_source is None:
+        # GPU frames go to NVENC as they are; it writes yuv420p itself.
+        command += ["-pix_fmt", "yuv420p"]
+    command += [
         "-b:v", bitrate,
         # A keyframe every KEYFRAME_SECONDS, so highlight windows can be
         # stream-copied out after the session instead of re-encoded: 0.2s a
