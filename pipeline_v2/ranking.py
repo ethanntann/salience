@@ -21,8 +21,13 @@ SPEECH_VARIANT = "speech"
 # a player whose talk was callouts; 1.0 is for a player whose keeps are mostly
 # what was said.
 SPEECH_WEIGHTS = (0.0, 0.3, 1.0)
-# Speech has to beat description-only by this much on held-out minutes. Below
-# it the difference is noise, and noise is not worth a less legible ranker.
+# Speech is on unless the player's ratings show it hurts. It used to be off
+# unless they showed it helped, which a player who says six things a session
+# can never show -- and what was said is the one signal the frames cannot
+# carry. 0.3 was neutral where speech did not matter (92.8% vs 92.6%).
+DEFAULT_SPEECH_WEIGHT = 0.3
+# A difference smaller than this on held-out minutes is noise: it can neither
+# switch speech off nor turn it up.
 MIN_SPEECH_GAIN = 0.01
 # Held-out blocks for choosing the weight: neighbouring windows of one session
 # are near-duplicates, so they must fall in the same fold.
@@ -47,15 +52,17 @@ def choose_speech_weight(
 ) -> tuple[float, dict]:
     """How much what was said should count, judged on this player's own ratings.
 
-    Returns (weight, held-out accuracy per weight tried). Zero unless speech
-    measurably helps: for a player who never talks, or whose talk does not
-    track what they keep, the ranking is exactly the description-only one.
+    Returns (weight, held-out accuracy per weight tried). `DEFAULT_SPEECH_WEIGHT`
+    unless the ratings say otherwise: off if it measurably hurts, full if full
+    measurably beats it. Without enough speech to judge, the default stands.
     """
     from dataclasses import replace
 
-    voiced = sum(e.clip_sha in speech for e in training)
-    if not dims or voiced < 10:
+    if not dims:
         return 0.0, {}
+    voiced = sum(e.clip_sha in speech for e in training)
+    if voiced < 10:
+        return DEFAULT_SPEECH_WEIGHT, {}
     regrouped = [replace(e, engagement=groups.get(e.clip_sha, e.engagement)) for e in training]
     tried: dict[float, float] = {}
     for weight in SPEECH_WEIGHTS:
@@ -67,12 +74,14 @@ def choose_speech_weight(
         accuracy, pairs = taste_mod.pairwise_accuracy(
             examples, mode, folds=5, model="logistic")
         if not pairs:
-            return 0.0, {}
+            return DEFAULT_SPEECH_WEIGHT, {}
         tried[weight] = accuracy
-    best = max(SPEECH_WEIGHTS, key=lambda w: (tried[w], -w))
-    if tried[best] < tried[0.0] + MIN_SPEECH_GAIN:
+    default = DEFAULT_SPEECH_WEIGHT
+    if tried[0.0] > tried[default] + MIN_SPEECH_GAIN:
         return 0.0, tried
-    return best, tried
+    if tried[1.0] > tried[default] + MIN_SPEECH_GAIN:
+        return 1.0, tried
+    return default, tried
 
 
 @dataclass(frozen=True)

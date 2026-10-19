@@ -35,21 +35,25 @@ def test_speech_is_weighed_in_when_keeps_follow_what_was_said():
     assert tried[weight] > tried[0.0]
 
 
-def test_speech_is_ignored_when_keeps_follow_what_was_seen():
+def test_speech_is_never_turned_up_when_keeps_follow_what_was_seen():
+    """Light by default; off if the ratings show it hurts; never full weight."""
     training, speech, groups = _player("seen")
 
-    weight, _ = ranking.choose_speech_weight(training, speech, 5, groups, "embedding")
+    weight, tried = ranking.choose_speech_weight(training, speech, 5, groups, "embedding")
 
-    assert weight == 0.0
+    assert weight in (0.0, ranking.DEFAULT_SPEECH_WEIGHT)
+    if tried[0.0] > tried[ranking.DEFAULT_SPEECH_WEIGHT] + ranking.MIN_SPEECH_GAIN:
+        assert weight == 0.0
 
 
-def test_too_little_speech_is_not_judged():
+def test_too_little_speech_keeps_the_default():
+    """Six things said in a session cannot show speech helps or hurts."""
     training, speech, groups = _player("speech")
 
     weight, tried = ranking.choose_speech_weight(
         training, {k: v for k, v in list(speech.items())[:5]}, 5, groups, "embedding")
 
-    assert (weight, tried) == (0.0, {})
+    assert (weight, tried) == (ranking.DEFAULT_SPEECH_WEIGHT, {})
 
 
 def test_silent_clip_gets_zeros_not_missing_data():

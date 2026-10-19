@@ -261,7 +261,8 @@ def test_each_clip_is_ranked_once_even_if_two_fights_name_it(tmp_path, isolated_
     conn.close()
 
     assert "taste" in basis
-    assert ordered == [(0.9, clip)]
+    # Once, at its better fight's score (standardised: a lone clip scores 0).
+    assert [c for _, c in ordered] == [clip]
 
 
 def test_speech_changes_without_new_cuts_rebuild_embeddings(tmp_path, isolated_data):

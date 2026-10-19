@@ -230,6 +230,39 @@ def _session_clips(conn, clip_dir: Path) -> tuple[str | None, list]:
     return variant, inside
 
 
+# How much the player's hands count beside taste, within an event tier. Kills
+# the player kept came with more key presses (building, editing, swapping) than
+# kills they skipped: ordering kills, taste alone 37% / 69% on sessions 2 / 3,
+# with this 48% / 72%. Both scores are standardised within the session.
+ACTIVITY_WEIGHT = 1.0
+
+
+def activity(session: Path, clips: list) -> dict[str, float]:
+    """Key presses during each clip's window, from the recorder's input log."""
+    from pipeline_v2.capture.input_activity import ActivitySampler
+
+    try:
+        samples = ActivitySampler.read_journal(session / "input.tsv")
+    except OSError:
+        return {}
+    found: dict[str, float] = {}
+    for clip in clips:
+        span = _span(clip)
+        if span is not None and samples:
+            found[clip.clip_sha] = float(sum(
+                s.presses for s in samples if span[0] <= s.at < span[1]))
+    return found
+
+
+def _standardised(values: dict[str, float]) -> dict[str, float]:
+    import statistics
+
+    if len(values) < 2:
+        return {k: 0.0 for k in values}
+    mean, spread = statistics.mean(values.values()), statistics.pstdev(values.values())
+    return {k: (v - mean) / (spread or 1.0) for k, v in values.items()}
+
+
 def rank(conn, clip_dir: Path) -> tuple[str, list]:
     """Clips best-first, and the basis of the order: "taste" or a fallback."""
     from pipeline_v2.ranking import ranked_fights
@@ -249,26 +282,32 @@ def rank(conn, clip_dir: Path) -> tuple[str, list]:
         if sha in wanted and (sha not in best or fight.score > best[sha][0]):
             best[sha] = (fight.score, fight.best)
     scored = list(best.values())
+    hands = _standardised(activity(clip_dir.parent, inside))
     if scored:
+        taste = _standardised({clip.clip_sha: score for score, clip in scored})
+        scored = [(taste[c.clip_sha] + ACTIVITY_WEIGHT * hands.get(c.clip_sha, 0.0), c)
+                  for _, c in scored]
         scored.sort(key=lambda pair: (-event_tier(pair[1]), -pair[0]))
         weight = info.get("speech_weight", 0.0)
         tried = info.get("speech_cv") or {}
         if weight:
             heard = f", speech weighted {weight:g}"
         elif tried:
-            heard = ", speech did not help this player's ratings"
+            heard = ", speech off: it hurt this player's ratings"
         else:
             heard = ""
-        return f"what happened, then taste ({labels} labels, {variant}{heard})", scored
+        used = ", key presses" if hands else ""
+        return (f"what happened, then taste{used} ({labels} labels, {variant}{heard})",
+                scored)
 
     def fallback(clip) -> tuple[float, float]:
-        outcome = _OUTCOME_ORDER.get((clip.payload or {}).get("outcome"), 0)
-        confidence = float(_sidecar(clip.path).get("trigger_confidence") or 0)
-        return (outcome, confidence)
+        # With no ratings yet, the player's hands are the best tie-break there
+        # is (and better than a detector's confidence, which measured weak).
+        return (float(event_tier(clip)), hands.get(clip.clip_sha, 0.0))
 
     ordered = sorted(inside, key=fallback, reverse=True)
     return (
-        "fallback: what happened, then trigger confidence -- no labels on "
+        "fallback: what happened, then key presses -- no labels on "
         f"this footage yet (review --variant {variant})",
         [(float(fallback(c)[0]), c) for c in ordered],
     )
