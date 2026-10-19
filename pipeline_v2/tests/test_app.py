@@ -211,3 +211,23 @@ def test_a_recording_warning_is_shown_once(tmp_path):
     controller.tick()
 
     assert world.toasts.count("Check your audio") == 1
+
+
+def test_child_processes_get_no_console_window(monkeypatch):
+    """Under pythonw every ffmpeg opened a console that stole focus from the game."""
+    import subprocess
+
+    seen = []
+
+    class Popen:
+        def __init__(self, *args, creationflags=0, **kwargs):
+            seen.append(creationflags)
+
+    monkeypatch.setattr(subprocess, "Popen", Popen)
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    app.hide_child_consoles()
+
+    subprocess.Popen(["ffmpeg"])
+    subprocess.Popen(["ffmpeg"], creationflags=0x4000)  # below normal priority, kept
+
+    assert seen == [0x08000000, 0x08000000 | 0x4000]

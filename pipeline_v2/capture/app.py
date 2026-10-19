@@ -325,10 +325,34 @@ class _Review:
         webbrowser.open(f"http://localhost:{REVIEW_PORT}/")
 
 
+def hide_child_consoles() -> None:
+    """Start every child process without a console window.
+
+    The tray app has no console, so each ffmpeg it starts got a new one: a
+    window flashing up every few seconds, taking focus from the game and
+    freezing it (session 4's first try). Run from a terminal, the children
+    shared that terminal and nothing showed, which is why no earlier session
+    hit it. Done once for the whole process, so no call site can miss it.
+    """
+    import subprocess
+
+    flag = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if not flag or getattr(subprocess.Popen, "_salience_hidden", False):
+        return
+    original = subprocess.Popen.__init__
+
+    def __init__(self, *args, creationflags=0, **kwargs):
+        original(self, *args, creationflags=creationflags | flag, **kwargs)
+
+    subprocess.Popen.__init__ = __init__
+    subprocess.Popen._salience_hidden = True
+
+
 def main() -> int:
     APP_DIR.mkdir(parents=True, exist_ok=True)
     if sys.stdout is None:  # pythonw: no console, so keep the log on disk
         sys.stdout = sys.stderr = open(LOG, "a", encoding="utf-8", buffering=1)
+    hide_child_consoles()
     if not _single_instance():
         return 0
     load_environment()
