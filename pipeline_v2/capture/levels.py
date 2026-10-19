@@ -102,3 +102,15 @@ def summarise(levels: list[Level]) -> dict:
         "peak_db": round(values[-1], 1),
         "audible_fraction": round(len(audible) / len(values), 3),
     }
+
+
+def loudness(clip: Path, track: int) -> float | None:
+    """95th-percentile level of one track (dBFS), or None if it has no audio.
+
+    The loud end rather than the mean: a reaction is a few seconds of a window,
+    and a mean would average it into the silence around it.
+    """
+    levels = extract_levels(clip, track)
+    if not levels:
+        return None
+    return summarise(levels)["p95_db"]

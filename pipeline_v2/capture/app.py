@@ -124,6 +124,7 @@ class Controller:
         self.last_session: Path | None = None
         self._gone_since: float | None = None
         self._stop_requested = False
+        self._warned: str | None = None
 
     @property
     def status(self) -> str:
@@ -159,6 +160,10 @@ class Controller:
         if self.state != "recording":
             return
         self.session.tick()
+        warning = getattr(self.session, "warning", None)
+        if warning and warning != self._warned:
+            self._warned = warning
+            self.notify("Check your audio", warning)
         if self.session.error:
             self._finish(failed=True)
             return

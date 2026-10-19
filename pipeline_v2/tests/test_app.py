@@ -185,3 +185,15 @@ def test_latest_session_is_the_newest_recording(tmp_path):
         (tmp_path / name / "segments.csv").write_text("", encoding="utf-8")
 
     assert app.latest_session(tmp_path).name == "20261018-172215"
+
+
+def test_a_recording_warning_is_shown_once(tmp_path):
+    world = _World(tmp_path)
+    controller = world.controller()
+    world.window = 1
+    controller.tick()
+    world.sessions[0].warning = "Game audio is silent."
+    controller.tick()
+    controller.tick()
+
+    assert world.toasts.count("Check your audio") == 1

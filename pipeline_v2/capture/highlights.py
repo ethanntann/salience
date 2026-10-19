@@ -235,6 +235,33 @@ def _session_clips(conn, clip_dir: Path) -> tuple[str | None, list]:
 # kills they skipped: ordering kills, taste alone 37% / 69% on sessions 2 / 3,
 # with this 48% / 72%. Both scores are standardised within the session.
 ACTIVITY_WEIGHT = 1.0
+# The player's voice, as loudness rather than words: reactions are mostly not
+# words, and Whisper drops them. Session 3: kept windows were louder on the mic
+# 86% of the time, kept kills over skipped ones 70%. Half weight, because on
+# session 2 it carried nothing within kills (47%).
+VOICE_WEIGHT = 0.5
+MIC_LEVEL_KEY = "mic_p95_db"
+
+
+def voice(clips: list) -> dict[str, float]:
+    """The mic's loudness in each clip, cached in its sidecar."""
+    from pipeline_v2.capture import levels, voice as voice_mod
+    from pipeline_v2.jsonio import write_json
+
+    found: dict[str, float] = {}
+    for clip in clips:
+        sidecar = Path(clip.path).with_suffix(".capture.json")
+        record = _sidecar(clip.path)
+        if MIC_LEVEL_KEY not in record and record:
+            record[MIC_LEVEL_KEY] = levels.loudness(Path(clip.path), voice_mod.MIC_TRACK)
+            try:
+                write_json(sidecar, record)
+            except OSError:
+                pass
+        if record.get(MIC_LEVEL_KEY) is not None:
+            found[clip.clip_sha] = float(record[MIC_LEVEL_KEY])
+    # A silent track says nothing about any window; leave it out entirely.
+    return found if len(set(found.values())) > 1 else {}
 
 
 def activity(session: Path, clips: list) -> dict[str, float]:
@@ -283,10 +310,14 @@ def rank(conn, clip_dir: Path) -> tuple[str, list]:
             best[sha] = (fight.score, fight.best)
     scored = list(best.values())
     hands = _standardised(activity(clip_dir.parent, inside))
+    voiced = _standardised(voice(inside))
+
+    def extra(sha: str) -> float:
+        return ACTIVITY_WEIGHT * hands.get(sha, 0.0) + VOICE_WEIGHT * voiced.get(sha, 0.0)
+
     if scored:
         taste = _standardised({clip.clip_sha: score for score, clip in scored})
-        scored = [(taste[c.clip_sha] + ACTIVITY_WEIGHT * hands.get(c.clip_sha, 0.0), c)
-                  for _, c in scored]
+        scored = [(taste[c.clip_sha] + extra(c.clip_sha), c) for _, c in scored]
         scored.sort(key=lambda pair: (-event_tier(pair[1]), -pair[0]))
         weight = info.get("speech_weight", 0.0)
         tried = info.get("speech_cv") or {}
@@ -296,18 +327,18 @@ def rank(conn, clip_dir: Path) -> tuple[str, list]:
             heard = ", speech off: it hurt this player's ratings"
         else:
             heard = ""
-        used = ", key presses" if hands else ""
+        used = "".join(name for name, on in ((", key presses", hands), (", mic level", voiced)) if on)
         return (f"what happened, then taste{used} ({labels} labels, {variant}{heard})",
                 scored)
 
     def fallback(clip) -> tuple[float, float]:
         # With no ratings yet, the player's hands are the best tie-break there
         # is (and better than a detector's confidence, which measured weak).
-        return (float(event_tier(clip)), hands.get(clip.clip_sha, 0.0))
+        return (float(event_tier(clip)), extra(clip.clip_sha))
 
     ordered = sorted(inside, key=fallback, reverse=True)
     return (
-        "fallback: what happened, then key presses -- no labels on "
+        "fallback: what happened, then key presses and mic level -- no labels on "
         f"this footage yet (review --variant {variant})",
         [(float(fallback(c)[0]), c) for c in ordered],
     )

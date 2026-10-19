@@ -134,6 +134,7 @@ class Session:
         self.hwnd = hwnd
         self.path = (root or args.out) / time.strftime("%Y%m%d-%H%M%S")
         self.live = None
+        self.warning: str | None = None
         self._seen_samples = 0
         self._origin_saved = False
 
@@ -174,10 +175,27 @@ class Session:
     def error(self) -> str | None:
         return self.rec.error
 
+    def _check_audio(self) -> None:
+        """Warn once if the game track is pure silence two minutes in.
+
+        Session 2 recorded 43 minutes of digital silence on the game track
+        (Fortnite was playing through another output than Windows' default),
+        and nobody knew until the analysis.
+        """
+        stats = getattr(self.rec, "audio_stats", None)
+        game = next((t for t in getattr(stats, "tracks", []) if t.name == "game"), None)
+        if game is None or game.seconds < 120 or self.warning is not None:
+            return
+        if game.silent_fraction > 0.99:
+            self.warning = ("Game audio is silent. Fortnite may be playing through a "
+                            "different output than Windows' default sound device.")
+            print(f"  WARNING: {self.warning}")
+
     def tick(self) -> None:
         from pipeline_v2.capture import clips
 
         rec = self.rec
+        self._check_audio()
         if not self._origin_saved and rec.stats.first_frame_at is not None:
             # Written now rather than at stop: `live` lines the game log up
             # with the video while it is still recording.
