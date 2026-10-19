@@ -22,6 +22,9 @@ obs = ["obsws-python>=1.6"]
 audio = ["soundfile>=0.12", "faster-whisper>=1"]
 # The tray app (`pipeline_v2.capture.app`): icon and menu. Its dialogs are tkinter.
 app = ["pystray>=0.19", "pillow>=10"]
+# Reading the HUD from our own footage (`capture.hud`): template matching,
+# and OCR of the opponent's name on the few frames that match.
+hud = ["opencv-python>=4.8", "rapidocr_onnxruntime>=1.3", "numpy>=1.26"]
 
 [project.scripts]
 salience = "pipeline_v2.cli:main"
