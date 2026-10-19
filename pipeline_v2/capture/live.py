@@ -202,12 +202,6 @@ class LiveDescriber:
                     self.session, seen=self.seen, stopping=self._stop, **extra)
                 if self.speech and idle and not self._stop.is_set():
                     self.speech = self.listen_fn(self.session, self._whisper)
-                if idle and not self._stop.is_set():
-                    # HUD reading (opt-in) costs ~5s of CPU per 30s of footage:
-                    # between matches only, never while the player is fighting.
-                    from pipeline_v2.capture import highlights
-
-                    highlights.read_hud(self.session, runner=_low_priority_run)
             except Exception as exc:  # noqa: BLE001 -- never take the recording down
                 # The final run describes and transcribes whatever this missed.
                 self.error = f"{type(exc).__name__}: {exc}"

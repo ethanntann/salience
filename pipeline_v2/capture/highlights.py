@@ -48,19 +48,8 @@ _OUTCOME_ORDER = {"elimination": 2, "knock": 1}
 VICTORY_TIER = 3
 
 
-# A banner is drawn just after the shot that earned it; it is credited to the
-# window holding this moment before it.
-BANNER_LAG = 0.5
-
-
-def event_tier(clip, hud: dict | None = None) -> int:
+def event_tier(clip) -> int:
     """What happened, coarsely: a win, then eliminations, knocks, the rest.
-
-    With `hud` (`hud.tiers`: banner times read off the player's own screen),
-    kills and knocks come from the game's banners and the describer's outcome
-    is not used: on session 3 the describer credited 3 kills that had no
-    banner (other players' kill-feed lines) and the banners missed at most 1
-    (the last kill of a win, under the Victory Royale screen).
 
     Ranking goes by this first and by taste within a tier. Measured out of
     sample (taste trained on session 1, scored on session 2's 320 ratings),
@@ -71,27 +60,7 @@ def event_tier(clip, hud: dict | None = None) -> int:
     """
     if "victory royale" in (clip.summary or "").lower():
         return VICTORY_TIER
-    described = _OUTCOME_ORDER.get((clip.payload or {}).get("outcome"), 0)
-    if hud is not None:
-        span = _span(clip)
-        if span is not None:
-            def shown(times, before: float = 0.0):
-                # As drawn, or a moment earlier: a banner at the very start of
-                # a window (session 2, NateC1357) is that window's kill too.
-                lo, hi = span[0], span[1] + before
-                return any(lo <= t < hi or lo <= t - BANNER_LAG < hi for t in times)
-
-            # A banner in this window, or the describer's kill confirmed by a
-            # banner within the next window: the fight leading up to a banner
-            # is part of the kill, and players keep it (session 2: banners
-            # alone found 10 kept kill windows, confirmed kills 17).
-            if shown(hud["eliminations"]) or (
-                    described == 2 and shown(hud["eliminations"], span[1] - span[0])):
-                return _OUTCOME_ORDER["elimination"]
-            if shown(hud["knocks"]) or (described >= 1 and shown(hud["knocks"], span[1] - span[0])):
-                return _OUTCOME_ORDER["knock"]
-            return 0
-    return described
+    return _OUTCOME_ORDER.get((clip.payload or {}).get("outcome"), 0)
 
 # What an exported highlight adds around its 8s coverage window: the approach
 # matters to a viewer even though the model only needed the window itself.
@@ -160,36 +129,6 @@ def listen(session: Path, clip_dir: Path) -> int:
         return voice.attach(session, sorted(files))
     except ImportError:
         print("  speech: skipped (pip install -e .[audio] to rank by what was said)")
-        return 0
-
-
-def hud_enabled() -> bool:
-    """HUD reading is opt-in (SALIENCE_HUD=1). Out of sample it found kills
-    more reliably than the describer but did not improve the ranking (session
-    2 top 10 8 vs 8, session 3 9 vs 9), and it costs ~5s of CPU per 30s of play.
-    It earns its place once its facts feed the prompt."""
-    import os
-
-    return os.environ.get("SALIENCE_HUD", "") not in ("", "0")
-
-
-def read_hud(session: Path, runner=None) -> int:
-    """Read the session's HUD banners (`hud`); new banners found, 0 if unavailable.
-
-    Optional like speech: without OpenCV the describer's judgement of kills is
-    used, which is what every session had before.
-    """
-    import subprocess
-
-    from pipeline_v2.capture import hud
-
-    if not hud_enabled():
-        return 0
-
-    try:
-        return hud.update(session, runner=runner or subprocess.run)
-    except ImportError:
-        print("  hud: skipped (pip install opencv-python rapidocr_onnxruntime)")
         return 0
 
 
@@ -351,19 +290,9 @@ def _standardised(values: dict[str, float]) -> dict[str, float]:
     return {k: (v - mean) / (spread or 1.0) for k, v in values.items()}
 
 
-def session_tier(session: Path):
-    """`event_tier` for this session: from its HUD banners when they were read."""
-    from pipeline_v2.capture import hud as hud_mod
-
-    banners = hud_mod.tiers(hud_mod.read_events(session))
-    return (lambda clip: event_tier(clip, banners)), banners is not None
-
-
 def rank(conn, clip_dir: Path) -> tuple[str, list]:
     """Clips best-first, and the basis of the order: "taste" or a fallback."""
     from pipeline_v2.ranking import ranked_fights
-
-    tier, from_hud = session_tier(clip_dir.parent)
 
     variant, inside = _session_clips(conn, clip_dir)
     if not inside:
@@ -389,7 +318,7 @@ def rank(conn, clip_dir: Path) -> tuple[str, list]:
     if scored:
         taste = _standardised({clip.clip_sha: score for score, clip in scored})
         scored = [(taste[c.clip_sha] + extra(c.clip_sha), c) for _, c in scored]
-        scored.sort(key=lambda pair: (-tier(pair[1]), -pair[0]))
+        scored.sort(key=lambda pair: (-event_tier(pair[1]), -pair[0]))
         weight = info.get("speech_weight", 0.0)
         tried = info.get("speech_cv") or {}
         if weight:
@@ -399,14 +328,13 @@ def rank(conn, clip_dir: Path) -> tuple[str, list]:
         else:
             heard = ""
         used = "".join(name for name, on in ((", key presses", hands), (", mic level", voiced)) if on)
-        seen = "kills from the HUD" if from_hud else "what happened"
-        return (f"{seen}, then taste{used} ({labels} labels, {variant}{heard})",
+        return (f"what happened, then taste{used} ({labels} labels, {variant}{heard})",
                 scored)
 
     def fallback(clip) -> tuple[float, float]:
         # With no ratings yet, the player's hands are the best tie-break there
         # is (and better than a detector's confidence, which measured weak).
-        return (float(tier(clip)), extra(clip.clip_sha))
+        return (float(event_tier(clip)), extra(clip.clip_sha))
 
     ordered = sorted(inside, key=fallback, reverse=True)
     return (
@@ -435,14 +363,13 @@ FIGHT_TAGS = frozenset({
 })
 
 
-def in_fight(clip, tier=event_tier) -> bool:
+def in_fight(clip) -> bool:
     """Whether a window is part of a fight: a kill or knock, or fight mechanics."""
     payload = clip.payload or {}
-    return tier(clip) > 0 or bool(FIGHT_TAGS & set(payload.get("mechanics") or []))
+    return event_tier(clip) > 0 or bool(FIGHT_TAGS & set(payload.get("mechanics") or []))
 
 
-def fight_extent(clip, by_start: dict, pad: tuple[float, float],
-                 tier=event_tier) -> tuple[float, float] | None:
+def fight_extent(clip, by_start: dict, pad: tuple[float, float]) -> tuple[float, float] | None:
     """The span to export for `clip`: its window grown over the neighbouring
     windows of the same fight, plus `pad`, at most `MAX_HIGHLIGHT` long.
 
@@ -457,9 +384,9 @@ def fight_extent(clip, by_start: dict, pad: tuple[float, float],
 
     def neighbour(at):
         found = by_start.get(round(at, 1))
-        return found if found is not None and in_fight(found, tier) else None
+        return found if found is not None and in_fight(found) else None
 
-    if in_fight(clip, tier):
+    if in_fight(clip):
         while end - start + stride + pad[0] + pad[1] <= MAX_HIGHLIGHT:
             before, after = neighbour(start - stride), neighbour(end)
             if after is not None:
@@ -472,7 +399,7 @@ def fight_extent(clip, by_start: dict, pad: tuple[float, float],
         # the cap rather than a second highlight of the same moment (session 3
         # ranked the final kill and its Victory Royale banner #1 and #2).
         after = by_start.get(round(end, 1))
-        if after is not None and tier(after) == VICTORY_TIER:
+        if after is not None and event_tier(after) == VICTORY_TIER:
             end += stride
     return start - pad[0], end + pad[1]
 
@@ -545,7 +472,6 @@ def run(
     reembed_fn=None,
     undescribed_fn=None,
     unembedded_fn=None,
-    hud_fn=None,
 ) -> dict:
     """Cut, describe, rank and keep the best `top` clips from one recording."""
     from pipeline_v2 import store
@@ -586,8 +512,6 @@ def run(
         cut = harvest_fn(session, clip_dir)
     # Before describing, so the embeddings built at its end include speech.
     heard = (listen_fn or listen)(session, clip_dir) if speech else 0
-    if coverage:
-        (hud_fn or read_hud)(session)
     # `cut` includes windows already cut on an earlier run. Describing those
     # again is free (cached) but not fast: 300s of frame extraction on
     # session 1 to look up 235 answers it already had.
@@ -619,10 +543,9 @@ def run(
     pad = (HIGHLIGHT_LEAD, HIGHLIGHT_LAG) if coverage else (0.0, 0.0)
     export = export_fn or _export
     index = window_index(ordered)
-    tier, _ = session_tier(session)
 
     def extent(clip):
-        return fight_extent(clip, index, pad, tier) if coverage else None
+        return fight_extent(clip, index, pad) if coverage else None
 
     kept: list[Highlight] = []
     for position, (score, clip) in enumerate(
