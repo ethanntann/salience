@@ -32,6 +32,9 @@ CHANNELS = 2
 # ~21ms per block: small enough that a dropped one is inaudible, large enough
 # not to wake the thread thousands of times a second.
 BLOCK_FRAMES = 1024
+# How far a track may drift from the video before it is corrected. Under the
+# ~45ms at which a late sound starts to look wrong, over one block of jitter.
+SYNC_TOLERANCE = int(0.04 * SAMPLE_RATE)
 
 
 @dataclass
@@ -44,6 +47,11 @@ class TrackStats:
     # up with the video. Counted so a recording can be judged rather than
     # assumed intact.
     discontinuities: int = 0
+    # Corrections that kept this track on the video's timeline: silence added
+    # where the device delivered nothing (loopback sends no samples while the
+    # game is silent), samples dropped where it ran ahead.
+    padded_samples: int = 0
+    trimmed_samples: int = 0
     error: str | None = None
     # Loudness of the most recent block, so a detector can read the level while
     # the session is still running. The block maximum is already computed to
@@ -72,6 +80,8 @@ class AudioStats:
                 "dropped": t.dropped,
                 "silent_fraction": round(t.silent_fraction, 3),
                 "discontinuities": t.discontinuities,
+                "padded_seconds": round(t.padded_samples / SAMPLE_RATE, 3),
+                "trimmed_seconds": round(t.trimmed_samples / SAMPLE_RATE, 3),
                 "error": t.error,
             }
             for t in self.tracks
@@ -168,13 +178,39 @@ class NamedPipeSink:
             self._handle = None
 
 
-class TrackPump:
-    """Reads one device and writes raw float32 PCM to a pipe."""
+def correction(written: int, block: int, target: int,
+               tolerance: int = SYNC_TOLERANCE) -> tuple[int, int]:
+    """(silence to insert before the block, samples to cut from its start) so
+    the track ends near `target`, the video's length in samples.
 
-    def __init__(self, name: str, device, sink) -> None:
+    FFmpeg stamps a raw PCM input by its sample count alone, so a track is
+    only in sync while it holds exactly as many samples as the video has
+    seconds. It did not: loopback delivers nothing while the game is silent,
+    and the mic runs on its own clock. Measured with a flash-and-beep test on
+    2026-10-18: audio slid ~2.5ms per second against the video, which over a
+    51-minute session is seconds.
+    """
+    ahead = written + block - target
+    if ahead < -tolerance:
+        return -ahead, 0
+    if ahead > tolerance:
+        return 0, min(block, ahead)
+    return 0, 0
+
+
+class TrackPump:
+    """Reads one device and writes raw float32 PCM to a pipe.
+
+    With `timeline` (seconds of video written so far), the track is held to
+    the video's length: see `correction`.
+    """
+
+    def __init__(self, name: str, device, sink, timeline=None) -> None:
         self.stats = TrackStats(name=name)
         self._device = device
         self._sink = sink
+        self._timeline = timeline
+        self._written = 0
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -211,6 +247,19 @@ class TrackPump:
                     self.stats.latest_db = to_db(loudest)
                     if loudest < 1e-5:
                         self.stats.silent_blocks += 1
+                    if self._timeline is not None:
+                        pad, cut = correction(self._written, len(block),
+                                              int(self._timeline() * SAMPLE_RATE))
+                        if pad:
+                            block = np.concatenate(
+                                [np.zeros((pad, block.shape[1]), np.float32), block])
+                            self.stats.padded_samples += pad
+                        if cut:
+                            block = block[cut:]
+                            self.stats.trimmed_samples += cut
+                        if not len(block):
+                            continue
+                    self._written += len(block)
                     try:
                         self._sink.write(
                             np.ascontiguousarray(block, dtype=np.float32).tobytes()

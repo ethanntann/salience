@@ -31,7 +31,11 @@ from pipeline_v2.capture import clips as clips_mod
 CACHE_NAME = "mic_transcript.json"
 # `wgc` maps the game loopback first and the microphone second.
 MIC_TRACK = 1
-SOURCE = "mic/faster-whisper-small"
+# Part of the cache: a transcript made another way is redone, not trusted.
+SOURCE = "mic/faster-whisper-small/norm-vad0.3"
+# Evens out a quiet mic before Whisper's voice detector sees it. Per-moment
+# gain, so timing is untouched and a shout is not made louder than it was.
+LOUDNESS = "dynaudnorm=f=150:g=15"
 
 
 @dataclass(frozen=True, order=True)
@@ -62,7 +66,8 @@ def _mic_wav(segments: list, destination: Path, runner=subprocess.run) -> Path |
     ), encoding="utf-8")
     done = runner(
         ["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
-         "-map", f"0:a:{MIC_TRACK}", "-ac", "1", "-ar", "16000", str(destination)],
+         "-map", f"0:a:{MIC_TRACK}", "-af", LOUDNESS, "-ac", "1", "-ar", "16000",
+         str(destination)],
         capture_output=True,
     )
     if done.returncode != 0 or not destination.is_file():
@@ -71,10 +76,18 @@ def _mic_wav(segments: list, destination: Path, runner=subprocess.run) -> Path |
 
 
 def _read_cache(path: Path) -> dict[str, list]:
+    """Segment name -> utterances, or empty if it was made another way."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        cache = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+    if cache.pop("_source", None) != SOURCE:
+        return {}
+    return cache
+
+
+def _write_cache(path: Path, cache: dict[str, list]) -> None:
+    path.write_text(json.dumps({"_source": SOURCE, **cache}), encoding="utf-8")
 
 
 def _place(chunk: list, heard: list) -> dict[str, list]:
@@ -115,7 +128,7 @@ def transcribe_session(
                 # Stored in session time: once raw segments are pruned, the
                 # listing no longer says where each one started.
                 cache.update(_place(chunk, [] if wav is None else transcriber.timed(wav)))
-                cache_path.write_text(json.dumps(cache), encoding="utf-8")
+                _write_cache(cache_path, cache)
     return sorted(
         Utterance(start, end, text)
         for heard in cache.values()

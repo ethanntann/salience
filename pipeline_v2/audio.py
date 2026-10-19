@@ -94,6 +94,9 @@ def reaction_features(wav: Path) -> tuple[float, float]:
     return peak_ratio, loud_fraction
 
 
+VAD_THRESHOLD = 0.3
+
+
 class Transcriber:
     """Whisper, loaded once. `small` trades some accuracy for speed on CPU."""
 
@@ -117,11 +120,17 @@ class Transcriber:
 
         Segments Whisper itself thinks are not speech are dropped: on a quiet
         mic it otherwise invents stock phrases ("Thank you.") from breathing.
+
+        The voice detector runs at 0.3 rather than its 0.5 default, on audio
+        `voice` has already evened out: at the default, a mic recorded around
+        -40dB lost almost every callout (3 utterances in a 51-minute session;
+        "Why are you hiding in the building bro?" came out "the building bro").
         """
         segments, _ = self._model.transcribe(
             str(wav),
             language="en",
             vad_filter=True,
+            vad_parameters={"threshold": VAD_THRESHOLD},
             beam_size=1,
             condition_on_previous_text=False,
         )

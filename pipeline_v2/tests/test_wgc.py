@@ -288,3 +288,16 @@ def test_the_first_session_is_allowed(tmp_path, monkeypatch):
     recorder = wgc.WgcRecorder(tmp_path).start()
 
     assert recorder._control is not None
+
+
+def test_audio_is_padded_when_the_device_delivered_nothing():
+    """Loopback sends no samples while the game is silent; the video kept going."""
+    from pipeline_v2.capture.audio_pump import SYNC_TOLERANCE, correction
+
+    one_second = 48000
+    pad, cut = correction(written=one_second, block=1024, target=2 * one_second)
+    assert (pad, cut) == (one_second - 1024, 0)
+    assert correction(written=one_second, block=1024, target=one_second + 1024) == (0, 0)
+    pad, cut = correction(written=one_second + SYNC_TOLERANCE * 2, block=1024,
+                          target=one_second)
+    assert pad == 0 and cut == 1024  # ahead: never more than the block itself

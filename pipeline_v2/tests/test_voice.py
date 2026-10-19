@@ -92,7 +92,22 @@ def test_no_mic_track_is_silence_not_an_error(tmp_path):
 
     assert voice.transcribe_session(
         session, transcriber=FakeWhisper(), runner=no_track) == []
-    assert json.loads((session / voice.CACHE_NAME).read_text()) == {"part-00000.mkv": []}
+    assert json.loads((session / voice.CACHE_NAME).read_text()) == {
+        "_source": voice.SOURCE, "part-00000.mkv": []}
+
+
+def test_a_transcript_made_the_old_way_is_redone(tmp_path):
+    """Before loudness levelling, quiet callouts were lost; trusting that
+    cache would keep them lost."""
+    session = _session(tmp_path, segments=1)
+    (session / voice.CACHE_NAME).write_text(
+        json.dumps({"part-00000.mkv": [[1.0, 2.0, "the building bro"]]}), encoding="utf-8")
+
+    def no_track(command, **_):
+        return subprocess.CompletedProcess(command, 1)
+
+    assert voice.transcribe_session(
+        session, transcriber=FakeWhisper(), runner=no_track) == []
 
 
 def test_said_between_takes_overlapping_speech_only():

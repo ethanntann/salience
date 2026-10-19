@@ -83,7 +83,7 @@ def _summary(stats) -> str:
             f"({stats.superseded_rate:.1%} superseded)")
 
 
-def _save_stats(session: Path, stats, error: str | None) -> None:
+def _save_stats(session: Path, stats, error: str | None, audio=None) -> None:
     """What the capture produced, kept beside the footage: the console that
     printed it is usually closed before anyone reads it."""
     from dataclasses import asdict
@@ -92,6 +92,8 @@ def _save_stats(session: Path, stats, error: str | None) -> None:
 
     record = {k: v for k, v in asdict(stats).items() if k != "first_frame_at"}
     record.update(superseded_rate=stats.superseded_rate, error=error)
+    if audio is not None:
+        record["audio"] = audio.summary()
     if stats.first_frame_at is not None:
         # Wall-clock t=0 of the video, which `gameplay` lines Fortnite's log up
         # against. `first_frame_at` is monotonic and means nothing once the
@@ -217,7 +219,7 @@ class Session:
         if marks:
             print(f"  marks : {keeps} keep, {len(marks) - keeps} dull -> marks.json")
         print(_summary(s))
-        _save_stats(self.path, s, self.rec.error)
+        _save_stats(self.path, s, self.rec.error, getattr(self.rec, "audio_stats", None))
         if self.rec.error:
             print(f"  error: {self.rec.error}")
         return s

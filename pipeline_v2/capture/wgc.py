@@ -208,7 +208,9 @@ class WgcRecorder:
                 continue
             sink = audio_pump.NamedPipeSink(audio_pump.pipe_name(name)).open()
             self._sinks.append(sink)
-            pump = audio_pump.TrackPump(name, device, sink)
+            # Held to the video's own timeline: frames written / fps.
+            pump = audio_pump.TrackPump(
+                name, device, sink, timeline=lambda: self.stats.written / self.fps)
             self._pumps.append(pump)
             stats.tracks.append(pump.stats)
             pipes.append(sink.name)
