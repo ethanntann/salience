@@ -195,6 +195,14 @@ class LogisticRanker:
             return 0.0
         return float(self.model.decision_function([example.features(mode)])[0])
 
+    def score_many(self, examples: list[Example], mode: str) -> list[float]:
+        """`score` for many at once: one call into sklearn instead of one each,
+        which was 10 of the 20 seconds a finished session waited on."""
+        if self.model is None or not examples:
+            return [0.0] * len(examples)
+        return [float(v) for v in self.model.decision_function(
+            [e.features(mode) for e in examples])]
+
 
 class CentroidRanker:
     def __init__(self) -> None:
@@ -353,9 +361,11 @@ def pairwise_accuracy(
             or getattr(ranker, "model", True) is None
         ):
             continue
+        if hasattr(ranker, "score_many"):
+            scored = dict(zip((e.clip_sha for e in test), ranker.score_many(test, mode)))
+        else:
+            scored = {e.clip_sha: ranker.score(e, mode) for e in test}
         for good, bad in pair_fn(test):
             total += 1
-            correct += _pair_credit(
-                ranker.score(good, mode), ranker.score(bad, mode)
-            )
+            correct += _pair_credit(scored[good.clip_sha], scored[bad.clip_sha])
     return (correct / total if total else 0.0), total

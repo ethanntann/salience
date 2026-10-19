@@ -3,7 +3,7 @@
     pythonw -m pipeline_v2.capture.app        (no console; `python -m` shows the log)
 
 It waits in the tray. When the Fortnite window appears it starts recording,
-when the window has been gone for `GRACE` seconds it stops, makes the
+when the game has quit (or its window has been gone `GRACE` seconds) it stops, makes the
 highlights and says so. The player never opens a terminal or presses Ctrl+C,
 which is what made session 3 lose its highlights step: a second Ctrl+C
 during a silent stop cancelled it.
@@ -111,8 +111,9 @@ class Controller:
     """
 
     def __init__(self, *, find_game, start_session, make_highlights, notify,
-                 clock=time.monotonic, grace: float = GRACE):
+                 clock=time.monotonic, grace: float = GRACE, game_running=lambda: True):
         self.find_game = find_game
+        self.game_running = game_running
         self.start_session = start_session
         self.make_highlights = make_highlights
         self.notify = notify
@@ -171,7 +172,10 @@ class Controller:
             self._gone_since = self._gone_since or self.clock()
         else:
             self._gone_since = None
-        gone = self._gone_since is not None and self.clock() - self._gone_since >= self.grace
+        # The grace is for a window the game recreates; once the game itself
+        # has exited there is nothing to wait for, and the player is waiting.
+        gone = self._gone_since is not None and (
+            self.clock() - self._gone_since >= self.grace or not self.game_running())
         if gone or self._stop_requested:
             self._finish()
 
@@ -184,6 +188,8 @@ class Controller:
             self.state = "waiting"
             return
         self.state = "highlights"
+        # At once, so quitting the game is answered before the work is done.
+        self.notify("Making highlights", "Your highlights will open in a few seconds.")
         try:
             manifest = self.make_highlights(session.path)
         except Exception as exc:  # noqa: BLE001 -- report it, keep the app alive
@@ -332,7 +338,7 @@ def main() -> int:
     import pystray
 
     from pipeline_v2.capture import highlights, record
-    from pipeline_v2.capture.windows import game_window
+    from pipeline_v2.capture.windows import game_running, game_window
 
     icon = pystray.Icon("salience", _icon_image(False), "Salience")
 
@@ -355,7 +361,8 @@ def main() -> int:
         return manifest
 
     controller = Controller(find_game=game_window, start_session=start_session,
-                            make_highlights=make_highlights, notify=notify)
+                            make_highlights=make_highlights, notify=notify,
+                            game_running=game_running)
     controller.last_session = latest_session(_recording_args().out)
     review = _Review()
     quitting = threading.Event()

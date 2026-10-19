@@ -70,7 +70,7 @@ def test_records_while_the_game_is_open_and_makes_highlights_after(tmp_path):
     _run(controller, world, 20)
     assert world.sessions[0].stopped and world.made == [world.sessions[0].path]
     assert controller.state == "waiting"
-    assert world.toasts == ["Recording", "Highlights ready"]
+    assert world.toasts == ["Recording", "Making highlights", "Highlights ready"]
 
 
 def test_a_window_that_blinks_out_does_not_split_the_session(tmp_path):
@@ -85,6 +85,20 @@ def test_a_window_that_blinks_out_does_not_split_the_session(tmp_path):
     _run(controller, world, 30)
 
     assert len(world.sessions) == 1 and not world.sessions[0].stopped
+
+
+def test_once_the_game_has_quit_highlights_start_without_the_grace(tmp_path):
+    """The grace is for a recreated window; a closed game has nothing to wait for."""
+    world = _World(tmp_path)
+    running = [True]
+    controller = world.controller(grace=15, game_running=lambda: running[0])
+    world.window = 1
+    _run(controller, world, 30)
+
+    world.window, running[0] = None, False
+    controller.tick()
+
+    assert world.sessions[0].stopped and world.made == [world.sessions[0].path]
 
 
 def test_stop_now_ends_the_session_while_the_game_is_still_open(tmp_path):

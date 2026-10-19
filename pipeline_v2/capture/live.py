@@ -219,6 +219,13 @@ class LiveDescriber:
         return self
 
     def _loop(self) -> None:
+        try:
+            # What ranking needs, loaded now rather than in the wait after the
+            # player quits: sklearn alone is ~2s to import.
+            import pipeline_v2.ranking  # noqa: F401
+            import sklearn.linear_model  # noqa: F401
+        except ImportError:
+            pass
         while not self._stop.wait(self.interval):
             try:
                 idle = self.idle_fn(self.session)

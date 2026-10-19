@@ -66,6 +66,7 @@ def event_tier(clip) -> int:
 # matters to a viewer even though the model only needed the window itself.
 HIGHLIGHT_LEAD = 8.0
 HIGHLIGHT_LAG = 2.0
+EXPORT_WORKERS = 5
 
 
 def _sidecar(clip_path) -> dict:
@@ -547,15 +548,29 @@ def run(
     def extent(clip):
         return fight_extent(clip, index, pad) if coverage else None
 
-    kept: list[Highlight] = []
-    for position, (score, clip) in enumerate(
-            pick(ordered, top, pad, extent if coverage else None), start=1):
+    chosen = [
+        (position, score, clip) for position, (score, clip) in enumerate(
+            pick(ordered, top, pad, extent if coverage else None), start=1)
+        if Path(clip.path).is_file()
+    ]
+
+    def export_one(job) -> None:
+        position, _, clip = job
         source = Path(clip.path)
-        if not source.is_file():
-            continue
         destination = out / f"{position:02d}-{source.name}"
         if not (coverage and export(session, clip, destination, extent(clip))):
             shutil.copy2(source, destination)
+
+    # Side by side: each is a stream copy waiting on the disk, and one after
+    # another they were 3.4s of the wait after a session.
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(EXPORT_WORKERS) as pool:
+        list(pool.map(export_one, chosen))
+
+    kept: list[Highlight] = []
+    for position, score, clip in chosen:
+        source = Path(clip.path)
         payload = clip.payload or {}
         kept.append(Highlight(
             rank=position, clip=source.name, score=round(score, 4),

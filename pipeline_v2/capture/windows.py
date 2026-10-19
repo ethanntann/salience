@@ -244,6 +244,38 @@ def window_is_game(hwnd: int) -> bool:
         kernel.CloseHandle(process)
 
 
+def game_running() -> bool:
+    """Whether the game's executable is running at all, window or not."""
+    _require_windows()
+    kernel = ct.WinDLL("kernel32", use_last_error=True)
+
+    class Entry(ct.Structure):
+        _fields_ = [
+            ("size", wt.DWORD), ("usage", wt.DWORD), ("pid", wt.DWORD),
+            ("heap", ct.c_void_p), ("module", wt.DWORD), ("threads", wt.DWORD),
+            ("parent", wt.DWORD), ("priority", ct.c_long), ("flags", wt.DWORD),
+            ("exe", wt.WCHAR * 260),
+        ]
+
+    kernel.CreateToolhelp32Snapshot.restype = wt.HANDLE
+    kernel.Process32FirstW.argtypes = [wt.HANDLE, ct.POINTER(Entry)]
+    kernel.Process32NextW.argtypes = [wt.HANDLE, ct.POINTER(Entry)]
+    kernel.CloseHandle.argtypes = [wt.HANDLE]
+    snapshot = kernel.CreateToolhelp32Snapshot(0x2, 0)  # TH32CS_SNAPPROCESS
+    if not snapshot or snapshot == wt.HANDLE(-1).value:
+        return True  # unknown: let the window's grace decide
+    try:
+        entry = Entry(size=ct.sizeof(Entry))
+        more = kernel.Process32FirstW(snapshot, ct.byref(entry))
+        while more:
+            if entry.exe.lower() == GAME_EXE:
+                return True
+            more = kernel.Process32NextW(snapshot, ct.byref(entry))
+        return False
+    finally:
+        kernel.CloseHandle(snapshot)
+
+
 def game_window() -> int | None:
     """HWND of the game's first visible top-level window, or None."""
     _require_windows()

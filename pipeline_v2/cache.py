@@ -36,13 +36,24 @@ class CachedResponse:
     cost_usd: float
 
 
+# Hashes already taken in this process, by file identity. A finished session
+# hashed each of its ~340 windows twice (5s) though live describing had already
+# hashed them all; a rewritten file has a new size or mtime and is hashed again.
+_HASHED: dict[tuple[str, int, int], str] = {}
+
+
 def clip_sha(path: Path) -> str:
     """Hash file contents, not the name -- renaming a clip must not re-bill it."""
+    stat = path.stat()
+    identity = (str(Path(path).resolve()), stat.st_size, stat.st_mtime_ns)
+    if identity in _HASHED:
+        return _HASHED[identity]
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             digest.update(chunk)
-    return digest.hexdigest()
+    _HASHED[identity] = digest.hexdigest()
+    return _HASHED[identity]
 
 
 def _connect() -> sqlite3.Connection:
