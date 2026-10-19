@@ -283,21 +283,87 @@ def _span(clip) -> tuple[float, float] | None:
         return None
 
 
-def pick(ordered: list, top: int, pad: tuple[float, float] = (0.0, 0.0)) -> list:
+# A highlight grows over neighbouring windows that are still the same fight,
+# up to this long. A build fight runs longer than one 8s window, and cutting
+# it at the window edge (the player's complaint on session 3) loses the end.
+MAX_HIGHLIGHT = 45.0
+FIGHT_TAGS = frozenset({
+    "build_fight", "box_fight", "piece_control", "editing", "shield_crack",
+    "third_party", "multi_opponent", "multi_elimination", "finish_downed", "close_range",
+})
+
+
+def in_fight(clip) -> bool:
+    """Whether a window is part of a fight: a kill or knock, or fight mechanics."""
+    payload = clip.payload or {}
+    return event_tier(clip) > 0 or bool(FIGHT_TAGS & set(payload.get("mechanics") or []))
+
+
+def fight_extent(clip, by_start: dict, pad: tuple[float, float]) -> tuple[float, float] | None:
+    """The span to export for `clip`: its window grown over the neighbouring
+    windows of the same fight, plus `pad`, at most `MAX_HIGHLIGHT` long.
+
+    `by_start` maps each window's start time to its clip. Growth stops at the
+    first window that is not in the fight, or at a gap (a skipped window).
+    """
+    span = _span(clip)
+    if span is None:
+        return None
+    start, end = span
+    stride = end - start
+
+    def neighbour(at):
+        found = by_start.get(round(at, 1))
+        return found if found is not None and in_fight(found) else None
+
+    if in_fight(clip):
+        while end - start + stride + pad[0] + pad[1] <= MAX_HIGHLIGHT:
+            before, after = neighbour(start - stride), neighbour(end)
+            if after is not None:
+                end += stride
+            elif before is not None:
+                start -= stride
+            else:
+                break
+        # The win is the payoff of the fight before it: worth one window over
+        # the cap rather than a second highlight of the same moment (session 3
+        # ranked the final kill and its Victory Royale banner #1 and #2).
+        after = by_start.get(round(end, 1))
+        if after is not None and event_tier(after) == VICTORY_TIER:
+            end += stride
+    return start - pad[0], end + pad[1]
+
+
+def window_index(ordered: list) -> dict:
+    """Window start time -> clip, for `fight_extent`."""
+    index = {}
+    for _, clip in ordered:
+        span = _span(clip)
+        if span is not None:
+            index[round(span[0], 1)] = clip
+    return index
+
+
+def pick(ordered: list, top: int, pad: tuple[float, float] = (0.0, 0.0),
+         extent=None) -> list:
     """The best `top` clips, never two whose exported spans overlap.
 
     `pad` is the lead and lag an export adds. The second-best window is usually
     the same fight 8 seconds later; padded, the two exports would overlap, and
-    keeping both fills a short reel with one moment twice.
+    keeping both fills a short reel with one moment twice. `extent(clip)`, when
+    given, is the whole span exported for a clip (`fight_extent`).
     """
     chosen: list = []
     taken: list[tuple[float, float]] = []
     for score, clip in ordered:
         if len(chosen) >= top:
             break
-        span = _span(clip)
-        if span is not None:
-            span = (span[0] - pad[0], span[1] + pad[1])
+        if extent is not None:
+            span = extent(clip)
+        else:
+            span = _span(clip)
+            if span is not None:
+                span = (span[0] - pad[0], span[1] + pad[1])
         if span is not None and any(
             span[0] < end and start < span[1] for start, end in taken
         ):
@@ -308,17 +374,17 @@ def pick(ordered: list, top: int, pad: tuple[float, float] = (0.0, 0.0)) -> list
     return chosen
 
 
-def _export(session: Path, clip, destination: Path, pad) -> bool:
-    """A coverage window re-cut from the raw footage with its lead-in.
+def _export(session: Path, clip, destination: Path, span) -> bool:
+    """A coverage window re-cut from the raw footage over `span` (its lead-in
+    and the rest of its fight).
 
     False when the raw segments are gone (pruned) or the cut fails; the caller
     then exports the bare window, which is shorter but still the moment.
     """
-    span = _span(clip)
     if span is None:
         return False
     return clips_mod.cut_span(
-        session, span[0] - pad[0], span[1] + pad[1], destination
+        session, span[0], span[1], destination
     ) is not None
 
 
@@ -368,6 +434,10 @@ def run(
             analysis_span=clips_mod.COVERAGE_STRIDE,
             lead=half, lag=half, skip=outside,
         )
+        if played["spans"] is not None:
+            # Who the player is and the match phase, for the prompt (v3.8).
+            segments = clips_mod.read_segments(session)
+            gameplay_mod.annotate(session, clip_dir, max(s.end for s in segments))
     else:
         cut = harvest_fn(session, clip_dir)
     # Before describing, so the embeddings built at its end include speech.
@@ -402,13 +472,19 @@ def run(
 
     pad = (HIGHLIGHT_LEAD, HIGHLIGHT_LAG) if coverage else (0.0, 0.0)
     export = export_fn or _export
+    index = window_index(ordered)
+
+    def extent(clip):
+        return fight_extent(clip, index, pad) if coverage else None
+
     kept: list[Highlight] = []
-    for position, (score, clip) in enumerate(pick(ordered, top, pad), start=1):
+    for position, (score, clip) in enumerate(
+            pick(ordered, top, pad, extent if coverage else None), start=1):
         source = Path(clip.path)
         if not source.is_file():
             continue
         destination = out / f"{position:02d}-{source.name}"
-        if not (coverage and export(session, clip, destination, pad)):
+        if not (coverage and export(session, clip, destination, extent(clip))):
             shutil.copy2(source, destination)
         payload = clip.payload or {}
         kept.append(Highlight(

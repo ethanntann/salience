@@ -53,6 +53,9 @@ class ClipFacts:
     analysis_start_sec: float | None = None
     analysis_end_sec: float | None = None
     capture_session: str | None = None
+    # From the game's own log (`gameplay.annotate`), when it covers the window.
+    player_name: str | None = None
+    match_phase: str | None = None
 
 
 def event_from_filename(path: Path) -> str | None:
@@ -92,6 +95,8 @@ def gather(clip: Path, duration_sec: float | None) -> ClipFacts:
             analysis_start_sec=start,
             analysis_end_sec=end,
             capture_session=metadata.get("session_id"),
+            player_name=metadata.get("player_name"),
+            match_phase=metadata.get("match_phase"),
         )
     return ClipFacts(
         source_event=event_from_filename(clip),

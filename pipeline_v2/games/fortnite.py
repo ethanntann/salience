@@ -81,3 +81,67 @@ Never describe scenery, weather, foliage, colours, lighting, skins or
 cosmetics. Mention the surroundings only when they change the fight: cover,
 high ground, the storm, a named location shown on the HUD.
 """
+
+
+# v3.8: the v3.7 bank (frozen above: its text is part of every cached v3.7
+# request) with three corrections from the player's review of session 3.
+#
+# - Kills: "the player's kill-feed line" never said who the player is, and the
+#   feed lists every kill in the lobby, so other people's kills were credited
+#   to the player. The name now comes from the log (`CONTEXT`).
+# - Weapons: a weapon's name is drawn only briefly after a switch, and 7 frames
+#   over 8s are 1.3s apart, so the name on screen is often the gun switched to
+#   after the kill (a Heavy Assault Rifle kill described as a pistol one).
+# - Builds: walls, floors, ramps and cones were mixed up; each gets its shape.
+_V37_ELIMINATION = """- elimination: an ELIMINATED banner or the player's kill-feed line names the
+  opponent. Name the opponent if the banner or feed shows it."""
+_V38_ELIMINATION = """- elimination: the centre-screen elimination notice (ELIMINATED / the
+  player's own elimination count) or a kill-feed line that begins with the
+  recording player's name (given below). Name the opponent if shown. Kill-feed
+  lines naming anyone else are other fights: never the recording player's."""
+_V37_PIECES = """- tunnel, cone, turtle: say so only if that exact structure is built."""
+_V38_PIECES = """- Build pieces by shape: wall = an upright flat panel; floor = a flat
+  horizontal panel (underfoot or overhead); ramp = a panel sloping diagonally
+  upward; cone (roof) = a pyramid of four sloping faces meeting at a peak.
+  Name a piece only when its shape is clear; otherwise say "builds".
+- tunnel, turtle: say so only if that exact structure is built."""
+_V37_WEAPONS = """- Read the weapon's name from the HUD or kill feed. Rarity by colour: grey
+  common, green uncommon, blue rare, purple epic, gold legendary, mythic.
+- If the name is unreadable, use the family: shotgun, SMG, assault rifle,
+  pistol, sniper rifle, DMR. Never guess a specific name."""
+_V38_WEAPONS = """- The weapon that got a kill is the one in the player's hands in the frame
+  of the hit (damage numbers, the elimination notice): the highlighted slot
+  of the weapon bar, bottom right, and the gun model on screen. Its name is
+  drawn only for a moment after a switch, so a name visible in a LATER frame
+  is often the gun switched to after the kill. Never name the kill weapon
+  from text that appears after the hit.
+- If the name is not readable at the hit, give the family from the gun's
+  shape: shotgun (short, wide barrel, single heavy shots), SMG (compact,
+  rapid fire), assault rifle (long, rifle stock), pistol (small, one-handed),
+  sniper or hunting rifle (long barrel, scope). Rarity by colour: grey
+  common, green uncommon, blue rare, purple epic, gold legendary."""
+
+WORD_BANK_V38 = (WORD_BANK.replace(_V37_ELIMINATION, _V38_ELIMINATION)
+                 .replace(_V37_PIECES, _V38_PIECES)
+                 .replace(_V37_WEAPONS, _V38_WEAPONS))
+assert WORD_BANK_V38.count("never the recording player's") == 1, "v3.7 bank text moved"
+assert "pyramid of four" in WORD_BANK_V38 and "LATER frame" in WORD_BANK_V38
+
+CONTEXT = """
+From Fortnite's own log for this session (always correct; trust it over what
+the frames seem to show):
+- The recording player is "{player}". A kill-feed line is their kill only if
+  it begins with "{player}".
+"""
+CONTEXT_PHASE = """- These frames are from {phase}.
+"""
+
+# What each phase in the log means for a description. The model has called a
+# mid-match window "a pre-game lobby" (session 3, window 375) when the log knew
+# better.
+PHASES = {
+    "Warmup": "the pre-game island (warm-up), where kills do not count",
+    "Aircraft": "the Battle Bus or the drop from it",
+    "SafeZones": "the match itself, after the drop: not the pre-game island or a lobby",
+    "EndGame": "the end of the match, where a Victory Royale may be shown",
+}

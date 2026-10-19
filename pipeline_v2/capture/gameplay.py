@@ -154,5 +154,56 @@ def spans(session: Path, duration: float, log_dir: Path | None = None) -> dict:
     }
 
 
+def context(session: Path, duration: float, log_dir: Path | None = None):
+    """(the local player's name, a function giving the phase at a video time).
+
+    Both None when the log does not cover the session; nothing is guessed.
+    """
+    origin, _ = video_origin(session)
+    if origin is None:
+        return None, lambda t: None
+    log_dir = log_dir or game_log.DEFAULT_LOG.parent
+    end = origin + timedelta(seconds=duration)
+    events = sorted(
+        (e for path in _logs(log_dir, origin) for e in game_log.read_events(path)
+         if origin - timedelta(minutes=30) <= e.at <= end),
+        key=lambda e: e.at)
+    phases = [((e.at - origin).total_seconds(), e.detail) for e in events if e.kind == "phase"]
+
+    def phase_at(t: float) -> str | None:
+        current = None
+        for at, name in phases:
+            if at > t:
+                break
+            current = name
+        return current
+
+    return game_log.local_player(events), phase_at
+
+
+def annotate(session: Path, clip_dir: Path, duration: float, log_dir: Path | None = None) -> int:
+    """Write the player's name and each window's match phase into its sidecar,
+    for the prompt (`facts.gather`). Returns how many sidecars changed."""
+    import json
+
+    from pipeline_v2.jsonio import write_json
+
+    player, phase_at = context(session, duration, log_dir)
+    if player is None:
+        return 0
+    changed = 0
+    for sidecar in sorted(clip_dir.glob("*.capture.json")):
+        try:
+            record = json.loads(sidecar.read_text(encoding="utf-8"))
+            middle = (float(record["segment_start_sec"]) + float(record["segment_end_sec"])) / 2
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        update = {"player_name": player, "match_phase": phase_at(middle)}
+        if any(record.get(k) != v for k, v in update.items()):
+            write_json(sidecar, {**record, **update})
+            changed += 1
+    return changed
+
+
 def overlaps(spans_: list[tuple[float, float]], start: float, end: float) -> bool:
     return any(start < b and a < end for a, b in spans_)

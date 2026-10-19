@@ -99,6 +99,9 @@ def step(session: Path, *, seen: set | None = None, cfg=None, workers: int = WOR
         skip=lambda r: r.at not in wanted, runner=_low_priority_run,
     )
     paths = [clip_dir / record["video_file"] for record in cut]
+    if harvest_fn is None:
+        segments = clips_mod.read_segments(session)
+        gameplay_mod.annotate(session, clip_dir, segments[-1].end)
     conn = (connect or store.connect)()
     try:
         described = {row[0] for row in conn.execute("select clip_sha from descriptions")}

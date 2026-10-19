@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -346,3 +347,65 @@ def test_a_win_outranks_kills_and_kills_outrank_taste():
     tiers = [highlights.event_tier(c) for c in (win, kill, walk)]
 
     assert tiers == sorted(tiers, reverse=True) and len(set(tiers)) == 3
+
+
+def _windows(tmp_path, kinds):
+    """Back-to-back 8s windows; each kind is 'kill', 'build' (fight tags) or 'calm'."""
+    found = []
+    for i, kind in enumerate(kinds):
+        clip = tmp_path / f"{i:03d}-coverage.mkv"
+        clip.write_bytes(b"x")
+        clip.with_suffix(".capture.json").write_text(
+            json.dumps({"segment_start_sec": i * 8.0, "segment_end_sec": i * 8.0 + 8}),
+            encoding="utf-8")
+        payload = {"outcome": "elimination" if kind == "kill" else "no_event",
+                   "mechanics": ["build_fight"] if kind == "build" else []}
+        found.append((0.0, SimpleNamespace(path=str(clip), payload=payload, summary="")))
+    return found
+
+
+def test_a_highlight_grows_over_the_rest_of_its_fight(tmp_path):
+    ordered = _windows(tmp_path, ["calm", "build", "build", "kill", "build", "calm"])
+    index = highlights.window_index(ordered)
+
+    span = highlights.fight_extent(ordered[3][1], index, pad=(8.0, 2.0))
+
+    # Windows 1-4 are the fight (8s to 40s); the lead-in reaches back into 0.
+    assert span == (8.0 - 8.0, 40.0 + 2.0)
+
+
+def test_growth_stops_at_the_length_cap(tmp_path):
+    ordered = _windows(tmp_path, ["build"] * 10)
+    span = highlights.fight_extent(ordered[0][1], highlights.window_index(ordered), (8.0, 2.0))
+
+    assert span[1] - span[0] <= highlights.MAX_HIGHLIGHT
+
+
+def test_a_calm_window_is_exported_as_it_was(tmp_path):
+    ordered = _windows(tmp_path, ["build", "calm", "build"])
+    span = highlights.fight_extent(ordered[1][1], highlights.window_index(ordered), (8.0, 2.0))
+
+    assert span == (8.0 - 8.0, 16.0 + 2.0)
+
+
+def test_two_highlights_never_share_a_fight(tmp_path):
+    ordered = _windows(tmp_path, ["kill", "build", "kill", "calm", "calm", "calm", "calm", "kill"])
+    index = highlights.window_index(ordered)
+
+    picked = highlights.pick(ordered, 5, (8.0, 2.0),
+                             lambda c: highlights.fight_extent(c, index, (8.0, 2.0)))
+
+    names = [Path(c.path).name for _, c in picked]
+    assert "000-coverage.mkv" in names and "002-coverage.mkv" not in names
+
+
+def test_a_win_right_after_a_long_fight_joins_it(tmp_path):
+    # A fight long enough to reach the cap at 32s, then the win's banner.
+    ordered = _windows(tmp_path, ["build"] * 4 + ["calm"] * 2)
+    ordered[4][1].summary = "The Victory Royale banner appears"
+    index = highlights.window_index(ordered)
+
+    span = highlights.fight_extent(ordered[0][1], index, (8.0, 2.0))
+
+    assert span == (-8.0, 40.0 + 2.0)  # through the banner window, past the cap
+    assert span[1] - span[0] > highlights.MAX_HIGHLIGHT

@@ -331,6 +331,7 @@ def build_prompt(clip_facts: ClipFacts, version: str | None = None) -> str:
         schema.KILL_WEAPON_PROMPT_VERSION,
         schema.OWN_KILLS_PROMPT_VERSION,
         schema.WORD_BANK_PROMPT_VERSION,
+        schema.GAME_CONTEXT_PROMPT_VERSION,
     ):
         own = version != schema.KILL_WEAPON_PROMPT_VERSION
         template = _INSTRUCTIONS
@@ -341,13 +342,22 @@ def build_prompt(clip_facts: ClipFacts, version: str | None = None) -> str:
         field = _OWN_KILL_FIELD if own else _KILL_WEAPON_FIELD
         rules = _OWN_KILL_RULES if own else _KILL_WEAPON_RULES
         built = template.replace(_V33_WEAPON_FIELD, field) + rules
-        if version == schema.WORD_BANK_PROMPT_VERSION:
+        if version in (schema.WORD_BANK_PROMPT_VERSION, schema.GAME_CONTEXT_PROMPT_VERSION):
             from pipeline_v2.games import fortnite
 
             if _DEFAULT_TAGS not in built:
                 raise ValueError("could not find the mechanics list to extend")
             tags = _DEFAULT_TAGS.rstrip("\n") + ",\n" + ", ".join(fortnite.MECHANICS) + "\n"
-            built = built.replace(_DEFAULT_TAGS, tags) + fortnite.WORD_BANK
+            built = built.replace(_DEFAULT_TAGS, tags)
+            if version == schema.WORD_BANK_PROMPT_VERSION:
+                return built + fortnite.WORD_BANK
+            built += fortnite.WORD_BANK_V38
+            # What the game's log knows, when it covers this window.
+            if clip_facts.player_name:
+                built += fortnite.CONTEXT.format(player=clip_facts.player_name)
+                phase = fortnite.PHASES.get(clip_facts.match_phase or "")
+                if phase:
+                    built += fortnite.CONTEXT_PHASE.format(phase=phase)
         return built
 
     if clip_facts.event_source == "capture_window":

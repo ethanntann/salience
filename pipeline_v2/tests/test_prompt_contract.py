@@ -228,3 +228,31 @@ def test_v37_is_v36_plus_the_word_bank_and_nothing_else():
     assert restored == v36
     assert schema.mechanics_for("v3.7-wordbank-window@deepseek-v4p1-flash") == (
         schema.MECHANICS + fortnite.MECHANICS)
+
+
+def test_v38_tells_the_model_who_the_player_is_and_the_phase():
+    from pipeline_v2 import facts as facts_mod
+
+    window = facts_mod.ClipFacts(event_source="capture_window", event_sec=4.0,
+                                 analysis_start_sec=0.0, analysis_end_sec=8.0,
+                                 player_name="BabyRico.YT", match_phase="SafeZones")
+    built = prompt.build_prompt(window, schema.GAME_CONTEXT_PROMPT_VERSION)
+
+    assert 'begins with "BabyRico.YT"' in built
+    assert "not the pre-game island or a lobby" in built
+    assert "LATER frame" in built and "pyramid of four" in built
+    # Without the log, nothing is claimed.
+    bare = prompt.build_prompt(facts_mod.ClipFacts(event_source="capture_window"),
+                               schema.GAME_CONTEXT_PROMPT_VERSION)
+    assert "From Fortnite's own log" not in bare
+
+
+def test_v37_is_untouched_by_v38():
+    """Its text is part of every cached v3.7 request."""
+    from pipeline_v2 import facts as facts_mod
+
+    window = facts_mod.ClipFacts(event_source="capture_window", player_name="BabyRico.YT",
+                                 match_phase="SafeZones")
+    built = prompt.build_prompt(window, schema.WORD_BANK_PROMPT_VERSION)
+
+    assert "BabyRico.YT" not in built and "the player's kill-feed line" in built

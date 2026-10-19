@@ -211,6 +211,23 @@ def describe_many(cfg, clips: list[Path], max_calls: int | None, workers: int = 
         pool.shutdown(wait=True, cancel_futures=True)
 
 
+def anonymised(text: str, player: str | None) -> str:
+    """`text` with the player's name written as "the recording player".
+
+    v3.8 tells the model the player's name so it can tell their kill-feed
+    lines from everyone else's, and it then uses the name in summaries. The
+    taste model learns from words: a name present in one session's training
+    text and absent from another's is a difference between sessions, not
+    between moments.
+    """
+    if not player or player not in text:
+        return text
+    import re
+
+    text = re.sub(rf"(^|(?<=[.!?]\s)){re.escape(player)}", "The recording player", text)
+    return text.replace(player, "the recording player")
+
+
 def store_described(conn, cfg, clip: Path, duration, clip_facts, result) -> str:
     """Store one described clip and commit; returns the variant it landed in."""
     engagement_at = engagements.clip_time(clip)
@@ -229,7 +246,7 @@ def store_described(conn, cfg, clip: Path, duration, clip_facts, result) -> str:
             "analysis_start_sec": clip_facts.analysis_start_sec,
             "analysis_end_sec": clip_facts.analysis_end_sec,
         },
-        summary=result.description.embed_text,
+        summary=anonymised(result.description.embed_text, clip_facts.player_name),
         payload=result.description.model_dump(),
         prompt_version=variant,
     )

@@ -41,7 +41,7 @@ Without the tray: `python -m pipeline_v2.capture.record`, Ctrl+C when done. To t
 http://localhost:8777/ (**K** keep, **J** skip, **W** description is wrong):
 
 ```powershell
-python -m pipeline_v2 review --variant v3.7-wordbank-window@deepseek-v4p1-flash --only <session folder>
+python -m pipeline_v2 review --variant v3.8-context-window@deepseek-v4p1-flash --only <session folder>
 python -m pipeline_v2.capture.highlights <session folder>   # re-rank with new ratings
 ```
 
@@ -104,6 +104,24 @@ nine hardest windows (the player's "description wrong" flags and the cases two
 models disagreed on). minimax-m3 named the wrong weapon on five of nine and
 called a 106-damage shield crack a kill; deepseek matched kimi-k3, the most
 accurate, on eight of nine at a twentieth of its price (~$0.002 a window).
+
+**v3.8 (shipped): what the game's log knows.** The describer is told the
+player's name and the match phase, from Fortnite's log. Without the name,
+"the player's kill-feed line" meant any line in the feed, and other people's
+kills were credited to the player; without the phase, mid-match windows were
+called "the pre-game lobby". Weapons are judged at the hit (a name drawn
+after a weapon switch belongs to the next gun), and build pieces by shape.
+Session 3 added a second out-of-sample test (trained on sessions 1+2):
+
+| Sessions 2 + 3, 33 kept moments | v3.7 | v3.8 |
+|---|---|---|
+| Kept moments in the top 10 | 11 | **15** |
+| Kept moments in the top 15 | 20 | **22** |
+| Mid-match windows called "lobby" | 15 | **6** |
+
+Session 2 alone was slightly worse in the top 15 (9 vs 11 of 16); session 3
+much better (13 vs 9 of 17). Highlights now run over the whole fight (up to
+45s, through a Victory Royale that ends it) instead of a fixed 18s.
 
 What is not solved: **which kills** a player keeps. Most keeps are kills, but
 so are many skipped fights, and ordering kill windows among themselves is
