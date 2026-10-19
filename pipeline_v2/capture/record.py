@@ -53,19 +53,6 @@ def _parser() -> argparse.ArgumentParser:
                         help="how many highlights to keep (default 10)")
     parser.add_argument("--no-triggers", dest="triggers", action="store_false",
                         help="record without journalling detector moments")
-    parser.add_argument("--no-live", dest="live", action="store_false",
-                        help="describe only after recording stops, not during play")
-    # Measured 2026-10-18 on a 165fps game: mid-match frame extraction as a
-    # burst (16 CPU decoders) dipped it to 100-120 every 30s; as a trickle (one
-    # frame at a time, GPU-decoded) it held ~160, the same as capture alone.
-    parser.add_argument("--live-between", dest="live_between", action="store_true",
-                        help="describe only between matches, never mid-match")
-    parser.add_argument("--live-during", dest="live_between", action="store_false",
-                        help=argparse.SUPPRESS)
-    parser.add_argument("--capture-fps", type=int, default=None,
-                        help="how often to grab the game window (default 2x --fps)")
-    parser.add_argument("--no-speech", dest="speech", action="store_false",
-                        help="do not transcribe the mic when ranking highlights")
     parser.add_argument("--no-open", dest="open", action="store_false",
                         help="do not open the highlights folder when done")
     return parser
@@ -148,8 +135,7 @@ class Session:
         args, session = self.args, self.path
         self.rec = WgcRecorder(session, fps=args.fps, bitrate=args.bitrate,
                                monitor_index=None if self.hwnd else 1, window_hwnd=self.hwnd,
-                               audio=args.audio, mic_hint=args.mic or None,
-                               capture_fps=args.capture_fps)
+                               audio=args.audio, mic_hint=args.mic or None)
         self.rec.start()
         self.marker = MarkRecorder(journal=session / "marks.tsv").start()
         self.activity = ActivitySampler(journal=session / "input.tsv").start()
@@ -162,13 +148,11 @@ class Session:
         # full coverage they no longer decide what gets described.
         self.bus = TriggerBus(detectors_for(args.game)) if args.triggers else None
         self.journal = session / clips.JOURNAL_NAME
-        if args.highlights and args.live:
+        if args.highlights:
             from pipeline_v2.capture.live import LiveDescriber
 
-            self.live = LiveDescriber(session, speech=args.speech,
-                                      between_only=args.live_between).start()
-            print("  live  : describing " + ("between matches" if args.live_between
-                                             else "each finished 30s segment during play"))
+            self.live = LiveDescriber(session).start()
+            print("  live  : describing each finished 30s segment during play")
         return self
 
     @property
@@ -282,15 +266,14 @@ def main(argv: list[str] | None = None) -> int:
               f"  python -m pipeline_v2.capture.highlights {session}")
         return 1 if recording.error else 0
 
-    # What live did not reach (the last segment, or everything with --no-live)
-    # is described here. Interrupting loses nothing: cutting resumes, and every
+    # What live did not reach (the last segment or two) is described here. Interrupting loses nothing: cutting resumes, and every
     # paid description is cached.
     from pipeline_v2.capture import highlights
 
     signal.signal(signal.SIGINT, signal.default_int_handler)
     print("\nmaking highlights, usually under a minute (Ctrl+C here postpones them)")
     try:
-        highlights.report(highlights.run(session, top=args.top, speech=args.speech))
+        highlights.report(highlights.run(session, top=args.top))
     except KeyboardInterrupt:
         print("  postponed; nothing lost. Finish them with:\n"
               f"  python -m pipeline_v2.capture.highlights {session}")

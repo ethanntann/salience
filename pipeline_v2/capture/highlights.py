@@ -625,17 +625,8 @@ def main(argv: list[str] | None = None) -> int:
         "--prune-raw", action="store_true",
         help="delete the raw 30s segments once highlights exist (irreversible)",
     )
-    parser.add_argument(
-        "--triggers-only", dest="coverage", action="store_false",
-        help="describe only where a detector fired (cheaper, misses most keeps)",
-    )
-    parser.add_argument(
-        "--no-speech", dest="speech", action="store_false",
-        help="do not transcribe the mic (rank on what was seen only)",
-    )
     args = parser.parse_args(argv)
-    report(run(args.session, top=args.top, prune_raw=args.prune_raw,
-               coverage=args.coverage, speech=args.speech))
+    report(run(args.session, top=args.top, prune_raw=args.prune_raw))
     return 0
 
 

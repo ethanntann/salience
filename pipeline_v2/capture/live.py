@@ -24,9 +24,8 @@ Mid-match work is a trickle: one window and one frame at a time, decoded on
 the GPU's video decoder (which the game does not use), below normal priority.
 Measured on a 165fps game (2026-10-18): as a burst of 16 CPU decoders every
 30s it dipped the game to 100-120; as the trickle it held ~160, the same as
-capture alone. Between matches it catches up at full width. `--live-between`
-(`between_only`) does nothing mid-match at all. Cuts are stream copies; the
-cloud calls cost the machine nothing.
+capture alone. Between matches it catches up at full width. Cuts are stream
+copies; the cloud calls cost the machine nothing.
 """
 
 from __future__ import annotations
@@ -165,17 +164,13 @@ class LiveDescriber:
     """
 
     def __init__(self, session: Path, interval: float = INTERVAL, step_fn=step,
-                 speech: bool = True, idle_fn=between_matches, listen_fn=listen_step,
-                 between_only: bool = False):
+                 speech: bool = True, idle_fn=between_matches, listen_fn=listen_step):
         self.session = session
         self.interval = interval
         self.step_fn = step_fn
         self.speech = speech
         self.idle_fn = idle_fn
         self.listen_fn = listen_fn
-        # Nothing at all mid-match: the match's windows wait for the lobby (or
-        # the end of the session), and the game has the machine to itself.
-        self.between_only = between_only
         self._whisper: dict = {}
         self.seen: set[float] = set()
         self.described = 0
@@ -194,8 +189,6 @@ class LiveDescriber:
         while not self._stop.wait(self.interval):
             try:
                 idle = self.idle_fn(self.session)
-                if self.between_only and not idle:
-                    continue
                 # Out of a match the machine is free, so catch up at full width.
                 extra = {"workers": IDLE_WORKERS} if idle else {}
                 self.described += self.step_fn(

@@ -25,11 +25,10 @@ compatibility is a hard constraint.
 - **Live describing (`live`):** every 30s, the windows that are fully on disk
   and that the log places inside a match are cut and described, one window
   and one frame at a time, GPU-decoded, below normal priority (a burst of CPU
-  decoders cost ~50fps; the trickle costs none measurable). `--live-between`
-  waits for the lobby instead. Between matches the mic is
-  transcribed too. It does only what step 2–4 below would do, the same way, so
-  the final run finds them done; anything it missed (the last segment, a
-  failed call, no log) is left to that run. `--no-live` turns it off.
+  decoders cost ~50fps; the trickle costs none measurable). Between matches
+  the mic is transcribed too. It does only what step 2–4 below would do, the
+  same way, so the final run finds them done; anything it missed (the last
+  segment, a failed call, no log) is left to that run.
 
 ## After play: `highlights` → `clips`
 

@@ -59,8 +59,7 @@ python -m pipeline_v2.capture.highlights <session folder>   # re-rank with new r
   100–120 every 30s; as a trickle it holds ~160, the same as capture alone.
   Replaying session 2 this way: 8s from stop to highlights. Whisper runs only between matches. Describing
   after the fact, one call at a time, had been 4.6s per window (about 20
-  minutes a session); 16 calls in flight brought that to 0.8s
-  (`--no-live` still works that way).
+  minutes a session); 16 calls in flight brought that to 0.8s.
 - **Every moment is looked at, not just the ones a detector flagged.** The
   first design described only where a live detector fired (button-mashing
   bursts, voice spikes). A seeded random-control experiment showed why that

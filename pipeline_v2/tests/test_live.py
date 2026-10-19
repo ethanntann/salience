@@ -197,27 +197,6 @@ def test_without_whisper_installed_live_stops_asking(tmp_path, monkeypatch):
 
     assert live.listen_step(tmp_path, {}) is False
 
-
-def test_between_only_does_nothing_mid_match(tmp_path):
-    states = iter([False, False, True])
-    looked, stepped = threading.Event(), []
-
-    def idle(session):
-        state = next(states, None)
-        if state is None:
-            looked.set()
-            return False
-        return state
-
-    describer = live.LiveDescriber(
-        tmp_path, interval=0.01, step_fn=lambda s, seen, **kw: stepped.append(1) or 0,
-        idle_fn=idle, listen_fn=lambda s, holder: True, between_only=True).start()
-    assert looked.wait(2.0)
-    describer.stop()
-
-    assert len(stepped) == 1  # only the look that found the player in the lobby
-
-
 def test_stopping_early_never_runs_the_queue(monkeypatch):
     paid: list[str] = []
     _fake_describe(monkeypatch, cached=set(), paid=paid)
