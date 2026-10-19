@@ -332,6 +332,7 @@ def build_prompt(clip_facts: ClipFacts, version: str | None = None) -> str:
         schema.OWN_KILLS_PROMPT_VERSION,
         schema.WORD_BANK_PROMPT_VERSION,
         schema.GAME_CONTEXT_PROMPT_VERSION,
+        *schema.NOTES_PROMPT_VERSIONS,
     ):
         own = version != schema.KILL_WEAPON_PROMPT_VERSION
         template = _INSTRUCTIONS
@@ -342,7 +343,8 @@ def build_prompt(clip_facts: ClipFacts, version: str | None = None) -> str:
         field = _OWN_KILL_FIELD if own else _KILL_WEAPON_FIELD
         rules = _OWN_KILL_RULES if own else _KILL_WEAPON_RULES
         built = template.replace(_V33_WEAPON_FIELD, field) + rules
-        if version in (schema.WORD_BANK_PROMPT_VERSION, schema.GAME_CONTEXT_PROMPT_VERSION):
+        if version in (schema.WORD_BANK_PROMPT_VERSION, schema.GAME_CONTEXT_PROMPT_VERSION,
+                       *schema.NOTES_PROMPT_VERSIONS):
             from pipeline_v2.games import fortnite
 
             if _DEFAULT_TAGS not in built:
@@ -358,6 +360,9 @@ def build_prompt(clip_facts: ClipFacts, version: str | None = None) -> str:
                 phase = fortnite.PHASES.get(clip_facts.match_phase or "")
                 if phase:
                     built += fortnite.CONTEXT_PHASE.format(phase=phase)
+            if version in schema.NOTES_PROMPT_VERSIONS and clip_facts.notes:
+                built += "\nAlso known about these frames (reliable; use it):\n" + "".join(
+                    f"- {note}\n" for note in clip_facts.notes)
         return built
 
     if clip_facts.event_source == "capture_window":

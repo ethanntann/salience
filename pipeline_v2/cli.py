@@ -21,6 +21,7 @@ from pipeline_v2 import feedback as feedback_mod  # noqa: E402
 from pipeline_v2 import frames as frames_mod  # noqa: E402
 from pipeline_v2 import prompt as prompt_mod  # noqa: E402
 from pipeline_v2 import review as review_mod  # noqa: E402
+from pipeline_v2 import schema  # noqa: E402
 from pipeline_v2 import store  # noqa: E402
 from pipeline_v2 import taste as taste_mod  # noqa: E402
 from pipeline_v2 import vlm  # noqa: E402
@@ -179,11 +180,21 @@ def describe_many(cfg, clips: list[Path], max_calls: int | None, workers: int = 
 
     lock = threading.Lock()
     left = [max_calls if max_calls is not None else len(clips)]
+    noted = getattr(cfg, "prompt_version", None) in schema.NOTES_PROMPT_VERSIONS
 
     def one(clip: Path):
         duration, clip_facts, window = _prepare(clip)
         if not window:
             return None
+        if noted:
+            from dataclasses import replace
+
+            from pipeline_v2 import notes as notes_mod
+
+            variant = prompt_mod.storage_variant(cfg.prompt_version, clip_facts, cfg.model)
+            with closing(store.connect()) as conn:
+                clip_facts = replace(clip_facts, notes=notes_mod.window_notes(
+                    conn, clip, cache.clip_sha(clip), variant))
         frames = [f.path for f in window]
         try:
             # A cached answer costs nothing, so it never touches the allowance.

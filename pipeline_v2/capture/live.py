@@ -76,7 +76,7 @@ def ready_windows(session: Path) -> tuple[list[clips_mod.ClipRequest], dict]:
 
 def step(session: Path, *, seen: set | None = None, cfg=None, workers: int = WORKERS,
          harvest_fn=None, describe_fn=None, store_fn=None, connect=None,
-         stopping: threading.Event | None = None) -> int:
+         stopping: threading.Event | None = None, listen=None) -> int:
     """Cut and describe whatever has become ready; how many were described.
 
     `seen` holds windows already dealt with, so a long session does not re-hash
@@ -110,13 +110,21 @@ def step(session: Path, *, seen: set | None = None, cfg=None, workers: int = WOR
         seen.update(wanted)
         if not fresh:
             return 0
+        if listen is not None:
+            # Before describing: the prompt is told what was said (`notes`).
+            listen(session, fresh)
         cfg = cfg or config.resolve(config.load_config())
         done = 0
-        for clip, outcome in (describe_fn or cli.describe_many)(cfg, fresh, len(fresh), workers):
-            if outcome is None or isinstance(outcome, Exception):
-                continue  # the final run retries it, from cache if it was paid
-            (store_fn or cli.store_described)(conn, cfg, clip, *outcome)
-            done += 1
+        # One at a time, each stored before the next is asked about: a window's
+        # prompt includes the one before it (`notes`). Catching up between
+        # matches goes wide instead and lets the final run fill any gaps.
+        batches = [[clip] for clip in fresh] if workers == 1 else [fresh]
+        for batch in batches:
+            for clip, outcome in (describe_fn or cli.describe_many)(cfg, batch, len(batch), workers):
+                if outcome is None or isinstance(outcome, Exception):
+                    continue  # the final run retries it, from cache if it was paid
+                (store_fn or cli.store_described)(conn, cfg, clip, *outcome)
+                done += 1
             if stopping is not None and stopping.is_set():
                 break  # the rest is the final run's; stopping must not wait on it
         return done
@@ -139,16 +147,37 @@ def between_matches(session: Path) -> bool:
         played["spans"], frontier - INTERVAL, frontier)
 
 
+# Whisper's threads while a match may be on: one core's worth of work in
+# bursts of ~0.4s a segment, never all of them.
+LIVE_WHISPER_THREADS = 2
+
+
+def _transcriber(holder: dict):
+    if "model" not in holder:
+        from pipeline_v2.audio import Transcriber
+
+        holder["model"] = Transcriber(cpu_threads=LIVE_WHISPER_THREADS)
+    return holder["model"]
+
+
+def listen_windows(session: Path, windows: list[Path], holder: dict) -> bool:
+    """Transcribe what is new and attach it to `windows`; False without Whisper."""
+    from pipeline_v2.capture import voice
+
+    try:
+        voice.attach(session, windows, transcriber=_transcriber(holder))
+    except ImportError:
+        return False
+    return True
+
+
 def listen_step(session: Path, holder: dict, transcribe=None) -> bool:
     """Transcribe a batch of the mic between matches. False once Whisper is
     unavailable, so the caller stops asking."""
     from pipeline_v2.capture import voice
 
     try:
-        if "model" not in holder:
-            from pipeline_v2.audio import Transcriber
-
-            holder["model"] = Transcriber()
+        _transcriber(holder)
     except ImportError:
         return False
     (transcribe or voice.transcribe_session)(
@@ -178,6 +207,10 @@ class LiveDescriber:
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._loop, name="live-describe", daemon=True)
 
+    def _listen(self, session: Path, windows: list[Path]) -> None:
+        if self.speech:
+            self.speech = listen_windows(session, windows, self._whisper)
+
     def start(self) -> "LiveDescriber":
         from salience_media import ffmpeg
 
@@ -191,6 +224,8 @@ class LiveDescriber:
                 idle = self.idle_fn(self.session)
                 # Out of a match the machine is free, so catch up at full width.
                 extra = {"workers": IDLE_WORKERS} if idle else {}
+                if self.speech:
+                    extra["listen"] = self._listen
                 self.described += self.step_fn(
                     self.session, seen=self.seen, stopping=self._stop, **extra)
                 if self.speech and idle and not self._stop.is_set():

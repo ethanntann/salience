@@ -3,7 +3,7 @@
 ```powershell
 python -m pipeline_v2.capture.record            # record, then make highlights
 python -m pipeline_v2.capture.highlights <run>  # re-run the post-session pipeline
-python -m pipeline_v2 review --variant v3.8-context-window@deepseek-v4p1-flash --only <session>
+python -m pipeline_v2 review --variant v3.9-said-window@deepseek-v4p1-flash --only <session>
 ```
 
 ## During play: `record` → `wgc`, `audio_pump`, `input_activity`, `marks`, `live`

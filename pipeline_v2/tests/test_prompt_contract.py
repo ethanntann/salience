@@ -97,10 +97,14 @@ def test_v35_follows_the_capture_window_wording():
 
 def test_every_registered_ablation_builds_a_distinct_prompt():
     clipped = ClipFacts(event_source="fraction")
-    versions = {"v3.3", *schema.ABLATIONS.values()}
+    # The v3.9 arms differ by their per-window notes, so with none they are v3.8.
+    versions = {"v3.3", *schema.ABLATIONS.values()} - set(schema.NOTES_PROMPT_VERSIONS)
     built = {v: prompt.build_prompt(clipped, v) for v in versions}
 
     assert len(set(built.values())) == len(versions)
+    noted = ClipFacts(event_source="fraction", notes=("Said on the mic: \"bro\"",))
+    assert "Said on the mic" in prompt.build_prompt(noted, schema.SAID_PROMPT_VERSION)
+    assert "Said on the mic" not in prompt.build_prompt(noted, schema.GAME_CONTEXT_PROMPT_VERSION)
 
 
 def test_the_shipped_prompt_text_is_unchanged():

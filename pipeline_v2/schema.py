@@ -65,6 +65,11 @@ WORD_BANK_PROMPT_VERSION = "v3.7-wordbank"
 # v3.7 plus what Fortnite's log knows (who the player is, the match phase) and
 # sharper weapon and build-piece rules (`games.fortnite.WORD_BANK_V38`).
 GAME_CONTEXT_PROMPT_VERSION = "v3.8-context"
+# v3.8 plus two lines about the window (`notes`): what the player said, and
+# what happened in the 8 seconds before. Beat v3.8 19 vs 17 of 33 kept
+# moments in the top 10; HUD banner facts added nothing on top.
+SAID_PROMPT_VERSION = "v3.9-said"
+NOTES_PROMPT_VERSIONS = (SAID_PROMPT_VERSION,)
 
 # One registry for V2_ABLATE. config maps the variable to a version; prompt
 # branches on the version. Reading the environment in both places let the two
@@ -77,6 +82,7 @@ ABLATIONS = {
     "ownkills": OWN_KILLS_PROMPT_VERSION,
     "wordbank": WORD_BANK_PROMPT_VERSION,
     "context": GAME_CONTEXT_PROMPT_VERSION,
+    "said": SAID_PROMPT_VERSION,
 }
 
 
@@ -84,7 +90,7 @@ def mechanics_for(prompt_version: str) -> tuple[str, ...]:
     """The tag vocabulary a description at this version could legally contain."""
     if prompt_version == ATTRIBUTION_PROMPT_VERSION:
         return ATTRIBUTION_MECHANICS
-    if prompt_version.startswith((WORD_BANK_PROMPT_VERSION, GAME_CONTEXT_PROMPT_VERSION)):
+    if prompt_version.startswith((WORD_BANK_PROMPT_VERSION, GAME_CONTEXT_PROMPT_VERSION, "v3.9")):
         from pipeline_v2.games import fortnite
 
         return MECHANICS + fortnite.MECHANICS

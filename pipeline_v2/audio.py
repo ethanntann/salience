@@ -100,10 +100,12 @@ VAD_THRESHOLD = 0.3
 class Transcriber:
     """Whisper, loaded once. `small` trades some accuracy for speed on CPU."""
 
-    def __init__(self, model_size: str = "small") -> None:
+    def __init__(self, model_size: str = "small", cpu_threads: int = 0) -> None:
         from faster_whisper import WhisperModel
 
-        self._model = WhisperModel(model_size, device="cpu", compute_type="int8")
+        # 0 lets CTranslate2 take every core: right after a session, wrong mid-match.
+        self._model = WhisperModel(model_size, device="cpu", compute_type="int8",
+                                   cpu_threads=cpu_threads)
 
     def transcribe(self, wav: Path) -> str:
         segments, _ = self._model.transcribe(

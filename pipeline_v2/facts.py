@@ -56,6 +56,8 @@ class ClipFacts:
     # From the game's own log (`gameplay.annotate`), when it covers the window.
     player_name: str | None = None
     match_phase: str | None = None
+    # More about this window, one line each, for the v3.9 prompts.
+    notes: tuple[str, ...] = ()
 
 
 def event_from_filename(path: Path) -> str | None:
