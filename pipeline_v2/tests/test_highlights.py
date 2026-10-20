@@ -440,3 +440,39 @@ def test_asking_twice_for_one_moment_keeps_it_once(tmp_path):
     picked = highlights.pick(ordered, 2, pinned=highlights.asked_for(ordered, [4.0, 6.0]))
 
     assert [c for _, c in picked].count(ordered[0][1]) == 1
+
+
+def test_clip_that_in_the_lobby_is_cut_from_the_footage(tmp_path):
+    ordered = _windows(tmp_path, ["kill", "calm"])  # gameplay 0-16s
+
+    # Inside gameplay: a window means it. In the lobby at 100s and 104s: one cut.
+    spans = highlights.unwindowed(ordered, [10.0, 100.0, 104.0])
+
+    lead, lag = highlights.ASK_SPAN
+    assert spans == [(100.0 - lead, 104.0 + lag)]
+
+
+def test_a_lobby_clip_that_is_kept_first_with_what_was_said(tmp_path, isolated_data, monkeypatch):
+    from pipeline_v2.capture import voice
+
+    session = _session(tmp_path, ["elimination", "no_event"])
+    (session / voice.CACHE_NAME).write_text(json.dumps(
+        {"_source": voice.SOURCE, "part-00001.mkv": [[48.0, 49.5, "Bro look at him, clip that"]]}),
+        encoding="utf-8")
+    cuts = []
+
+    def cut(run_dir, start, end, destination):
+        cuts.append((start, end))
+        destination.write_bytes(b"cut")
+        return start, end
+
+    monkeypatch.setattr(clips, "cut_span", cut)
+
+    manifest = _run(session)
+
+    first = manifest["highlights"][0]
+    assert first["asked"] and first["outcome"] == "not_described"
+    assert first["said"] == "Bro look at him, clip that"
+    assert cuts == [(49.5 - highlights.ASK_SPAN[0], 49.5 + highlights.ASK_SPAN[1])]
+    assert (session / "highlights" / first["clip"]).is_file()
+    assert len(manifest["highlights"]) == 3

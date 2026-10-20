@@ -423,8 +423,8 @@ ASK_LOOKBACK = 12.0
 
 def asked_for(ordered: list, times: list[float]) -> list:
     """The clip each "clip that" means: of the windows in the `ASK_LOOKBACK`
-    seconds up to it, the one ranked best. Commands outside gameplay (no
-    window there) mean nothing."""
+    seconds up to it, the one ranked best. Commands with no window there
+    (the lobby) are `unwindowed`'s."""
     found: list = []
     for at in times:
         for _, clip in ordered:
@@ -434,6 +434,28 @@ def asked_for(ordered: list, times: list[float]) -> list:
                     found.append(clip)
                 break
     return found
+
+
+# What is cut for "clip that" said where no window was described (the lobby,
+# a loading screen): the moment it means, its lead-in, and the words.
+ASK_SPAN = (ASK_LOOKBACK + HIGHLIGHT_LEAD, HIGHLIGHT_LAG)
+
+
+def unwindowed(ordered: list, times: list[float]) -> list[tuple[float, float]]:
+    """Spans to cut straight from the footage, one per "clip that" no window
+    covers. Lobby windows are never described (they are no gameplay), but a
+    lobby can still be the funny moment; asks close together are one span."""
+    spans: list[list[float]] = []
+    for at in sorted(times):
+        if any(span[0] < at and at - ASK_LOOKBACK < span[1]
+               for _, clip in ordered if (span := _span(clip)) is not None):
+            continue
+        start, end = at - ASK_SPAN[0], at + ASK_SPAN[1]
+        if spans and start < spans[-1][1]:
+            spans[-1][1] = end
+        else:
+            spans.append([start, end])
+    return [(start, end) for start, end in spans]
 
 
 def pick(ordered: list, top: int, pad: tuple[float, float] = (0.0, 0.0),
@@ -577,36 +599,58 @@ def run(
 
     from pipeline_v2.capture import voice as voice_mod
 
-    pinned = asked_for(ordered, voice_mod.clip_requests(voice_mod.heard(session))) if speech else []
-    chosen = [
-        (position, score, clip) for position, (score, clip) in enumerate(
-            pick(ordered, top, pad, extent if coverage else None, pinned), start=1)
-        if Path(clip.path).is_file()
-    ]
+    utterances = voice_mod.heard(session) if speech else []
+    asks = voice_mod.clip_requests(utterances)
+    pinned = asked_for(ordered, asks)
+    picked = [pair for pair in pick(ordered, top, pad, extent if coverage else None, pinned)
+              if Path(pair[1].path).is_file()]
+    # Asked for, then asked for where nothing was looked at, then the rest.
+    jobs = ([("window", score, clip) for score, clip in picked if clip in pinned]
+            + [("raw", 0.0, span) for span in unwindowed(ordered, asks)]
+            + [("window", score, clip) for score, clip in picked if clip not in pinned])
 
-    def export_one(job) -> None:
-        position, _, clip = job
-        source = Path(clip.path)
-        destination = out / f"{position:02d}-{source.name}"
-        if not (coverage and export(session, clip, destination, extent(clip))):
-            shutil.copy2(source, destination)
+    def name(position, job) -> str:
+        kind, _, item = job
+        if kind == "raw":
+            return f"{position:02d}-asked-{item[1]:.0f}s.mkv"
+        return f"{position:02d}-{Path(item.path).name}"
+
+    def export_one(numbered) -> bool:
+        position, job = numbered
+        kind, _, item = job
+        destination = out / name(position, job)
+        if kind == "raw":
+            return clips_mod.cut_span(session, *item, destination) is not None
+        if not (coverage and export(session, item, destination, extent(item))):
+            shutil.copy2(Path(item.path), destination)
+        return True
 
     # Side by side: each is a stream copy waiting on the disk, and one after
     # another they were 3.4s of the wait after a session.
     from concurrent.futures import ThreadPoolExecutor
 
+    numbered = list(enumerate(jobs, start=1))
     with ThreadPoolExecutor(EXPORT_WORKERS) as pool:
-        list(pool.map(export_one, chosen))
+        exported = list(pool.map(export_one, numbered))
 
     kept: list[Highlight] = []
-    for position, score, clip in chosen:
-        source = Path(clip.path)
-        payload = clip.payload or {}
+    for (position, (kind, score, item)), ok in zip(numbered, exported):
+        if not ok:
+            continue
+        if kind == "raw":
+            kept.append(Highlight(
+                rank=position, clip=name(position, (kind, score, item)), score=0.0,
+                summary="", outcome="not_described", trigger="clip_command",
+                said=voice_mod.said_between(utterances, *item), asked=True,
+            ))
+            continue
+        source = Path(item.path)
+        payload = item.payload or {}
         kept.append(Highlight(
             rank=position, clip=source.name, score=round(score, 4),
-            summary=clip.summary or "", outcome=str(payload.get("outcome")),
+            summary=item.summary or "", outcome=str(payload.get("outcome")),
             trigger=str(_sidecar(source).get("trigger_source", "")),
-            said=said.get(clip.clip_sha, ""), asked=clip in pinned,
+            said=said.get(item.clip_sha, ""), asked=item in pinned,
         ))
 
     manifest = {
@@ -654,6 +698,9 @@ def report(manifest: dict) -> None:
               "loading or spectating windows skipped")
     for h in manifest["highlights"]:
         asked = " (you said clip it)" if h.get("asked") else ""
+        if h.get("outcome") == "not_described":
+            print(f"  {h['rank']:2d}. (you said clip it, outside a match) \"{h['said'][:100]}\"")
+            continue
         print(f"  {h['rank']:2d}. [{h['outcome']}]{asked} {h['summary'][:100]}")
         if h.get("said"):
             print(f"      said: \"{h['said'][:100]}\"")
