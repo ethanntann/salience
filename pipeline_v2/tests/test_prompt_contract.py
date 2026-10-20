@@ -260,3 +260,16 @@ def test_v37_is_untouched_by_v38():
     built = prompt.build_prompt(window, schema.WORD_BANK_PROMPT_VERSION)
 
     assert "BabyRico.YT" not in built and "the player's kill-feed line" in built
+
+
+def test_v3_10_asks_for_what_was_said_in_the_summary_only_when_something_was():
+    """v3.9 put speech in 4 of 999 summaries: its rules keep to what is seen."""
+    said = ClipFacts(event_source="capture_window",
+                     notes=(f'{prompt.SAID_NOTE} during these frames: "this guy sucks"',))
+    silent = ClipFacts(event_source="capture_window",
+                       notes=("In the 8 seconds just before these frames: loots a chest.",))
+
+    for version in schema.REACTION_PROMPT_VERSIONS:
+        assert prompt.REACTION_RULE in prompt.build_prompt(said, version)
+        assert prompt.REACTION_RULE not in prompt.build_prompt(silent, version)
+    assert prompt.REACTION_RULE not in prompt.build_prompt(said, schema.SAID_PROMPT_VERSION)

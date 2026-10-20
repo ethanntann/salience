@@ -41,7 +41,7 @@ Without the tray: `python -m pipeline_v2.capture.record`, Ctrl+C when done. To t
 http://localhost:8777/ (**K** keep, **J** skip, **W** description is wrong):
 
 ```powershell
-python -m pipeline_v2 review --variant v3.9-said-window@deepseek-v4p1-flash --only <session folder>
+python -m pipeline_v2 review --variant v3.10-react-window@deepseek-v4p1-flash --only <session folder>
 python -m pipeline_v2.capture.highlights <session folder>   # re-rank with new ratings
 ```
 
@@ -121,7 +121,7 @@ Session 3 added a second out-of-sample test (trained on sessions 1+2):
 Session 2 alone was slightly worse in the top 15 (9 vs 11 of 16); session 3
 much better (13 vs 9 of 17).
 
-**v3.9 (shipped): what the frames cannot carry.** Each window's prompt also
+**v3.9: what the frames cannot carry.** Each window's prompt also
 gets what the player said on their mic during it and the description of the 8
 seconds before it. Four describers, same windows, the product's full ranking:
 
@@ -131,6 +131,18 @@ seconds before it. Four describers, same windows, the product's full ranking:
 | **v3.9: + speech + the window before** | **19** | **24** |
 | v3.8 + HUD facts (kill banners read off the screen, weapon at the kill) | 18 | 22 |
 | v3.9 + HUD facts | 19 | 24 |
+
+**v3.10 (shipped): what was said goes in the description.** v3.9's model
+mentioned the player's words in 4 of 999 summaries, since its rules say to
+describe only what is seen; v3.10 requires the summary to end with them. With
+session 4 rated, three test sessions, each trained on the ones before (speech
+re-transcribed with word timing for all three):
+
+| Sessions 2 + 3 + 4, 39 kept moments | top 10 | top 15 |
+|---|---|---|
+| v3.9 | 23 | 29 |
+| **v3.10: summary carries what was said** | **26** | **31** |
+| v3.10 without the window before | 23 | 30 |
 
 Reading the HUD found kills more reliably than the describer, but added
 nothing to the ranking and cost 8-10 minutes of CPU a session, so it is not

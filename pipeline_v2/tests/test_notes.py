@@ -59,3 +59,4 @@ def test_the_first_window_and_a_silent_one_get_no_notes(tmp_path):
     conn = store.connect()
 
     assert notes.window_notes(conn, _window(folder, 0, 0.0), "z", V) == ()
+

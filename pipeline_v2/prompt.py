@@ -127,7 +127,18 @@ Rules, in order of importance:
 """
 
 
-_ATTRIBUTION_FIELDS = """  "viewpoint": "own_gameplay | spectating | non_gameplay | unknown",
+# How a note about speech starts (`notes.window_notes`).
+SAID_NOTE = "Said on the player's own microphone"
+# What the player said is part of what happened, and the summary rules
+# ("describe only what you can see") otherwise keep it out.
+REACTION_RULE = """
+What the player said belongs in "summary": end it with their words, quoted or
+closely paraphrased, and what they were said about, e.g. "...is eliminated by a
+pump shotgun; the player says 'this guy sucks!'". Report the words as said;
+do not add an emotion or a reason the words do not show.
+"""
+
+_ATTRIBUTION_FIELDS ="""  "viewpoint": "own_gameplay | spectating | non_gameplay | unknown",
   "event_actor": "recording_player | spectated_player | other | unknown",
   "elimination_weapon_name": "<weapon used for the decisive hit, or unknown>",
   "weapon_evidence_frames": [<one-based frame numbers supporting decisive-hit attribution>],
@@ -363,6 +374,9 @@ def build_prompt(clip_facts: ClipFacts, version: str | None = None) -> str:
             if version in schema.NOTES_PROMPT_VERSIONS and clip_facts.notes:
                 built += "\nAlso known about these frames (reliable; use it):\n" + "".join(
                     f"- {note}\n" for note in clip_facts.notes)
+                if version in schema.REACTION_PROMPT_VERSIONS and any(
+                        note.startswith(SAID_NOTE) for note in clip_facts.notes):
+                    built += REACTION_RULE
         return built
 
     if clip_facts.event_source == "capture_window":

@@ -69,7 +69,15 @@ GAME_CONTEXT_PROMPT_VERSION = "v3.8-context"
 # what happened in the 8 seconds before. Beat v3.8 19 vs 17 of 33 kept
 # moments in the top 10; HUD banner facts added nothing on top.
 SAID_PROMPT_VERSION = "v3.9-said"
-NOTES_PROMPT_VERSIONS = (SAID_PROMPT_VERSION,)
+# v3.9 told what was said, and the model put it in 4 of 999 summaries: its
+# rules say to describe only what it can see. v3.10 requires the summary to
+# carry what the player said. Tested 2026-10-20 on sessions 2-4, each trained
+# on the sessions before it: v3.9 put 23 of 39 kept moments in the top 10,
+# v3.10 26. Without "the 8 seconds before" (only what was said) it was 23, so
+# that note stays.
+REACT_PROMPT_VERSION = "v3.10-react"
+REACTION_PROMPT_VERSIONS = (REACT_PROMPT_VERSION,)
+NOTES_PROMPT_VERSIONS = (SAID_PROMPT_VERSION, *REACTION_PROMPT_VERSIONS)
 
 # One registry for V2_ABLATE. config maps the variable to a version; prompt
 # branches on the version. Reading the environment in both places let the two
@@ -83,6 +91,7 @@ ABLATIONS = {
     "wordbank": WORD_BANK_PROMPT_VERSION,
     "context": GAME_CONTEXT_PROMPT_VERSION,
     "said": SAID_PROMPT_VERSION,
+    "react": REACT_PROMPT_VERSION,
 }
 
 
@@ -90,7 +99,7 @@ def mechanics_for(prompt_version: str) -> tuple[str, ...]:
     """The tag vocabulary a description at this version could legally contain."""
     if prompt_version == ATTRIBUTION_PROMPT_VERSION:
         return ATTRIBUTION_MECHANICS
-    if prompt_version.startswith((WORD_BANK_PROMPT_VERSION, GAME_CONTEXT_PROMPT_VERSION, "v3.9")):
+    if prompt_version.startswith((WORD_BANK_PROMPT_VERSION, GAME_CONTEXT_PROMPT_VERSION, "v3.9", "v3.10")):
         from pipeline_v2.games import fortnite
 
         return MECHANICS + fortnite.MECHANICS
