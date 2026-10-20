@@ -410,3 +410,33 @@ def test_a_win_right_after_a_long_fight_joins_it(tmp_path):
 
     assert span == (-8.0, 40.0 + 2.0)  # through the banner window, past the cap
     assert span[1] - span[0] > highlights.MAX_HIGHLIGHT
+
+
+def test_clip_that_means_the_best_window_just_before_it(tmp_path):
+    ordered = _windows(tmp_path, ["calm", "kill", "calm", "calm", "calm"])
+    ordered = [ordered[1], ordered[0], *ordered[2:]]  # the kill ranks first
+    kill = ordered[0][1]
+
+    # Said at 22s, in the window after the kill (8-16s): the kill is meant.
+    assert highlights.asked_for(ordered, [22.0]) == [kill]
+    # Nothing recorded there (lobby): nothing is meant.
+    assert highlights.asked_for(ordered, [500.0]) == []
+
+
+def test_a_clip_asked_for_is_kept_even_below_the_top(tmp_path):
+    ordered = _windows(tmp_path, ["kill", "calm", "calm", "kill", "calm", "calm", "calm"])
+    asked = ordered[6][1]
+
+    picked = [c for _, c in highlights.pick(ordered, 1, pinned=[asked])]
+
+    assert picked == [asked]
+    picked = [c for _, c in highlights.pick(ordered, 2, pinned=[asked])]
+    assert picked == [asked, ordered[0][1]]
+
+
+def test_asking_twice_for_one_moment_keeps_it_once(tmp_path):
+    ordered = _windows(tmp_path, ["kill", "calm", "calm", "calm"])
+
+    picked = highlights.pick(ordered, 2, pinned=highlights.asked_for(ordered, [4.0, 6.0]))
+
+    assert [c for _, c in picked].count(ordered[0][1]) == 1

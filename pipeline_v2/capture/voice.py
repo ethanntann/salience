@@ -12,6 +12,10 @@ was laughing gets speech weighed in, and someone playing in silence, or whose
 talk is only callouts, gets the ranking they had before. A fixed list of "funny" phrases was the alternative, and
 `speech.py` records why a fixed vocabulary measured badly.
 
+One phrase is the exception, because it is a request, not a guess at what
+is funny: "clip it" / "clip that" (`clip_requests`) keeps the moment just
+before it as a highlight, whatever the ranking thought of it.
+
 Local (faster-whisper on the CPU), cached per raw segment in
 `mic_transcript.json`, so a re-run and a pruned session both keep what was
 heard. `live` transcribes between matches, when the CPU is the game's least;
@@ -21,6 +25,7 @@ the session's end does the rest.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -134,6 +139,25 @@ def transcribe_session(
         for heard in cache.values()
         for start, end, text in heard
     )
+
+
+def heard(session: Path) -> list[Utterance]:
+    """What is already transcribed, without transcribing anything."""
+    return sorted(
+        Utterance(start, end, text)
+        for heard in _read_cache(session / CACHE_NAME).values()
+        for start, end, text in heard
+    )
+
+
+# The player asking for the moment just gone: "clip it", "clip that!",
+# "clip this". Whisper may punctuate between the words ("Clip, that.").
+CLIP_COMMAND = re.compile(r"\bclip(?:ped)?[\s,.!?-]+(?:it|that|this)\b", re.IGNORECASE)
+
+
+def clip_requests(utterances: list[Utterance]) -> list[float]:
+    """When the player said "clip that": the end of each utterance asking."""
+    return [u.end for u in utterances if CLIP_COMMAND.search(u.text)]
 
 
 def said_between(utterances: list[Utterance], start: float, end: float) -> str:

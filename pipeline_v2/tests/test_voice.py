@@ -6,6 +6,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from pipeline_v2 import cache, store
 from pipeline_v2.capture import voice
 
@@ -148,3 +150,15 @@ def test_speech_minutes_apart_is_two_utterances_not_one_long_one():
              W(start=1034.4, end=1035.4, word=" walking"), W(start=1035.4, end=1036.6, word=" on.")]
 
     assert utterances(words) == [(922.2, 923.4, "But it's"), (1034.4, 1036.6, "walking on.")]
+
+
+@pytest.mark.parametrize("text", ["Clip it!", "clip that", "Oh my god, clip that.",
+                                  "CLIP THIS", "Clip, that.", "clipped it"])
+def test_asking_for_a_clip_is_heard(text):
+    assert voice.clip_requests([voice.Utterance(10.0, 11.5, text)]) == [11.5]
+
+
+@pytest.mark.parametrize("text", ["he clipped through the wall", "a clip of ammo",
+                                  "clipping the edge", "eclipse it"])
+def test_other_talk_about_clips_is_not_asking(text):
+    assert voice.clip_requests([voice.Utterance(10.0, 11.5, text)]) == []

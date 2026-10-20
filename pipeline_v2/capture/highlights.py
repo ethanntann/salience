@@ -90,6 +90,7 @@ class Highlight:
     outcome: str
     trigger: str
     said: str = ""
+    asked: bool = False  # the player said "clip that" for it
 
 
 def describe(clip_dir: Path, max_calls: int) -> None:
@@ -415,9 +416,32 @@ def window_index(ordered: list) -> dict:
     return index
 
 
+# How long before "clip that" the moment it means can have been: it is said
+# after the kill, often after a breath or a few seconds of looting.
+ASK_LOOKBACK = 12.0
+
+
+def asked_for(ordered: list, times: list[float]) -> list:
+    """The clip each "clip that" means: of the windows in the `ASK_LOOKBACK`
+    seconds up to it, the one ranked best. Commands outside gameplay (no
+    window there) mean nothing."""
+    found: list = []
+    for at in times:
+        for _, clip in ordered:
+            span = _span(clip)
+            if span is not None and span[0] < at and at - ASK_LOOKBACK < span[1]:
+                if clip not in found:
+                    found.append(clip)
+                break
+    return found
+
+
 def pick(ordered: list, top: int, pad: tuple[float, float] = (0.0, 0.0),
-         extent=None) -> list:
+         extent=None, pinned: list = ()) -> list:
     """The best `top` clips, never two whose exported spans overlap.
+
+    `pinned` clips (the player asked for them) come first and are never
+    dropped for `top`; a reel asked for twelve times holds twelve.
 
     `pad` is the lead and lag an export adds. The second-best window is usually
     the same fight 8 seconds later; padded, the two exports would overlap, and
@@ -426,8 +450,11 @@ def pick(ordered: list, top: int, pad: tuple[float, float] = (0.0, 0.0),
     """
     chosen: list = []
     taken: list[tuple[float, float]] = []
-    for score, clip in ordered:
-        if len(chosen) >= top:
+    first = [(score, clip) for score, clip in ordered if clip in pinned]
+    first.sort(key=lambda pair: pinned.index(pair[1]))
+    rest = [(score, clip) for score, clip in ordered if clip not in pinned]
+    for score, clip in first + rest:
+        if len(chosen) >= max(top, len(first)) and clip not in pinned:
             break
         if extent is not None:
             span = extent(clip)
@@ -548,9 +575,12 @@ def run(
     def extent(clip):
         return fight_extent(clip, index, pad) if coverage else None
 
+    from pipeline_v2.capture import voice as voice_mod
+
+    pinned = asked_for(ordered, voice_mod.clip_requests(voice_mod.heard(session))) if speech else []
     chosen = [
         (position, score, clip) for position, (score, clip) in enumerate(
-            pick(ordered, top, pad, extent if coverage else None), start=1)
+            pick(ordered, top, pad, extent if coverage else None, pinned), start=1)
         if Path(clip.path).is_file()
     ]
 
@@ -576,7 +606,7 @@ def run(
             rank=position, clip=source.name, score=round(score, 4),
             summary=clip.summary or "", outcome=str(payload.get("outcome")),
             trigger=str(_sidecar(source).get("trigger_source", "")),
-            said=said.get(clip.clip_sha, ""),
+            said=said.get(clip.clip_sha, ""), asked=clip in pinned,
         ))
 
     manifest = {
@@ -623,7 +653,8 @@ def report(manifest: dict) -> None:
         print(f"  gameplay from the Fortnite log: {played['excluded_windows']} lobby, "
               "loading or spectating windows skipped")
     for h in manifest["highlights"]:
-        print(f"  {h['rank']:2d}. [{h['outcome']}] {h['summary'][:100]}")
+        asked = " (you said clip it)" if h.get("asked") else ""
+        print(f"  {h['rank']:2d}. [{h['outcome']}]{asked} {h['summary'][:100]}")
         if h.get("said"):
             print(f"      said: \"{h['said'][:100]}\"")
     if manifest.get("pruned_raw"):
