@@ -135,3 +135,16 @@ def test_attach_stores_speech_per_clip(tmp_path, isolated_data):
     assert store.transcripts(conn) == {cache.clip_sha(loud): "let's go"}
     conn.close()
     assert changed == 1  # an empty transcript is recorded but changes nothing
+
+
+def test_speech_minutes_apart_is_two_utterances_not_one_long_one():
+    """Whisper returned "But it's ... walking retard though" as one segment
+    from 922s to 1036s, which put it in every window of those two minutes."""
+    from types import SimpleNamespace as W
+
+    from pipeline_v2.audio import utterances
+
+    words = [W(start=922.2, end=922.8, word=" But"), W(start=922.8, end=923.4, word=" it's"),
+             W(start=1034.4, end=1035.4, word=" walking"), W(start=1035.4, end=1036.6, word=" on.")]
+
+    assert utterances(words) == [(922.2, 923.4, "But it's"), (1034.4, 1036.6, "walking on.")]

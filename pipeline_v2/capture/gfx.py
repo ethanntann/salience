@@ -137,14 +137,14 @@ class GfxRecorder:
 
         stats = audio_pump.AudioStats()
         pipes = []
-        for name, device in (("game", audio_pump.loopback_device()),
-                             ("mic", audio_pump.microphone_device(self.mic_hint))):
-            if device is None:
-                stats.tracks.append(audio_pump.TrackStats(name=name, error="no such device"))
-                continue
+        # Both tracks always exist, so the mic is always the second: one with
+        # no device yet records silence until one is plugged in.
+        for name, choose in (("game", audio_pump.loopback_device),
+                             ("mic", lambda: audio_pump.microphone_device(self.mic_hint))):
             sink = audio_pump.NamedPipeSink(audio_pump.pipe_name(name)).open()
             self._sinks.append(sink)
-            pump = audio_pump.TrackPump(name, device, sink, timeline=self.progress.timeline)
+            pump = audio_pump.TrackPump(name, choose(), sink, timeline=self.progress.timeline,
+                                        choose=choose)
             self._pumps.append(pump)
             stats.tracks.append(pump.stats)
             pipes.append(sink.name)

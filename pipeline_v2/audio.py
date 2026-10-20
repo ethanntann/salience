@@ -127,6 +127,14 @@ class Transcriber:
         `voice` has already evened out: at the default, a mic recorded around
         -40dB lost almost every callout (3 utterances in a 51-minute session;
         "Why are you hiding in the building bro?" came out "the building bro").
+
+        Utterances are cut from word times, not taken as Whisper's segments.
+        The voice detector splices the speech together before Whisper hears
+        it, and a segment straddling a splice is mapped back as one span over
+        everything between: in session 4 (2026-10-19) "But it's" (922s) and
+        "walking retard though" (1034s) came back as one 114-second line, said
+        over every window in that stretch. A pause of `WORD_GAP` starts a new
+        utterance.
         """
         segments, _ = self._model.transcribe(
             str(wav),
@@ -135,12 +143,34 @@ class Transcriber:
             vad_parameters={"threshold": VAD_THRESHOLD},
             beam_size=1,
             condition_on_previous_text=False,
+            word_timestamps=True,
         )
-        return [
-            (float(s.start), float(s.end), s.text.strip())
-            for s in segments
-            if s.text.strip() and s.no_speech_prob < 0.6
-        ]
+        heard = []
+        for segment in segments:
+            if not segment.text.strip() or segment.no_speech_prob >= 0.6:
+                continue
+            words = [w for w in segment.words or [] if w.word.strip()]
+            if not words:
+                heard.append((float(segment.start), float(segment.end), segment.text.strip()))
+                continue
+            heard.extend(utterances(words))
+        return heard
+
+
+# Seconds of silence between two words that make them separate utterances.
+WORD_GAP = 1.0
+
+
+def utterances(words) -> list[tuple[float, float, str]]:
+    """Whisper's words, as (start, end, text) runs split at `WORD_GAP` pauses."""
+    runs = [[words[0]]]
+    for word in words[1:]:
+        if word.start - runs[-1][-1].end > WORD_GAP:
+            runs.append([word])
+        else:
+            runs[-1].append(word)
+    return [(float(run[0].start), float(run[-1].end), "".join(w.word for w in run).strip())
+            for run in runs]
 
 
 def analyse(

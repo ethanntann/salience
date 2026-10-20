@@ -87,12 +87,97 @@ def test_silence_is_reported_rather_than_treated_as_an_error():
     assert stats.error is None
 
 
-def test_a_missing_device_is_recorded_not_raised():
-    stats = audio_pump.AudioStats(
-        tracks=[audio_pump.TrackStats(name="mic", error="no such device")]
-    )
+class FakeDevice:
+    """Records blocks filled with `level`; `fail` makes recording raise."""
 
-    assert stats.summary()["mic"]["error"] == "no such device"
+    def __init__(self, id, level=0.5, fail=False):
+        self.id, self.level, self.fail = id, level, fail
+
+    def recorder(self, **kwargs):
+        device = self
+
+        class Recorder:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return None
+
+            def record(self, numframes):
+                import numpy as np
+
+                if device.fail:
+                    raise RuntimeError("device invalidated")
+                return np.full((numframes, audio_pump.CHANNELS), device.level, np.float32)
+
+        return Recorder()
+
+
+class Sink:
+    def __init__(self, pump_ref, limit):
+        self.blocks, self.pump_ref, self.limit = [], pump_ref, limit
+
+    def write(self, data):
+        import numpy as np
+
+        self.blocks.append(float(np.frombuffer(data, np.float32)[0]))
+        if len(self.blocks) >= self.limit:
+            self.pump_ref[0].signal_stop()
+
+
+def run_pump(device, choose, limit):
+    ref = []
+    sink = Sink(ref, limit)
+    clock = iter(range(10**6))  # every look at the clock is a second later
+    pump = audio_pump.TrackPump("mic", device, sink, choose=choose, clock=lambda: next(clock))
+    ref.append(pump)
+    pump._loop()
+    return pump, sink.blocks
+
+
+def test_a_mic_plugged_in_mid_session_is_recorded_from_then_on():
+    """Session 4 started before the mic was plugged in and recorded the old
+    default for all 38 minutes."""
+    laptop, headset = FakeDevice("laptop", 0.1), FakeDevice("headset", 0.9)
+    plugged = []
+
+    def choose():
+        plugged.append(1)
+        return headset if len(plugged) > 1 else laptop
+
+    pump, blocks = run_pump(laptop, choose, limit=6)
+
+    assert blocks[0] == pytest.approx(0.1)
+    assert blocks[-1] == pytest.approx(0.9)
+    assert pump.stats.switches == 1
+
+
+def test_no_mic_at_the_start_is_silence_until_one_appears():
+    headset = FakeDevice("headset", 0.9)
+    asked = []
+
+    def choose():
+        asked.append(1)
+        return headset if len(asked) > 2 else None
+
+    pump, blocks = run_pump(None, choose, limit=12)
+
+    assert blocks[0] == 0.0
+    assert blocks[-1] == pytest.approx(0.9)
+
+
+def test_an_unplugged_mic_leaves_silence_not_an_ended_track():
+    pump, blocks = run_pump(FakeDevice("headset", fail=True), lambda: None, limit=3)
+
+    assert pump.stats.error is None
+    assert blocks == [0.0, 0.0, 0.0]
+
+
+def test_without_choosing_a_failing_device_ends_the_track_with_the_error():
+    pump, blocks = run_pump(FakeDevice("headset", fail=True), None, limit=3)
+
+    assert "device invalidated" in pump.stats.error
+    assert blocks == []
 
 
 def test_signal_stop_does_not_wait():

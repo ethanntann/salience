@@ -32,7 +32,7 @@ CACHE_NAME = "mic_transcript.json"
 # `wgc` maps the game loopback first and the microphone second.
 MIC_TRACK = 1
 # Part of the cache: a transcript made another way is redone, not trusted.
-SOURCE = "mic/faster-whisper-small/norm-vad0.3"
+SOURCE = "mic/faster-whisper-small/norm-vad0.3-words"
 # Evens out a quiet mic before Whisper's voice detector sees it. Per-moment
 # gain, so timing is untouched and a shout is not made louder than it was.
 LOUDNESS = "dynaudnorm=f=150:g=15"

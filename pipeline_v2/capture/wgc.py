@@ -200,17 +200,17 @@ class WgcRecorder:
         devices = self._audio_devices
         stats = audio_pump.AudioStats()
         pipes = []
+        choosers = {"game": audio_pump.loopback_device,
+                    "mic": lambda: audio_pump.microphone_device(self.mic_hint)}
+        # Both tracks always exist, so the mic is always the second: one with
+        # no device yet records silence until one is plugged in.
         for name, device in devices:
-            if device is None:
-                stats.tracks.append(
-                    audio_pump.TrackStats(name=name, error="no such device")
-                )
-                continue
             sink = audio_pump.NamedPipeSink(audio_pump.pipe_name(name)).open()
             self._sinks.append(sink)
             # Held to the video's own timeline: frames written / fps.
             pump = audio_pump.TrackPump(
-                name, device, sink, timeline=lambda: self.stats.written / self.fps)
+                name, device, sink, timeline=lambda: self.stats.written / self.fps,
+                choose=choosers[name])
             self._pumps.append(pump)
             stats.tracks.append(pump.stats)
             pipes.append(sink.name)

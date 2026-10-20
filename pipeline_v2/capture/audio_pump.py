@@ -22,6 +22,7 @@ it rather than backing up into the capture threads.
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -35,6 +36,11 @@ BLOCK_FRAMES = 1024
 # How far a track may drift from the video before it is corrected. Under the
 # ~45ms at which a late sound starts to look wrong, over one block of jitter.
 SYNC_TOLERANCE = int(0.04 * SAMPLE_RATE)
+# How often a track asks Windows which device it should be recording. A device
+# opened once at the start stays the one recorded: session 4 (2026-10-19) began
+# before the player plugged in their mic, and its whole mic track came from the
+# device that was the default before it.
+FOLLOW_SECONDS = 2.0
 
 
 @dataclass
@@ -52,6 +58,9 @@ class TrackStats:
     # game is silent), samples dropped where it ran ahead.
     padded_samples: int = 0
     trimmed_samples: int = 0
+    # Times the track moved to another device (plugged in, unplugged, or the
+    # Windows default changed).
+    switches: int = 0
     error: str | None = None
     # Loudness of the most recent block, so a detector can read the level while
     # the session is still running. The block maximum is already computed to
@@ -82,6 +91,7 @@ class AudioStats:
                 "discontinuities": t.discontinuities,
                 "padded_seconds": round(t.padded_samples / SAMPLE_RATE, 3),
                 "trimmed_seconds": round(t.trimmed_samples / SAMPLE_RATE, 3),
+                "switches": t.switches,
                 "error": t.error,
             }
             for t in self.tracks
@@ -96,10 +106,8 @@ def loopback_device(speaker_name: str | None = None):
     """The WASAPI loopback matching an output device, or None.
 
     Loopback follows the *speaker*, so a user switching from headphones to
-    desktop speakers mid-session changes which device carries game audio.
-    Resolving it by the current default at start time is correct for a session;
-    it is not a substitute for handling a device change mid-run, which the
-    recorder does not yet do.
+    desktop speakers mid-session changes which device carries game audio;
+    `TrackPump` asks again every `FOLLOW_SECONDS`.
     """
     import soundcard as sc
 
@@ -198,21 +206,108 @@ def correction(written: int, block: int, target: int,
     return 0, 0
 
 
+class _SilentRecorder:
+    def __init__(self, channels: int) -> None:
+        self.channels = channels
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc) -> None:
+        return None
+
+    def record(self, numframes: int):
+        import numpy as np
+
+        time.sleep(numframes / SAMPLE_RATE)
+        return np.zeros((numframes, self.channels), np.float32)
+
+
+class Silence:
+    """Stands in while there is no device: zeros at the pace of real audio.
+
+    The track has to keep flowing, not pause: FFmpeg interleaves its inputs,
+    so a pipe that went quiet would hold the video back with it.
+    """
+
+    id = None
+    name = "no device"
+
+    def recorder(self, samplerate=SAMPLE_RATE, channels=CHANNELS, blocksize=None):
+        return _SilentRecorder(channels)
+
+
+SILENCE = Silence()
+
+
+def _same(a, b) -> bool:
+    return getattr(a, "id", a) == getattr(b, "id", b)
+
+
 class TrackPump:
     """Reads one device and writes raw float32 PCM to a pipe.
 
     With `timeline` (seconds of video written so far), the track is held to
     the video's length: see `correction`.
+
+    With `choose` (the device this track should be recording now), the device
+    is chosen again every `FOLLOW_SECONDS` and whenever it fails, so a mic
+    plugged in mid-session is recorded from then on and one unplugged leaves
+    silence rather than ending the track. The gap a switch leaves is padded by
+    `correction` like any other.
     """
 
-    def __init__(self, name: str, device, sink, timeline=None) -> None:
+    def __init__(self, name: str, device, sink, timeline=None, choose=None,
+                 clock=time.monotonic) -> None:
         self.stats = TrackStats(name=name)
         self._device = device
         self._sink = sink
         self._timeline = timeline
+        self._choose = choose
+        self._clock = clock
         self._written = 0
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+
+    def _chosen(self):
+        try:
+            return self._choose() or SILENCE
+        except Exception:  # noqa: BLE001 - asking must never end the track
+            return SILENCE
+
+    def _push(self, block, np) -> bool:
+        """Correct and write one block; False once the sink is gone."""
+        self.stats.blocks += 1
+        # Silence is diagnostic, not an error: a muted game or an
+        # unplugged mic produces a valid but useless track, and the
+        # report should be able to say which.
+        loudest = float(np.abs(block).max())
+        self.stats.latest_db = to_db(loudest)
+        if loudest < 1e-5:
+            self.stats.silent_blocks += 1
+        # None: no video yet to hold to. FFmpeg that captures
+        # its own video (`gfx`) counts no frames until audio
+        # flows, so holding audio back then would wait forever;
+        # the startup excess is cut once frames are counted.
+        target = self._timeline() if self._timeline is not None else None
+        if target is not None:
+            pad, cut = correction(self._written, len(block), int(target * SAMPLE_RATE))
+            if pad:
+                block = np.concatenate(
+                    [np.zeros((pad, block.shape[1]), np.float32), block])
+                self.stats.padded_samples += pad
+            if cut:
+                block = block[cut:]
+                self.stats.trimmed_samples += cut
+            if not len(block):
+                return True
+        self._written += len(block)
+        try:
+            self._sink.write(np.ascontiguousarray(block, dtype=np.float32).tobytes())
+        except (BrokenPipeError, OSError, ValueError) as exc:
+            self.stats.error = f"sink closed: {exc}"
+            return False
+        return True
 
     def _loop(self) -> None:
         import warnings
@@ -229,51 +324,42 @@ class TrackPump:
             connect = getattr(self._sink, "connect", None)
             if connect is not None:
                 connect()
-            with self._device.recorder(
-                samplerate=SAMPLE_RATE, channels=CHANNELS, blocksize=BLOCK_FRAMES
-            ) as recorder:
-                while not self._stop.is_set():
-                    with warnings.catch_warnings(record=True) as caught:
-                        block = recorder.record(numframes=BLOCK_FRAMES)
-                    if any("discontinuity" in str(w.message) for w in caught):
-                        self.stats.discontinuities += 1
-                    if block is None or not len(block):
-                        continue
-                    self.stats.blocks += 1
-                    # Silence is diagnostic, not an error: a muted game or an
-                    # unplugged mic produces a valid but useless track, and the
-                    # report should be able to say which.
-                    loudest = float(np.abs(block).max())
-                    self.stats.latest_db = to_db(loudest)
-                    if loudest < 1e-5:
-                        self.stats.silent_blocks += 1
-                    # None: no video yet to hold to. FFmpeg that captures
-                    # its own video (`gfx`) counts no frames until audio
-                    # flows, so holding audio back then would wait forever;
-                    # the startup excess is cut once frames are counted.
-                    target = self._timeline() if self._timeline is not None else None
-                    if target is not None:
-                        pad, cut = correction(self._written, len(block),
-                                              int(target * SAMPLE_RATE))
-                        if pad:
-                            block = np.concatenate(
-                                [np.zeros((pad, block.shape[1]), np.float32), block])
-                            self.stats.padded_samples += pad
-                        if cut:
-                            block = block[cut:]
-                            self.stats.trimmed_samples += cut
-                        if not len(block):
-                            continue
-                    self._written += len(block)
-                    try:
-                        self._sink.write(
-                            np.ascontiguousarray(block, dtype=np.float32).tobytes()
-                        )
-                    except (BrokenPipeError, OSError, ValueError) as exc:
-                        self.stats.error = f"sink closed: {exc}"
-                        return
         except Exception as exc:  # noqa: BLE001 - a device fault must not kill capture
             self.stats.error = f"{type(exc).__name__}: {exc}"
+            return
+        device = self._device or SILENCE
+        while not self._stop.is_set():
+            switch = None
+            try:
+                with device.recorder(
+                    samplerate=SAMPLE_RATE, channels=CHANNELS, blocksize=BLOCK_FRAMES
+                ) as recorder:
+                    check = self._clock() + FOLLOW_SECONDS
+                    while not self._stop.is_set():
+                        with warnings.catch_warnings(record=True) as caught:
+                            block = recorder.record(numframes=BLOCK_FRAMES)
+                        if any("discontinuity" in str(w.message) for w in caught):
+                            self.stats.discontinuities += 1
+                        if block is not None and len(block) and not self._push(block, np):
+                            return
+                        if self._choose is not None and self._clock() >= check:
+                            check = self._clock() + FOLLOW_SECONDS
+                            found = self._chosen()
+                            if not _same(found, device):
+                                switch = found
+                                break
+            except Exception as exc:  # noqa: BLE001 - a device fault must not kill capture
+                if self._choose is None:
+                    self.stats.error = f"{type(exc).__name__}: {exc}"
+                    return
+                # Unplugged mid-read: whatever is there now, or silence.
+                self._stop.wait(0.2)
+                switch = self._chosen()
+                if _same(switch, device):
+                    switch = SILENCE  # still listed but failing; ask again later
+            if switch is not None:
+                device = switch
+                self.stats.switches += 1
 
     def start(self) -> "TrackPump":
         self._thread = threading.Thread(
