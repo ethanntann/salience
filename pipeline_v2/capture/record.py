@@ -129,6 +129,7 @@ class Session:
         from pipeline_v2.capture import clips
         from pipeline_v2.capture.input_activity import ActivitySampler
         from pipeline_v2.capture.marks import MarkRecorder
+        from pipeline_v2.capture.mouse import JOURNAL_NAME as MOUSE_JOURNAL, MouseMotion
         from pipeline_v2.capture.triggers import TriggerBus, detectors_for
         from pipeline_v2.capture import gfx
         from pipeline_v2.capture.wgc import WgcRecorder
@@ -144,6 +145,9 @@ class Session:
         self.rec.start()
         self.marker = MarkRecorder(journal=session / "marks.tsv").start()
         self.activity = ActivitySampler(journal=session / "input.tsv").start()
+        # On the input log's clock, so the two line up window for window.
+        self.mouse = MouseMotion(journal=session / MOUSE_JOURNAL,
+                                 started=self.activity.started).start()
         print(f"recording -> {session}")
         print(f"  target: {'game window' if self.hwnd else 'monitor 1'} @ {args.fps}fps {args.bitrate}")
         print(f"  audio : {'game + mic' if args.audio else 'OFF'}")
@@ -220,6 +224,9 @@ class Session:
             print(f"  live  : {self.live.stop()} window(s) described during play"
                   + (f" (last error: {self.live.error})" if self.live.error else ""))
         self.activity.stop()
+        self.mouse.stop()
+        if self.mouse.error:
+            print(f"  mouse : {self.mouse.error}")
         marks = self.marker.stop()
         self.marker.save(self.path / "marks.json")
         keeps = sum(1 for m in marks if m.kind == "keep")
