@@ -17,6 +17,7 @@ from pipeline_v2 import store
 from pipeline_v2.capture import clips, highlights
 
 VARIANT = "v3.6-ownkills-window@minimax-m3"
+_MAKE_REEL = highlights.make_reel  # before the fixture stubs it
 
 
 @pytest.fixture(autouse=True)
@@ -26,6 +27,8 @@ def _deaf(monkeypatch):
     # Nor the developer's real Fortnite log; gating has its own tests.
     monkeypatch.setattr(highlights, "find_gameplay", lambda session: {"spans": None})
     monkeypatch.setattr(highlights, "unembedded", lambda clip_dir: 0)
+    # Nor NVENC; reels have their own test.
+    monkeypatch.setattr(highlights, "make_reel", lambda source, destination: False)
 
 
 def _session(tmp_path: Path, outcomes: list[str]) -> Path:
@@ -476,3 +479,39 @@ def test_a_lobby_clip_that_is_kept_first_with_what_was_said(tmp_path, isolated_d
     assert cuts == [(49.5 - highlights.ASK_SPAN[0], 49.5 + highlights.ASK_SPAN[1])]
     assert (session / "highlights" / first["clip"]).is_file()
     assert len(manifest["highlights"]) == 3
+
+
+def test_a_reel_is_cropped_to_9_16_with_both_tracks_mixed(tmp_path):
+    calls = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        if command[0] == "ffprobe":
+            return SimpleNamespace(returncode=0, stdout="1 2")
+        Path(command[-1]).write_bytes(b"reel")
+        return SimpleNamespace(returncode=0)
+
+    reel = tmp_path / "reels" / "01-x.mp4"
+    assert _MAKE_REEL(tmp_path / "01-x.mkv", reel, runner=runner)
+
+    graph = calls[1][calls[1].index("-filter_complex") + 1]
+    assert "crop=trunc(ih*1080/1920/2)*2:ih" in graph and "scale=1080:1920" in graph
+    assert "[0:a:0][0:a:1]amix=inputs=2" in graph
+    assert reel.is_file()
+
+
+def test_every_kept_highlight_gets_a_reel_after_the_folder_is_made(tmp_path, isolated_data):
+    session = _session(tmp_path, ["elimination", "knock"])
+    manifest = _run(session)
+    made = []
+
+    def reel(source, destination):
+        made.append(source.name)
+        return source.name.startswith("01-")  # the second one fails
+
+    assert highlights.reels(session, reel_fn=reel) == 1
+
+    stored = json.loads((session / "highlights" / "highlights.json").read_text(encoding="utf-8"))
+    assert sorted(made) == sorted(h["file"] for h in manifest["highlights"])
+    assert [bool(h["reel"]) for h in stored["highlights"]] == [True, False]
+    assert stored["highlights"][0]["reel"].endswith(".mp4")

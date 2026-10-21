@@ -34,7 +34,9 @@ to re-cut with a different window or re-run a control.
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
+import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -68,6 +70,67 @@ HIGHLIGHT_LEAD = 8.0
 HIGHLIGHT_LAG = 2.0
 EXPORT_WORKERS = 5
 
+# Every highlight is also made as a 9:16 reel for TikTok, Shorts and Reels: a
+# centre crop, because the crosshair (and so the action) sits at the centre,
+# scaled to 1080x1920, with the game and mic tracks mixed into the one track
+# a phone plays. NVENC, so 4.6s for a 42s highlight.
+REEL_DIR = "reels"
+REEL_SIZE = (1080, 1920)
+
+
+def make_reel(source: Path, destination: Path, runner=subprocess.run) -> bool:
+    """A 9:16 copy of one exported highlight. False if it could not be made."""
+    probe = runner(["ffprobe", "-v", "error", "-select_streams", "a",
+                    "-show_entries", "stream=index", "-of", "csv=p=0", str(source)],
+                   capture_output=True, text=True)
+    tracks = len((probe.stdout or "").split()) if probe.returncode == 0 else 0
+    width, height = REEL_SIZE
+    video = (f"[0:v]crop=trunc(ih*{width}/{height}/2)*2:ih,"
+             f"scale={width}:{height}:flags=lanczos,setsar=1[v]")
+    if tracks > 1:
+        inputs = "".join(f"[0:a:{i}]" for i in range(tracks))
+        graph, audio = f"{video};{inputs}amix=inputs={tracks}:normalize=0[a]", ["-map", "[a]"]
+    else:
+        graph, audio = video, (["-map", "0:a:0"] if tracks else [])
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    done = runner(["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", str(source),
+                   "-filter_complex", graph, "-map", "[v]", *audio,
+                   "-c:v", "h264_nvenc", "-preset", "p1", "-b:v", "12M",
+                   "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+                   str(destination)], capture_output=True)
+    return done.returncode == 0 and destination.is_file()
+
+
+def reels(session: Path, reel_fn=None) -> int:
+    """A 9:16 reel of every highlight `run` kept; how many were made.
+
+    Its own step, run after the highlights folder has opened: 10 reels take
+    11s on the GPU encoder (its own limit, measured: parallel or not, GPU
+    crop or CPU), which the player should not wait on to see their clips.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from pipeline_v2.jsonio import write_json
+
+    out = session / "highlights"
+    try:
+        manifest = json.loads((out / "highlights.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return 0
+    kept = [h for h in manifest.get("highlights", []) if (out / h.get("file", "")).is_file()
+            and h.get("file")]
+
+    def one(highlight) -> str:
+        reel = Path(highlight["file"]).with_suffix(".mp4").name
+        made = (reel_fn or make_reel)(out / highlight["file"], out / REEL_DIR / reel)
+        return reel if made else ""
+
+    with ThreadPoolExecutor(EXPORT_WORKERS) as pool:
+        for highlight, reel in zip(kept, pool.map(one, kept)):
+            highlight["reel"] = reel
+    write_json(out / "highlights.json", manifest)
+    return sum(1 for h in kept if h["reel"])
+
 
 def _sidecar(clip_path) -> dict:
     """The trigger that produced a clip. Not in the store: `index` keeps only the
@@ -91,6 +154,8 @@ class Highlight:
     trigger: str
     said: str = ""
     asked: bool = False  # the player said "clip that" for it
+    file: str = ""  # its name in highlights/
+    reel: str = ""  # its 9:16 copy in reels/, once `reels` has made it
 
 
 def describe(clip_dir: Path, max_calls: int) -> None:
@@ -640,6 +705,7 @@ def run(
         if kind == "raw":
             kept.append(Highlight(
                 rank=position, clip=name(position, (kind, score, item)), score=0.0,
+                file=name(position, (kind, score, item)),
                 summary="", outcome="not_described", trigger="clip_command",
                 said=voice_mod.said_between(utterances, *item), asked=True,
             ))
@@ -651,6 +717,7 @@ def run(
             summary=item.summary or "", outcome=str(payload.get("outcome")),
             trigger=str(_sidecar(source).get("trigger_source", "")),
             said=said.get(item.clip_sha, ""), asked=item in pinned,
+            file=name(position, (kind, score, item)),
         ))
 
     manifest = {
@@ -720,6 +787,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     report(run(args.session, top=args.top, prune_raw=args.prune_raw))
+    print(f"  reels : {reels(args.session)} made, 9:16, in {args.session / 'highlights' / REEL_DIR}")
     return 0
 
 

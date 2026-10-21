@@ -294,6 +294,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  -> {out}")
     if args.open and out.is_dir() and hasattr(os, "startfile"):
         os.startfile(out)  # noqa: S606 -- the player's own folder, in Explorer
+    print(f"  reels : {highlights.reels(session)} made, 9:16, in {out / highlights.REEL_DIR}")
     return 0
 
 

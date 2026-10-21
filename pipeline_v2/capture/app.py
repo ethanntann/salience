@@ -382,6 +382,7 @@ def main() -> int:
         out = session / "highlights"
         if out.is_dir() and hasattr(os, "startfile"):
             os.startfile(out)  # noqa: S606 -- the player's own folder
+        highlights.reels(session)  # into highlights/reels, after the folder is open
         return manifest
 
     controller = Controller(find_game=game_window, start_session=start_session,
