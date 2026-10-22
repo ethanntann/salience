@@ -37,7 +37,14 @@ from salience_media.probe import safe_probe_media
 FRAME_WIDTH = int(os.environ.get("V2_FRAME_WIDTH", "1440"))
 # Frames per window. Most of the input tokens; 4 measured a third cheaper and
 # missed kills (agreement with the player 97.3% -> 94.5%), so 7.
-FRAME_COUNT = 7
+# V2_FRAME_COUNT overrides for experiments, stored as its own variant.
+# 14 on the fight windows (2026-10-22, v3.11, sessions 1-3 and 5, each ranked
+# by the other three): keeps in the top 10 18 of 27 either way, a kept kill
+# above a skipped one 62% against 75% at 7, headshots seen on 15 kept kills
+# against 19, and 70% more tokens. It also moved 19 kills to no_event, mostly
+# windows opening just after a kill (two of them kept), so 7 stays.
+DEFAULT_FRAME_COUNT = 7
+FRAME_COUNT = int(os.environ.get("V2_FRAME_COUNT", "") or DEFAULT_FRAME_COUNT)
 FRAME_FILTER = f"scale=w={FRAME_WIDTH}:h=-2:force_original_aspect_ratio=decrease"
 
 

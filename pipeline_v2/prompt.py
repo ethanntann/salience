@@ -342,6 +342,12 @@ def storage_variant(
         and clip_facts.event_source == "capture_window"
     ):
         variant = f"{prompt_version}-window"
+    # Another frame count is another look at the window, so another corpus.
+    import os
+
+    frames = int(os.environ.get("V2_FRAME_COUNT", "") or 7)
+    if frames != 7:
+        variant = f"{variant}-f{frames}"
     # A different model answering the same question is a different corpus, not
     # more of the existing one.
     if model and model != config.CORPUS_MODEL:

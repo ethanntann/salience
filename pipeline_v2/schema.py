@@ -186,6 +186,13 @@ class ClipDescription(BaseModel):
     kill_scope: str = "none"
     boxed_opponent: str = "unknown"
 
+    @field_validator("mechanics", mode="before")
+    @classmethod
+    def _at_most_six(cls, value):
+        # A seventh tag failed the whole parse of a paid answer (one of 132 at
+        # 14 frames); the first six are the ones it was surest of.
+        return value[:6] if isinstance(value, list) else value
+
     @field_validator("kill_hits", "kill_damage", mode="before")
     @classmethod
     def _count_or_none(cls, value):
