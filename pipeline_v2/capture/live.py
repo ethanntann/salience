@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 from pipeline_v2.capture import clips as clips_mod
@@ -226,7 +227,13 @@ class LiveDescriber:
             import sklearn.linear_model  # noqa: F401
         except ImportError:
             pass
-        while not self._stop.wait(self.interval):
+        # Every `interval` from the start of the last look, not after it: a
+        # look takes about 7s a window mid-match, and waiting the whole 30s
+        # after it covered about half the footage as it was recorded (session 5,
+        # 2026-10-21: 36 windows behind at the end, 38s of the wait after it).
+        due = time.monotonic() + self.interval
+        while not self._stop.wait(max(0.0, due - time.monotonic())):
+            due = time.monotonic() + self.interval
             try:
                 idle = self.idle_fn(self.session)
                 # Out of a match the machine is free, so catch up at full width.

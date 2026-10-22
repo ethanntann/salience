@@ -382,7 +382,9 @@ def main() -> int:
         out = session / "highlights"
         if out.is_dir() and hasattr(os, "startfile"):
             os.startfile(out)  # noqa: S606 -- the player's own folder
-        highlights.reels(session)  # into highlights/reels, after the folder is open
+        # Behind the "ready" toast, not before it: 10 reels are 12s of encoding.
+        threading.Thread(target=highlights.reels, args=(session,), name="reels",
+                         daemon=True).start()
         return manifest
 
     controller = Controller(find_game=game_window, start_session=start_session,

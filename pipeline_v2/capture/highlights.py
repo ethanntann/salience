@@ -308,6 +308,14 @@ ACTIVITY_WEIGHT = 1.0
 # session 2 it carried nothing within kills (47%).
 VOICE_WEIGHT = 0.5
 MIC_LEVEL_KEY = "mic_p95_db"
+LEVEL_WORKERS = 8
+
+
+def _step(what: str) -> None:
+    """A timestamped line in the log, so a slow wait says where it went."""
+    import time
+
+    print(f"  [{time.strftime('%H:%M:%S')}] {what}", flush=True)
 
 
 def voice(clips: list) -> dict[str, float]:
@@ -315,18 +323,25 @@ def voice(clips: list) -> dict[str, float]:
     from pipeline_v2.capture import levels, voice as voice_mod
     from pipeline_v2.jsonio import write_json
 
-    found: dict[str, float] = {}
-    for clip in clips:
-        sidecar = Path(clip.path).with_suffix(".capture.json")
+    from concurrent.futures import ThreadPoolExecutor
+
+    def measured(clip) -> dict:
         record = _sidecar(clip.path)
         if MIC_LEVEL_KEY not in record and record:
             record[MIC_LEVEL_KEY] = levels.loudness(Path(clip.path), voice_mod.MIC_TRACK)
             try:
-                write_json(sidecar, record)
+                write_json(Path(clip.path).with_suffix(".capture.json"), record)
             except OSError:
                 pass
-        if record.get(MIC_LEVEL_KEY) is not None:
-            found[clip.clip_sha] = float(record[MIC_LEVEL_KEY])
+        return record
+
+    found: dict[str, float] = {}
+    # Side by side: one ffmpeg each, and one after another they were 18s of
+    # session 5's wait (155 windows).
+    with ThreadPoolExecutor(LEVEL_WORKERS) as pool:
+        for clip, record in zip(clips, pool.map(measured, clips)):
+            if record.get(MIC_LEVEL_KEY) is not None:
+                found[clip.clip_sha] = float(record[MIC_LEVEL_KEY])
     # A silent track says nothing about any window; leave it out entirely.
     return found if len(set(found.values())) > 1 else {}
 
@@ -625,17 +640,20 @@ def run(
             gameplay_mod.annotate(session, clip_dir, max(s.end for s in segments))
     else:
         cut = harvest_fn(session, clip_dir)
+    _step(f"cut {len(cut)} windows")
     # Before describing, so the embeddings built at its end include speech.
     heard = (listen_fn or listen)(session, clip_dir) if speech else 0
     # `cut` includes windows already cut on an earlier run. Describing those
     # again is free (cached) but not fast: 300s of frame extraction on
     # session 1 to look up 235 answers it already had.
     fresh = (undescribed_fn or undescribed)(clip_dir) if cut else 0
+    _step(f"transcribed; {fresh} windows left to describe")
     if fresh:
         describe_fn(clip_dir, max_calls=fresh)
     elif heard or (unembedded_fn or unembedded)(clip_dir):
         (reembed_fn or reembed)(clip_dir)
 
+    _step("described")
     conn = store.connect()
     try:
         basis, ordered = rank(conn, clip_dir)
@@ -662,6 +680,7 @@ def run(
     def extent(clip):
         return fight_extent(clip, index, pad) if coverage else None
 
+    _step("ranked")
     from pipeline_v2.capture import voice as voice_mod
 
     utterances = voice_mod.heard(session) if speech else []
@@ -698,6 +717,7 @@ def run(
     with ThreadPoolExecutor(EXPORT_WORKERS) as pool:
         exported = list(pool.map(export_one, numbered))
 
+    _step("exported")
     kept: list[Highlight] = []
     for (position, (kind, score, item)), ok in zip(numbered, exported):
         if not ok:

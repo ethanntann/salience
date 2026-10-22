@@ -206,3 +206,23 @@ def test_stopping_early_never_runs_the_queue(monkeypatch):
         break
 
     assert len(paid) <= 2  # the one in flight (and at most one picked up next)
+
+
+def test_a_slow_look_is_not_followed_by_a_whole_interval_of_waiting(tmp_path):
+    import time as time_mod
+
+    starts = []
+
+    def slow(session, seen, **kw):
+        starts.append(time_mod.monotonic())
+        time_mod.sleep(0.15)
+        return 0
+
+    describer = live.LiveDescriber(tmp_path, interval=0.2, step_fn=slow,
+                                   idle_fn=lambda s: False).start()
+    time_mod.sleep(1.0)
+    describer.stop()
+
+    gaps = [b - a for a, b in zip(starts, starts[1:])]
+    # Looks start every 0.2s; waiting the full interval after each was 0.35s.
+    assert gaps and max(gaps) < 0.3
