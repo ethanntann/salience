@@ -41,8 +41,9 @@ compatibility is a hard constraint.
    none of them a keep. No log, no gating.
 2. `windows/`: each 8s window cut (stream copy on 2s-keyframe footage), with a
    `.capture.json` sidecar placing it on the session timeline.
-3. `mic_transcript.json`: the mic track transcribed locally (faster-whisper
-   `small`, CPU), about 2s per 30s of footage, cached per segment
+3. `mic_transcript.json`: the mic track transcribed locally (Parakeet TDT 0.6B
+   int8 on the CPU, every second of it, no voice detector), about 2s per 30s
+   of footage on all cores, cached per segment
    (`voice`). Each window gets what was said during it.
 4. Described (7 frames over the 8s, `index`, 16 calls in flight), stored,
    embedded. Every paid response is cached, and only windows with no

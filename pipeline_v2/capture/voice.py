@@ -16,7 +16,7 @@ One phrase is the exception, because it is a request, not a guess at what
 is funny: "clip it" / "clip that" (`clip_requests`) keeps the moment just
 before it as a highlight, whatever the ranking thought of it.
 
-Local (faster-whisper on the CPU), cached per raw segment in
+Local (Parakeet on the CPU, `audio.Transcriber`), cached per raw segment in
 `mic_transcript.json`, so a re-run and a pruned session both keep what was
 heard. `live` transcribes between matches, when the CPU is the game's least;
 the session's end does the rest.
@@ -37,8 +37,8 @@ CACHE_NAME = "mic_transcript.json"
 # `wgc` maps the game loopback first and the microphone second.
 MIC_TRACK = 1
 # Part of the cache: a transcript made another way is redone, not trusted.
-SOURCE = "mic/faster-whisper-small/norm-vad0.3-words"
-# Evens out a quiet mic before Whisper's voice detector sees it. Per-moment
+SOURCE = "mic/parakeet-tdt-0.6b-v2-int8/norm-novad-words"
+# Evens out a quiet mic before the speech model hears it. Per-moment
 # gain, so timing is untouched and a shout is not made louder than it was.
 LOUDNESS = "dynaudnorm=f=150:g=15"
 
@@ -50,8 +50,8 @@ class Utterance:
     text: str
 
 
-# Segments transcribed per Whisper call. One call per 30s segment measured 8s
-# each (its fixed per-call cost dominates); one call over 5 minutes, 2s per 30s.
+# Segments transcribed per call. Under Whisper one call per 30s segment measured
+# 8s each (its fixed per-call cost dominated); one call over 5 minutes, 2s per 30s.
 # Chunked rather than whole-session so an interrupted run resumes.
 CHUNK = 20
 
@@ -151,7 +151,7 @@ def heard(session: Path) -> list[Utterance]:
 
 
 # The player asking for the moment just gone: "clip it", "clip that!",
-# "clip this". Whisper may punctuate between the words ("Clip, that.").
+# "clip this". The model may punctuate between the words ("Clip, that.").
 CLIP_COMMAND = re.compile(r"\bclip(?:ped)?[\s,.!?-]+(?:it|that|this)\b", re.IGNORECASE)
 
 

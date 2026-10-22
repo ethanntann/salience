@@ -19,7 +19,7 @@ capture = ["soundcard>=0.4", "windows-capture>=2.0"]
 # Drives OBS's replay buffer over obs-websocket. `capture/obs_client.py`
 # needed this and nothing declared it.
 obs = ["obsws-python>=1.6"]
-audio = ["soundfile>=0.12", "faster-whisper>=1"]
+audio = ["soundfile>=0.12", "onnx-asr[cpu,hub]>=0.12"]
 # The tray app (`pipeline_v2.capture.app`): icon and menu. Its dialogs are tkinter.
 app = ["pystray>=0.19", "pillow>=10"]
 

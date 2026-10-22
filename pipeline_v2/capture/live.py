@@ -137,7 +137,7 @@ def between_matches(session: Path) -> bool:
     """Whether the newest footage is outside a match the log knows about.
 
     False when the log places no match at all: that is also what a missing log
-    looks like, and Whisper must not run mid-fight on a guess.
+    looks like, and transcription must not run mid-fight on a guess.
     """
     segments = clips_mod.read_segments(session)
     if not segments:
@@ -148,21 +148,20 @@ def between_matches(session: Path) -> bool:
         played["spans"], frontier - INTERVAL, frontier)
 
 
-# Whisper's threads while a match may be on: one core's worth of work in
-# bursts of ~0.4s a segment, never all of them.
-LIVE_WHISPER_THREADS = 2
+# The speech model's threads while a match may be on, never all of them.
+LIVE_SPEECH_THREADS = 2
 
 
 def _transcriber(holder: dict):
     if "model" not in holder:
         from pipeline_v2.audio import Transcriber
 
-        holder["model"] = Transcriber(cpu_threads=LIVE_WHISPER_THREADS)
+        holder["model"] = Transcriber(cpu_threads=LIVE_SPEECH_THREADS)
     return holder["model"]
 
 
 def listen_windows(session: Path, windows: list[Path], holder: dict) -> bool:
-    """Transcribe what is new and attach it to `windows`; False without Whisper."""
+    """Transcribe what is new and attach it to `windows`; False without the speech model."""
     from pipeline_v2.capture import voice
 
     try:
@@ -173,8 +172,8 @@ def listen_windows(session: Path, windows: list[Path], holder: dict) -> bool:
 
 
 def listen_step(session: Path, holder: dict, transcribe=None) -> bool:
-    """Transcribe a batch of the mic between matches. False once Whisper is
-    unavailable, so the caller stops asking."""
+    """Transcribe a batch of the mic between matches. False once the speech
+    model is unavailable, so the caller stops asking."""
     from pipeline_v2.capture import voice
 
     try:
@@ -201,7 +200,7 @@ class LiveDescriber:
         self.speech = speech
         self.idle_fn = idle_fn
         self.listen_fn = listen_fn
-        self._whisper: dict = {}
+        self._speech_model: dict = {}
         self.seen: set[float] = set()
         self.described = 0
         self.error: str | None = None
@@ -210,7 +209,7 @@ class LiveDescriber:
 
     def _listen(self, session: Path, windows: list[Path]) -> None:
         if self.speech:
-            self.speech = listen_windows(session, windows, self._whisper)
+            self.speech = listen_windows(session, windows, self._speech_model)
 
     def start(self) -> "LiveDescriber":
         from salience_media import ffmpeg
@@ -243,7 +242,7 @@ class LiveDescriber:
                 self.described += self.step_fn(
                     self.session, seen=self.seen, stopping=self._stop, **extra)
                 if self.speech and idle and not self._stop.is_set():
-                    self.speech = self.listen_fn(self.session, self._whisper)
+                    self.speech = self.listen_fn(self.session, self._speech_model)
             except Exception as exc:  # noqa: BLE001 -- never take the recording down
                 # The final run describes and transcribes whatever this missed.
                 self.error = f"{type(exc).__name__}: {exc}"

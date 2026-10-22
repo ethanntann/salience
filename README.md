@@ -11,7 +11,7 @@ game window ──WGC──▶ NVENC segments (+ game & mic audio)          duri
                      │  each finished 30s segment, inside a match:
                      ▼
   8s coverage windows ─▶ 7 frames each ─▶ VLM description
-          mic track ─▶ Whisper (local, between matches) ─▶ what was said
+          mic track ─▶ Parakeet (local, between matches) ─▶ what was said
                                                                │   after stop
                                         embeddings + speech vector
                                                                │
@@ -57,7 +57,7 @@ python -m pipeline_v2.capture.highlights <session folder>   # re-rank with new r
   which the game does not use (72% less CPU, byte-identical frames), one at a
   time. That mattered: as a burst of CPU decoders it dipped a 165fps game to
   100–120 every 30s; as a trickle it holds ~160, the same as capture alone.
-  Replaying session 2 this way: 8s from stop to highlights. Whisper runs only between matches. Describing
+  Replaying session 2 this way: 8s from stop to highlights. Speech is transcribed only between matches. Describing
   after the fact, one call at a time, had been 4.6s per window (about 20
   minutes a session); 16 calls in flight brought that to 0.8s.
 - **Every moment is looked at, not just the ones a detector flagged.** The

@@ -194,7 +194,7 @@ def find_gameplay(session: Path) -> dict:
 def listen(session: Path, clip_dir: Path) -> int:
     """Transcribe the mic and attach what was said to each clip (`voice`).
 
-    Optional: without faster-whisper installed the session is ranked on what
+    Optional: without the speech model installed (`.[audio]`) the session is ranked on what
     was seen alone, which is all a player who never talks loses anyway.
     """
     from pipeline_v2.capture import voice
@@ -312,7 +312,7 @@ def _session_clips(conn, clip_dir: Path) -> tuple[str | None, list]:
 # with this 48% / 72%. Both scores are standardised within the session.
 ACTIVITY_WEIGHT = 1.0
 # The player's voice, as loudness rather than words: reactions are mostly not
-# words, and Whisper drops them. Session 3: kept windows were louder on the mic
+# words, and speech models drop them. Session 3: kept windows were louder on the mic
 # 86% of the time, kept kills over skipped ones 70%. Half weight, because on
 # session 2 it carried nothing within kills (47%).
 VOICE_WEIGHT = 0.5

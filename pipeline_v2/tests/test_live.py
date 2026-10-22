@@ -146,7 +146,7 @@ def test_describe_many_keeps_order_and_never_pays_past_the_limit(monkeypatch):
     assert {"c1", "c3"}.isdisjoint(budgeted) and len(budgeted) == 2
 
 
-def test_whisper_runs_only_between_matches(tmp_path):
+def test_speech_runs_only_between_matches(tmp_path):
     states = iter([False, True, False, True])
     looked, listened = threading.Event(), []
 
@@ -183,14 +183,14 @@ def test_mid_match_and_unknown_are_not_between_matches(tmp_path, monkeypatch):
     assert live.between_matches(tmp_path) is False  # no log looks like this too
 
 
-def test_without_whisper_installed_live_stops_asking(tmp_path, monkeypatch):
+def test_without_the_speech_model_live_stops_asking(tmp_path, monkeypatch):
     import builtins
 
     real = builtins.__import__
 
     def no_whisper(name, *args, **kwargs):
         if name == "pipeline_v2.audio":
-            raise ImportError("faster_whisper")
+            raise ImportError("onnx_asr")
         return real(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", no_whisper)
