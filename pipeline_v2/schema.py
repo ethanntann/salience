@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 Outcome = Literal["elimination", "knock", "death", "no_event", "other"]
 Health = Literal["healthy", "damaged", "critical", "unknown"]
@@ -76,7 +76,14 @@ SAID_PROMPT_VERSION = "v3.9-said"
 # v3.10 26. Without "the 8 seconds before" (only what was said) it was 23, so
 # that note stays.
 REACT_PROMPT_VERSION = "v3.10-react"
-REACTION_PROMPT_VERSIONS = (REACT_PROMPT_VERSION,)
+# v3.10 plus what kind of kill it was: the weapon class, how many hits, the
+# biggest single hit, headshot, scoped or not, boxed, and whether the opponent
+# was a player, a bot or an NPC. The player keeps sniper kills, headshots,
+# one-pumps and piece control, and skips sprays and bots; v3.10's summaries
+# read "eliminates X with a shotgun at close range" for all of them, and taste
+# could not tell kept kills from skipped ones (48% and 38% on sessions 1 and 3).
+KILL_PROMPT_VERSION = "v3.11-kill"
+REACTION_PROMPT_VERSIONS = (REACT_PROMPT_VERSION, KILL_PROMPT_VERSION)
 NOTES_PROMPT_VERSIONS = (SAID_PROMPT_VERSION, *REACTION_PROMPT_VERSIONS)
 
 # One registry for V2_ABLATE. config maps the variable to a version; prompt
@@ -92,6 +99,7 @@ ABLATIONS = {
     "context": GAME_CONTEXT_PROMPT_VERSION,
     "said": SAID_PROMPT_VERSION,
     "react": REACT_PROMPT_VERSION,
+    "kill": KILL_PROMPT_VERSION,
 }
 
 
@@ -99,7 +107,7 @@ def mechanics_for(prompt_version: str) -> tuple[str, ...]:
     """The tag vocabulary a description at this version could legally contain."""
     if prompt_version == ATTRIBUTION_PROMPT_VERSION:
         return ATTRIBUTION_MECHANICS
-    if prompt_version.startswith((WORD_BANK_PROMPT_VERSION, GAME_CONTEXT_PROMPT_VERSION, "v3.9", "v3.10")):
+    if prompt_version.startswith((WORD_BANK_PROMPT_VERSION, GAME_CONTEXT_PROMPT_VERSION, "v3.9", "v3.10", "v3.11")):
         from pipeline_v2.games import fortnite
 
         return MECHANICS + fortnite.MECHANICS
@@ -167,6 +175,24 @@ class ClipDescription(BaseModel):
     )
     attribution_notes: str = Field(default="", max_length=1000)
     mechanics_evidence: str = Field(default="", max_length=1000)
+
+    # v3.11 kill fields. Plain strings, not enums: an off-list word should
+    # cost one field, not fail the whole parse of a paid response.
+    opponent_kind: str = "unknown"
+    kill_weapon_class: str = "none"
+    kill_hits: int | None = None
+    kill_damage: int | None = None
+    kill_headshot: str = "unknown"
+    kill_scope: str = "none"
+    boxed_opponent: str = "unknown"
+
+    @field_validator("kill_hits", "kill_damage", mode="before")
+    @classmethod
+    def _count_or_none(cls, value):
+        try:
+            return None if value is None or isinstance(value, bool) else int(value)
+        except (TypeError, ValueError):
+            return None  # "unknown", "n/a"
 
     @property
     def embed_text(self) -> str:

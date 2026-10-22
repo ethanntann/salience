@@ -515,3 +515,17 @@ def test_every_kept_highlight_gets_a_reel_after_the_folder_is_made(tmp_path, iso
     assert sorted(made) == sorted(h["file"] for h in manifest["highlights"])
     assert [bool(h["reel"]) for h in stored["highlights"]] == [True, False]
     assert stored["highlights"][0]["reel"].endswith(".mp4")
+
+
+def test_kill_traits_score_what_the_player_keeps_above_sprays_and_bots():
+    from types import SimpleNamespace as Clip
+
+    sniper = Clip(summary="The recording player no-scopes X with a hunting rifle headshot.",
+                  payload={"mechanics": ["headshot"], "opponent_kind": "player"})
+    spray = Clip(summary="The recording player lands a stream of SMG and assault rifle hits.",
+                 payload={"mechanics": [], "opponent_kind": "player"})
+    pistol = Clip(summary="The recording player eliminates X with a pistol.", payload={})
+    bot = Clip(summary="The recording player knocks the NPC Chica the Chicken with a shotgun.",
+               payload={"opponent_kind": "npc"})
+    scores = [highlights.kill_traits(c) for c in (sniper, spray, pistol, bot)]
+    assert scores == [2.0, -1.0, -1.0, -2.0]

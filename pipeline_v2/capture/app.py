@@ -40,7 +40,7 @@ PRODUCT_DEFAULTS = {
     "V2_INPUT_PRICE_PER_MTOK": "0.30",
     "V2_OUTPUT_PRICE_PER_MTOK": "1.20",
     "V2_CACHED_INPUT_PRICE_PER_MTOK": "0.30",
-    "V2_ABLATE": "react",
+    "V2_ABLATE": "kill",
     "V2_BUDGET_USD": "100",
 }
 

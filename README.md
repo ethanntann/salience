@@ -41,7 +41,7 @@ Without the tray: `python -m pipeline_v2.capture.record`, Ctrl+C when done. To t
 http://localhost:8777/ (**K** keep, **J** skip, **W** description is wrong):
 
 ```powershell
-python -m pipeline_v2 review --variant v3.10-react-window@deepseek-v4p1-flash --only <session folder>
+python -m pipeline_v2 review --variant v3.11-kill-window@deepseek-v4p1-flash --only <session folder>
 python -m pipeline_v2.capture.highlights <session folder>   # re-rank with new ratings
 ```
 
@@ -132,7 +132,7 @@ seconds before it. Four describers, same windows, the product's full ranking:
 | v3.8 + HUD facts (kill banners read off the screen, weapon at the kill) | 18 | 22 |
 | v3.9 + HUD facts | 19 | 24 |
 
-**v3.10 (shipped): what was said goes in the description.** v3.9's model
+**v3.10: what was said goes in the description.** v3.9's model
 mentioned the player's words in 4 of 999 summaries, since its rules say to
 describe only what is seen; v3.10 requires the summary to end with them. With
 session 4 rated, three test sessions, each trained on the ones before (speech
@@ -143,6 +143,23 @@ re-transcribed with word timing for all three):
 | v3.9 | 23 | 29 |
 | **v3.10: summary carries what was said** | **26** | **31** |
 | v3.10 without the window before | 23 | 30 |
+
+**v3.11 (shipped): what kind of kill.** The player keeps sniper kills,
+headshots, one-pumps and piece control, and skips sprays and bots; v3.10's
+summaries read "eliminates X with a shotgun" for all of them. v3.11 asks for
+the weapon class, hits, biggest single hit, headshot, scope, box and whether
+the opponent was a player, bot or NPC, and puts them in the summary; ranking
+adds a score for those traits within each event tier. Sessions 1, 2, 3 and 5,
+each ranked by the other three (27 keeps that fit in a top 10):
+
+| | top 10 | kept kill above a skipped one |
+|---|---|---|
+| v3.10 | 16 | 58% |
+| v3.11 | 17 | 64% |
+| **v3.11 + kill traits** | **18** | **75%** |
+
+It called 8 kills bot or NPC (Chica the Chicken, "Raiderbot"): all 8 skipped,
+no keep among them, one real player wrongly called an NPC.
 
 Reading the HUD found kills more reliably than the describer, but added
 nothing to the ranking and cost 8-10 minutes of CPU a session, so it is not

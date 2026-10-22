@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 from dataclasses import asdict, dataclass
@@ -309,6 +310,30 @@ ACTIVITY_WEIGHT = 1.0
 VOICE_WEIGHT = 0.5
 MIC_LEVEL_KEY = "mic_p95_db"
 LEVEL_WORKERS = 8
+# What kind of kill, as the player put it: they keep sniper kills, headshots,
+# no-scopes and piece control, and skip sprays (an SMG, rifle or pistol), bots
+# and finishing someone already down. Taste learns this from the summaries too
+# slowly; this says it outright, within an event tier. Each session ranked by
+# the other three (v3.11): 17 of 27 keeps in the top 10 without, 18 with, and
+# a kept kill above a skipped one 64% of the time without, 75% with.
+KILL_TRAIT_WEIGHT = 1.0
+_SNIPER = re.compile(r"sniper|hunting rifle|reaper|no-scope")
+_SPRAY = re.compile(r"assault rifle|pistol")
+_NOT_SPRAY = re.compile(r"shotgun|sniper|hunting rifle")
+
+
+def kill_traits(clip) -> float:
+    """+1 for each trait the player keeps, -1 or -2 for each they skip."""
+    payload = clip.payload or {}
+    text = " ".join([clip.summary or "", *(payload.get("kill_weapons") or [])]).lower()
+    tags = set(payload.get("mechanics") or [])
+    score = float("headshot" in text or "headshot" in tags)
+    score += float(bool(_SNIPER.search(text)))
+    score += float(bool({"piece_control", "box_fight"} & tags) or "piece control" in text)
+    score -= float(bool(_SPRAY.search(text)) and not _NOT_SPRAY.search(text))
+    score -= float("finish_downed" in tags or "downed" in text)
+    score -= 2.0 * (payload.get("opponent_kind") in ("bot", "npc"))
+    return score
 
 
 def _step(what: str) -> None:
@@ -393,9 +418,11 @@ def rank(conn, clip_dir: Path) -> tuple[str, list]:
     scored = list(best.values())
     hands = _standardised(activity(clip_dir.parent, inside))
     voiced = _standardised(voice(inside))
+    kinds = _standardised({c.clip_sha: kill_traits(c) for c in inside})
 
     def extra(sha: str) -> float:
-        return ACTIVITY_WEIGHT * hands.get(sha, 0.0) + VOICE_WEIGHT * voiced.get(sha, 0.0)
+        return (ACTIVITY_WEIGHT * hands.get(sha, 0.0) + VOICE_WEIGHT * voiced.get(sha, 0.0)
+                + KILL_TRAIT_WEIGHT * kinds.get(sha, 0.0))
 
     if scored:
         taste = _standardised({clip.clip_sha: score for score, clip in scored})
@@ -409,7 +436,8 @@ def rank(conn, clip_dir: Path) -> tuple[str, list]:
             heard = ", speech off: it hurt this player's ratings"
         else:
             heard = ""
-        used = "".join(name for name, on in ((", key presses", hands), (", mic level", voiced)) if on)
+        used = "".join(name for name, on in ((", key presses", hands), (", mic level", voiced),
+                                                  (", kill type", kinds)) if on)
         return (f"what happened, then taste{used} ({labels} labels, {variant}{heard})",
                 scored)
 

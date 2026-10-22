@@ -277,6 +277,49 @@ Rules for "kill_weapons":
 """
 
 
+# v3.11: what kind of kill it was. Inside the JSON shape, after kill_weapons
+# (fields appended after the shape came back null, see `_TRACKING_FIELDS`).
+# Ranking reads the summary, so the rules also put the answers there.
+_KILL_FIELDS = """\
+  "opponent_kind": "player | bot | npc | unknown",
+  "kill_weapon_class": "sniper | shotgun | smg | assault_rifle | pistol | explosive | other | none",
+  "kill_hits": <integer or null>,
+  "kill_damage": <integer or null>,
+  "kill_headshot": "yes | no | unknown",
+  "kill_scope": "scoped | no_scope | unknown | none",
+  "boxed_opponent": "yes | no | unknown","""
+
+_KILL_RULES = """
+Rules for the kill fields. They are about the recording player's decisive
+elimination or knock in these frames. With none (including the recording
+player being the one eliminated), use "none", null or "unknown".
+- "kill_weapon_class": the class of the weapon that landed the decisive hit.
+- "kill_hits": how many of the recording player's hits landed on that opponent
+  in these frames, counted from the damage numbers.
+- "kill_damage": the LARGEST SINGLE damage number in that sequence, never a
+  sum. An SMG, rifle or pistol lands many small hits that add up; that is many
+  hits, each small, not one big one.
+- "kill_headshot": "yes" only if the decisive hit's damage number has the
+  headshot style (larger, yellow/orange).
+- "kill_scope": for a sniper or scoped weapon, "scoped" if the scope overlay
+  fills the screen at the shot, "no_scope" if it is fired without the scope
+  overlay. "none" for weapons without a scope.
+- "boxed_opponent": "yes" if the opponent is enclosed by builds (walls around
+  them, or both players boxed in together) and the player edits or shoots into
+  that box for the kill.
+- "opponent_kind": "npc" for a named game character rather than a player: a
+  boss or character with a story name (for example "Chica the Chicken") in the
+  banner or feed. "bot" for an AI-controlled player: a name the game generated
+  together with behaviour no player shows (standing still under fire, walking
+  straight at the player without building). "player" otherwise, when the
+  opponent is visible. "unknown" when unsure.
+- In "summary", when the recording player gets a kill or knock, say: the weapon
+  class; whether it took one hit or several ("one shotgun headshot for 196",
+  "a stream of SMG hits"); whether it was a headshot; scoped or no-scope for a
+  sniper; whether the opponent was boxed; and if the opponent was a bot or NPC.
+"""
+
+
 def storage_variant(
     prompt_version: str, clip_facts: ClipFacts, model: str | None = None
 ) -> str:
@@ -377,6 +420,9 @@ def build_prompt(clip_facts: ClipFacts, version: str | None = None) -> str:
                 if version in schema.REACTION_PROMPT_VERSIONS and any(
                         note.startswith(SAID_NOTE) for note in clip_facts.notes):
                     built += REACTION_RULE
+            if version == schema.KILL_PROMPT_VERSION:
+                built = built.replace(_OWN_KILL_FIELD, _OWN_KILL_FIELD + "\n" + _KILL_FIELDS)
+                built += _KILL_RULES
         return built
 
     if clip_facts.event_source == "capture_window":
