@@ -527,5 +527,24 @@ def test_kill_traits_score_what_the_player_keeps_above_sprays_and_bots():
     pistol = Clip(summary="The recording player eliminates X with a pistol.", payload={})
     bot = Clip(summary="The recording player knocks the NPC Chica the Chicken with a shotgun.",
                payload={"opponent_kind": "npc"})
-    scores = [highlights.kill_traits(c) for c in (sniper, spray, pistol, bot)]
+    scores = [highlights._trait_words(c) for c in (sniper, spray, pistol, bot)]
     assert scores == [2.0, -1.0, -1.0, -2.0]
+
+
+def test_kill_fields_count_beside_the_words_so_one_phrase_cannot_swing_a_keep():
+    """A kept headshot kill re-described as "finishes a downed opponent"."""
+    from types import SimpleNamespace as Clip
+
+    fields = {"kill_weapon_class": "shotgun", "kill_headshot": "yes", "kill_hits": 1,
+              "kill_damage": 180, "opponent_kind": "player"}
+    first = Clip(summary="The recording player shotguns X through a build, landing a headshot.",
+                 payload=dict(fields))
+    again = Clip(summary="The recording player finishes a downed opponent with a shotgun.",
+                 payload=dict(fields))
+
+    assert highlights._trait_fields(first) == highlights._trait_fields(again) == 2.0
+    assert highlights.kill_traits(first) - highlights.kill_traits(again) == 1.0  # not 2
+
+    pistol = Clip(summary="eliminates X", payload={"kill_weapon_class": "pistol", "kill_hits": 1,
+                                                    "kill_damage": 104})
+    assert highlights._trait_fields(pistol) == -1.0  # its 104 is stacked hits, not a one-pump

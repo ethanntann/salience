@@ -324,6 +324,7 @@ LEVEL_WORKERS = 8
 # slowly; this says it outright, within an event tier. Each session ranked by
 # the other three (v3.11): 17 of 27 keeps in the top 10 without, 18 with, and
 # a kept kill above a skipped one 64% of the time without, 75% with.
+# (`kill_traits` says why the words are now averaged with the kill fields.)
 KILL_TRAIT_WEIGHT = 1.0
 _SNIPER = re.compile(r"sniper|hunting rifle|reaper|no-scope")
 _SPRAY = re.compile(r"assault rifle|pistol")
@@ -331,7 +332,21 @@ _NOT_SPRAY = re.compile(r"shotgun|sniper|hunting rifle")
 
 
 def kill_traits(clip) -> float:
-    """+1 for each trait the player keeps, -1 or -2 for each they skip."""
+    """What kind of kill, from the words and the kill fields averaged.
+
+    The words alone swung with the describer's phrasing. Re-describing 51
+    windows (only the note of what was said changed) turned a kept "shotguns
+    X through a build... headshot" into "finishes a downed opponent", and
+    two kept kills dropped out of the top 10: 24 of 32 keeps before, 22
+    after. The fields alone held 24 on both, and the average 24 on both with
+    the best kill ordering (a kept kill above a skipped one 78% and 77%,
+    against the words' 77% and 74%). Each session ranked by the other four.
+    """
+    return (_trait_words(clip) + _trait_fields(clip)) / 2
+
+
+def _trait_words(clip) -> float:
+    """+1 for each trait the player keeps, -1 or -2 for each they skip, as said."""
     payload = clip.payload or {}
     text = " ".join([clip.summary or "", *(payload.get("kill_weapons") or [])]).lower()
     tags = set(payload.get("mechanics") or [])
@@ -340,6 +355,22 @@ def kill_traits(clip) -> float:
     score += float(bool({"piece_control", "box_fight"} & tags) or "piece control" in text)
     score -= float(bool(_SPRAY.search(text)) and not _NOT_SPRAY.search(text))
     score -= float("finish_downed" in tags or "downed" in text)
+    score -= 2.0 * (payload.get("opponent_kind") in ("bot", "npc"))
+    return score
+
+
+def _trait_fields(clip) -> float:
+    """The same traits from v3.11's kill fields (zero on older descriptions)."""
+    payload = clip.payload or {}
+    weapon = str(payload.get("kill_weapon_class") or "none")
+    damage = payload.get("kill_damage") or 0
+    score = float(payload.get("kill_headshot") == "yes")
+    score += float(weapon == "sniper")
+    score += float(payload.get("boxed_opponent") == "yes")
+    # A one-pump. The damage is only trusted on a shotgun's single hit: on a
+    # pistol, SMG or rifle the number on screen is several hits stacked.
+    score += float(weapon == "shotgun" and payload.get("kill_hits") == 1 and damage >= 150)
+    score -= float(weapon in ("assault_rifle", "pistol"))  # SMG kills were kept 10 of 23
     score -= 2.0 * (payload.get("opponent_kind") in ("bot", "npc"))
     return score
 
