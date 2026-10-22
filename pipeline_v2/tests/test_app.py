@@ -231,3 +231,16 @@ def test_child_processes_get_no_console_window(monkeypatch):
     subprocess.Popen(["ffmpeg"], creationflags=0x4000)  # below normal priority, kept
 
     assert seen == [0x08000000, 0x08000000 | 0x4000]
+
+
+def test_recording_quality_defaults_to_60fps_and_follows_the_menu(tmp_path, monkeypatch):
+    monkeypatch.delenv(app.QUALITY_KEY, raising=False)
+    args = app._recording_args()
+    assert (args.fps, args.bitrate) == (60, "25M")
+    app.set_quality("standard", tmp_path / "settings.env")
+    assert app.read_settings(tmp_path / "settings.env")[app.QUALITY_KEY] == "standard"
+    args = app._recording_args()
+    assert (args.fps, args.bitrate) == (30, "8M")
+    monkeypatch.setenv(app.QUALITY_KEY, "nonsense")  # a hand-edited settings file
+    assert app.quality() == "high"
+    monkeypatch.delenv(app.QUALITY_KEY)

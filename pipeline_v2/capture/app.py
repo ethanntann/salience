@@ -216,7 +216,30 @@ def _recording_args():
 
     args = record._parser().parse_args([])
     args.mic = os.environ.get("SALIENCE_MIC", "")  # "" = Windows' default mic
+    args.fps, args.bitrate = record.QUALITY[quality()]
     return args
+
+
+QUALITY_KEY = "SALIENCE_QUALITY"
+# What each preset costs on disk, so the choice in the menu is an informed one.
+QUALITY_LABELS = {
+    "standard": "Standard: 30 fps, ~4 GB an hour",
+    "high": "High: 60 fps, ~11 GB an hour",
+    "max": "Max: 60 fps, ~18 GB an hour",
+}
+
+
+def quality() -> str:
+    from pipeline_v2.capture import record
+
+    chosen = os.environ.get(QUALITY_KEY, "").strip().lower()
+    return chosen if chosen in record.QUALITY else record.DEFAULT_QUALITY
+
+
+def set_quality(name: str, path: Path = SETTINGS) -> None:
+    """Remembered for the next recording; one already running keeps its own."""
+    write_setting(QUALITY_KEY, name, path)
+    os.environ[QUALITY_KEY] = name
 
 
 def _single_instance() -> bool:
@@ -442,6 +465,10 @@ def main() -> int:
         pystray.MenuItem("Open recordings folder",
                          lambda *_: open_folder(_recording_args().out)),
         pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Recording quality", pystray.Menu(*(
+            pystray.MenuItem(label, lambda *_, name=name: set_quality(name),
+                             checked=lambda _, name=name: quality() == name, radio=True)
+            for name, label in QUALITY_LABELS.items()))),
         pystray.MenuItem("Change Fireworks key...", change_key),
         pystray.MenuItem("Start with Windows", toggle_start,
                          checked=lambda _: starts_with_windows()),

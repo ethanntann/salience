@@ -25,6 +25,16 @@ from pathlib import Path
 
 DEFAULT_OUT = Path.home() / "Videos" / "Salience" / "Recordings"
 
+# (fps, video bitrate). "standard" is what sessions 1-5 recorded at: fine for
+# the describer, blocky in fights next to ShadowPlay's 1080p60. NVENC is its
+# own chip on the GPU, so a higher preset costs disk rather than game frames.
+QUALITY = {
+    "standard": (30, "8M"),
+    "high": (60, "25M"),
+    "max": (60, "40M"),
+}
+DEFAULT_QUALITY = "high"
+
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -32,8 +42,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT,
                         help=f"recording directory (default: {DEFAULT_OUT})")
-    parser.add_argument("--fps", type=int, default=30)
-    parser.add_argument("--bitrate", default="8M")
+    parser.add_argument("--fps", type=int, default=QUALITY[DEFAULT_QUALITY][0])
+    parser.add_argument("--bitrate", default=QUALITY[DEFAULT_QUALITY][1])
     parser.add_argument("--monitor", dest="window", action="store_false",
                         help="capture monitor 1 instead of the game window")
     # Kept so the command from earlier sessions still works; the window is the default.
