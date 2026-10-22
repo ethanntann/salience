@@ -80,7 +80,8 @@ def _summary(stats) -> str:
             f"({stats.superseded_rate:.1%} superseded)")
 
 
-def _save_stats(session: Path, stats, error: str | None, audio=None) -> None:
+def _save_stats(session: Path, stats, error: str | None, audio=None,
+                input_started: float | None = None) -> None:
     """What the capture produced, kept beside the footage: the console that
     printed it is usually closed before anyone reads it."""
     from dataclasses import asdict
@@ -99,6 +100,11 @@ def _save_stats(session: Path, stats, error: str | None, audio=None) -> None:
 
         started = time.time() - (time.monotonic() - stats.first_frame_at)
         record["first_frame_utc"] = datetime.fromtimestamp(started, tz=timezone.utc).isoformat()
+        if input_started is not None:
+            # The input and mouse logs count from when they started, the video
+            # from its first frame, 0.5-0.8s later (measured): a flick is a
+            # tenth of a second, so the gap is kept to line them up.
+            record["input_offset_sec"] = round(stats.first_frame_at - input_started, 3)
     try:
         write_json(session / "capture_stats.json", record)
     except OSError:
@@ -139,7 +145,7 @@ class Session:
         from pipeline_v2.capture import clips
         from pipeline_v2.capture.input_activity import ActivitySampler
         from pipeline_v2.capture.marks import MarkRecorder
-        from pipeline_v2.capture.mouse import JOURNAL_NAME as MOUSE_JOURNAL, MouseMotion
+        from pipeline_v2.capture.mouse import JOURNAL_NAME as MOUSE_JOURNAL, SHOTS_NAME, MouseMotion
         from pipeline_v2.capture.triggers import TriggerBus, detectors_for
         from pipeline_v2.capture import gfx
         from pipeline_v2.capture.wgc import WgcRecorder
@@ -156,7 +162,7 @@ class Session:
         self.marker = MarkRecorder(journal=session / "marks.tsv").start()
         self.activity = ActivitySampler(journal=session / "input.tsv").start()
         # On the input log's clock, so the two line up window for window.
-        self.mouse = MouseMotion(journal=session / MOUSE_JOURNAL,
+        self.mouse = MouseMotion(journal=session / MOUSE_JOURNAL, shots=session / SHOTS_NAME,
                                  started=self.activity.started).start()
         print(f"recording -> {session}")
         print(f"  target: {'game window' if self.hwnd else 'monitor 1'} @ {args.fps}fps {args.bitrate}")
@@ -202,7 +208,7 @@ class Session:
         if not self._origin_saved and rec.stats.first_frame_at is not None:
             # Written now rather than at stop: `live` lines the game log up
             # with the video while it is still recording.
-            _save_stats(self.path, rec.stats, None)
+            _save_stats(self.path, rec.stats, None, input_started=self.activity.started)
             self._origin_saved = True
         if self.bus is None:
             return
@@ -243,7 +249,8 @@ class Session:
         if marks:
             print(f"  marks : {keeps} keep, {len(marks) - keeps} dull -> marks.json")
         print(_summary(s))
-        _save_stats(self.path, s, self.rec.error, getattr(self.rec, "audio_stats", None))
+        _save_stats(self.path, s, self.rec.error, getattr(self.rec, "audio_stats", None),
+                    input_started=self.activity.started)
         if self.rec.error:
             print(f"  error: {self.rec.error}")
         return s

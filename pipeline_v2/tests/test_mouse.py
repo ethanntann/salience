@@ -43,3 +43,41 @@ def test_still_windows_are_still_written():
 
     assert [s.at for s in m.samples] == [0.5, 1.0, 1.5, 2.0]
     assert all(s.distance == 0 for s in m.samples)
+
+
+def test_left_presses_are_counted_even_on_absolute_records():
+    def press(flags):
+        body = mouse._MOUSE.pack(flags, mouse._LEFT_BUTTON_DOWN, 0, 0, 0, 0)
+        record = struct.pack("<II", 0, mouse._HEADER + len(body)) + bytes(mouse._HEADER - 8) + body
+        return record + bytes(-len(record) % 8)
+
+    buffer = _record(0, 0, 4, 0) + press(0) + press(mouse._MOUSE_MOVE_ABSOLUTE)
+
+    assert mouse.batch(buffer, 3) == ([(4, 0), (0, 0)], 2)
+
+
+def test_a_flick_into_a_shot_is_a_big_move_before_and_stillness_after(tmp_path):
+    m = mouse.MouseMotion(started=0.0, shots=tmp_path / "shots.tsv")
+    t = 0.0
+    for moved in [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:  # still for 100ms
+        t += 0.01
+        m.track(t, moved)
+    for moved in [200] * 10:  # 2000 counts in the 100ms into the shot
+        t += 0.01
+        m.track(t, moved)
+    m.track(t + 0.01, 50, presses=1)
+    for moved in [5] * 9 + [0] * 5:
+        t += 0.01
+        m.track(t + 0.01, moved)
+
+    assert m.shots == [mouse.Shot(at=0.21, before=2050.0, after=45.0)]
+    assert mouse.MouseMotion.read_shots(tmp_path / "shots.tsv") == m.shots
+
+
+def test_a_shot_still_collecting_at_stop_is_kept():
+    m = mouse.MouseMotion(started=0.0)
+    m.track(1.0, 10, presses=1)
+
+    m.stop()
+
+    assert m.shots == [mouse.Shot(at=1.0, before=10.0, after=0.0)]

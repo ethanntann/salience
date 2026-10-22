@@ -379,13 +379,23 @@ def activity(session: Path, clips: list) -> dict[str, float]:
         samples = ActivitySampler.read_journal(session / "input.tsv")
     except OSError:
         return {}
+    offset = input_offset(session)
     found: dict[str, float] = {}
     for clip in clips:
         span = _span(clip)
         if span is not None and samples:
             found[clip.clip_sha] = float(sum(
-                s.presses for s in samples if span[0] <= s.at < span[1]))
+                s.presses for s in samples if span[0] <= s.at - offset < span[1]))
     return found
+
+
+def input_offset(session: Path) -> float:
+    """Seconds from the input logs' zero to the video's; 0 before it was kept."""
+    try:
+        stats = json.loads((session / "capture_stats.json").read_text(encoding="utf-8"))
+        return float(stats.get("input_offset_sec") or 0.0)
+    except (OSError, ValueError, TypeError):
+        return 0.0
 
 
 def _standardised(values: dict[str, float]) -> dict[str, float]:

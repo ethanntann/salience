@@ -27,17 +27,28 @@ import ctypes
 import math
 import struct
 import threading
+from collections import deque
 import time
 from ctypes import wintypes
 from dataclasses import dataclass
 from pathlib import Path
 
 JOURNAL_NAME = "mouse.tsv"
+# One line per shot (left button down): when, how far the aim moved in the
+# 150ms before it, and in the 100ms after. A flick is a big move ending in a
+# shot, then the aim holding still; a box fight's spinning moves as far but
+# not into a shot. Fastest-50ms alone could not tell them apart: the kept
+# kill of session 5 was a flick and ranked 10th of 16 kills by it.
+SHOTS_NAME = "shots.tsv"
+SHOT_BEFORE = 0.15
+SHOT_AFTER = 0.10
 
 _RIDEV_INPUTSINK = 0x00000100
 _RID_INPUT = 0x10000003
 _RIM_TYPEMOUSE = 0
 _MOUSE_MOVE_ABSOLUTE = 0x01  # tablets, remote desktop: positions, not motion
+# usButtonFlags, the low half of the button union: RI_MOUSE_LEFT_BUTTON_DOWN.
+_LEFT_BUTTON_DOWN = 0x0001
 _WM_INPUT = 0x00FF
 _PM_REMOVE = 0x0001
 _HWND_MESSAGE = wintypes.HWND(-3)
@@ -53,17 +64,30 @@ class _RawInputDevice(ctypes.Structure):
                 ("dwFlags", wintypes.DWORD), ("hwndTarget", wintypes.HWND)]
 
 
-def motions(buffer: bytes, count: int) -> list[tuple[int, int]]:
-    """(dx, dy) of each relative mouse record in a `GetRawInputBuffer` batch."""
-    found, at = [], 0
+def batch(buffer: bytes, count: int) -> tuple[list[tuple[int, int]], int]:
+    """(dx, dy) of each relative mouse record in a `GetRawInputBuffer` batch,
+    and how many times the left button went down in it."""
+    found, presses, at = [], 0, 0
     for _ in range(count):
         kind, size = struct.unpack_from("<II", buffer, at)
         if kind == _RIM_TYPEMOUSE:
-            flags, _, _, dx, dy, _ = _MOUSE.unpack_from(buffer, at + _HEADER)
+            flags, buttons, _, dx, dy, _ = _MOUSE.unpack_from(buffer, at + _HEADER)
             if not flags & _MOUSE_MOVE_ABSOLUTE:
                 found.append((dx, dy))
+            presses += bool(buttons & _LEFT_BUTTON_DOWN)
         at = (at + size + 7) & ~7  # NEXTRAWINPUTBLOCK: records are 8-aligned
-    return found
+    return found, presses
+
+
+def motions(buffer: bytes, count: int) -> list[tuple[int, int]]:
+    return batch(buffer, count)[0]
+
+
+@dataclass(frozen=True)
+class Shot:
+    at: float  # seconds from the start of the recording
+    before: float  # mouse counts moved in the SHOT_BEFORE leading into it
+    after: float  # and in the SHOT_AFTER following it
 
 
 @dataclass(frozen=True)
@@ -80,8 +104,13 @@ class MouseMotion:
     BIN_SECONDS = 0.05
     DRAIN_SECONDS = 0.01
 
-    def __init__(self, journal: Path | None = None, started: float | None = None):
+    def __init__(self, journal: Path | None = None, started: float | None = None,
+                 shots: Path | None = None):
         self.journal = journal
+        self.shots_journal = shots
+        self.shots: list[Shot] = []
+        self._recent: deque[tuple[float, float]] = deque()  # (moment, moved) per drain
+        self._pending: list[list[float]] = []  # [at, before, after] still collecting
         self.started = started if started is not None else time.monotonic()
         self.samples: list[MouseSample] = []
         self.error: str | None = None
@@ -107,6 +136,50 @@ class MouseMotion:
         self._bin += moved
         self._distance += moved
         return closed
+
+    def track(self, moment: float, moved: float, presses: int = 0) -> list[Shot]:
+        """One drain: movement and left presses at `moment`. Returns the shots
+        whose after-window it closed."""
+        self.add(moment, moved)
+        finished = []
+        for pending in list(self._pending):
+            if moment <= pending[0] + SHOT_AFTER + 1e-9:
+                pending[2] += moved
+            else:
+                self._pending.remove(pending)
+                finished.append(self._shot(*pending))
+        self._recent.append((moment, moved))
+        while self._recent and self._recent[0][0] <= moment - SHOT_BEFORE - 1e-9:
+            self._recent.popleft()
+        if presses:
+            # This drain's own movement led into the press, so it counts before.
+            self._pending.append([moment, sum(m for _, m in self._recent), 0.0])
+        return finished
+
+    def _shot(self, at: float, before: float, after: float) -> Shot:
+        shot = Shot(round(at, 3), round(before, 1), round(after, 1))
+        self.shots.append(shot)
+        if self.shots_journal is not None:
+            try:
+                with self.shots_journal.open("a", encoding="utf-8") as handle:
+                    handle.write(f"{shot.at}\t{shot.before}\t{shot.after}\n")
+            except OSError:
+                pass
+        return shot
+
+    @staticmethod
+    def read_shots(path: Path) -> list[Shot]:
+        found = []
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return found
+        for line in lines:
+            try:
+                found.append(Shot(*(float(v) for v in line.split("\t"))))
+            except (TypeError, ValueError):
+                continue
+        return found
 
     def _close(self) -> MouseSample:
         sample = MouseSample(round(self._window_end, 2), round(self._distance, 1),
@@ -163,18 +236,20 @@ class MouseMotion:
         message = ctypes.create_string_buffer(64)  # MSG
         try:
             while not self._stop.wait(self.DRAIN_SECONDS):
-                moved = 0.0
+                moved, presses = 0.0, 0
                 while True:
                     size = wintypes.UINT(len(buffer))
                     count = user.GetRawInputBuffer(buffer, ctypes.byref(size), _HEADER)
                     if count in (0, 0xFFFFFFFF):
                         break
-                    moved += sum(math.hypot(dx, dy) for dx, dy in motions(buffer.raw, count))
+                    moves, pressed = batch(buffer.raw, count)
+                    moved += sum(math.hypot(dx, dy) for dx, dy in moves)
+                    presses += pressed
                 # What the batch read leaves queued as messages, cleared so the
                 # queue never fills.
                 while user.PeekMessageW(message, hwnd, _WM_INPUT, _WM_INPUT, _PM_REMOVE):
                     user.DispatchMessageW(message)
-                self.add(time.monotonic() - self.started, moved)
+                self.track(time.monotonic() - self.started, moved, presses)
         finally:
             device.dwFlags, device.hwndTarget = 0x00000001, None  # RIDEV_REMOVE
             user.RegisterRawInputDevices(ctypes.byref(device), 1, ctypes.sizeof(device))
@@ -189,4 +264,7 @@ class MouseMotion:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=3)
+        for pending in self._pending:  # the last shot's after-window, cut short
+            self._shot(*pending)
+        self._pending = []
         return self.samples
