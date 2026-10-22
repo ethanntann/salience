@@ -141,6 +141,12 @@ def transcribe_session(
     )
 
 
+def transcribed(session: Path) -> list[tuple[float, float]]:
+    """The stretches of the session already transcribed, a raw segment each."""
+    cache = _read_cache(session / CACHE_NAME)
+    return [(s.start, s.end) for s in clips_mod.read_segments(session) if s.path.name in cache]
+
+
 def heard(session: Path) -> list[Utterance]:
     """What is already transcribed, without transcribing anything."""
     return sorted(
@@ -166,8 +172,11 @@ def said_between(utterances: list[Utterance], start: float, end: float) -> str:
 
 
 def attach(session: Path, clip_files: list[Path], *, transcriber=None,
-           runner=subprocess.run) -> int:
-    """Store what was said in each clip. Returns how many transcripts changed."""
+           runner=subprocess.run, limit: int | None = None) -> int:
+    """Store what was said in each clip. Returns how many transcripts changed.
+
+    `limit` as for `transcribe_session`: 0 attaches what is already heard
+    without loading the speech model."""
     from pipeline_v2 import cache, store
 
     placed = []
@@ -180,7 +189,8 @@ def attach(session: Path, clip_files: list[Path], *, transcriber=None,
             continue
     if not placed:
         return 0
-    utterances = transcribe_session(session, transcriber=transcriber, runner=runner)
+    utterances = transcribe_session(session, transcriber=transcriber, runner=runner,
+                                    limit=limit)
     changed = 0
     conn = store.connect()
     try:

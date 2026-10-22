@@ -26,6 +26,13 @@ Measured on a 165fps game (2026-10-18): as a burst of 16 CPU decoders every
 30s it dipped the game to 100-120; as the trickle it held ~160, the same as
 capture alone. Between matches it catches up at full width. Cuts are stream
 copies; the cloud calls cost the machine nothing.
+
+The speech model never runs mid-match. A window's prompt includes what was
+said in it, so a window waits until its stretch of the mic is transcribed,
+which happens between matches. Session 7 (2026-10-22) transcribed mid-match
+instead, before each describe, at normal priority: about 2,000 CPU-seconds
+over the last match, the player's fps dropping, and a look still running 12
+minutes after the stop.
 """
 
 from __future__ import annotations
@@ -41,9 +48,10 @@ from pipeline_v2.capture import gameplay as gameplay_mod
 # How often to look for newly finished footage: the segment length, since
 # nothing new can be cut in between.
 INTERVAL = 30.0
-# Segments transcribed per look while the player is out of a match: about 10s
-# of CPU, which is also the longest stopping the recorder can wait on it.
-LISTEN_BATCH = 5
+# Segments transcribed per look while the player is out of a match: about 25s
+# on the live model's 2 threads (5 minutes of mic), so a lobby or two catches
+# up a match, and the longest stopping the recorder can wait on it.
+LISTEN_BATCH = 10
 # Windows in flight mid-match: one, so the decoding is a
 # trickle over the 30s rather than a burst. A segment holds about four windows.
 WORKERS = 1
@@ -75,23 +83,37 @@ def ready_windows(session: Path) -> tuple[list[clips_mod.ClipRequest], dict]:
     ], played
 
 
+def _inside(spans: list[tuple[float, float]], start: float, end: float) -> bool:
+    """Whether [start, end) is covered by `spans` (back-to-back segments join)."""
+    at = start
+    for first, last in sorted(spans):
+        if first <= at + 1e-6 < last:
+            at = last
+    return at >= end - 1e-6
+
+
 def step(session: Path, *, seen: set | None = None, cfg=None, workers: int = WORKERS,
          harvest_fn=None, describe_fn=None, store_fn=None, connect=None,
-         stopping: threading.Event | None = None, listen=None) -> int:
+         stopping: threading.Event | None = None, listen=None, heard=None) -> int:
     """Cut and describe whatever has become ready; how many were described.
 
     `seen` holds windows already dealt with, so a long session does not re-hash
-    every window it has every 30s.
+    every window it has every 30s. With `heard` (the transcribed stretches), a
+    window is ready only once all of it is transcribed; `listen` then attaches
+    what was said, without transcribing.
     """
     from pipeline_v2 import cache, cli, config, store
 
     seen = set() if seen is None else seen
+    half = clips_mod.COVERAGE_STRIDE / 2
     ready = [r for r in ready_windows(session)[0] if r.at not in seen]
+    if ready and heard is not None:
+        spans = heard(session)
+        ready = [r for r in ready if _inside(spans, r.at - half, r.at + half)]
     if not ready:
         return 0
     wanted = {r.at for r in ready}
     clips_mod.write_coverage(session)
-    half = clips_mod.COVERAGE_STRIDE / 2
     clip_dir = session / "windows"
     cut = (harvest_fn or clips_mod.harvest)(
         session, clip_dir, journal_name=clips_mod.COVERAGE_JOURNAL,
@@ -160,15 +182,17 @@ def _transcriber(holder: dict):
     return holder["model"]
 
 
-def listen_windows(session: Path, windows: list[Path], holder: dict) -> bool:
-    """Transcribe what is new and attach it to `windows`; False without the speech model."""
+def listen_windows(session: Path, windows: list[Path]) -> None:
+    """Attach what was already heard to `windows`; never runs the speech model."""
     from pipeline_v2.capture import voice
 
-    try:
-        voice.attach(session, windows, transcriber=_transcriber(holder))
-    except ImportError:
-        return False
-    return True
+    voice.attach(session, windows, limit=0)
+
+
+def heard_spans(session: Path) -> list[tuple[float, float]]:
+    from pipeline_v2.capture import voice
+
+    return voice.transcribed(session)
 
 
 def listen_step(session: Path, holder: dict, transcribe=None) -> bool:
@@ -188,8 +212,9 @@ def listen_step(session: Path, holder: dict, transcribe=None) -> bool:
 class LiveDescriber:
     """`step` every `interval` seconds on a background thread until `stop`.
 
-    With `speech`, the mic is also transcribed whenever the player is between
-    matches (lobby, island, spectating), so little of it is left at the end.
+    With `speech`, the mic is transcribed whenever the player is between
+    matches (lobby, island, spectating), and a window is described once its
+    stretch is. Without the speech model windows are described as they come.
     """
 
     def __init__(self, session: Path, interval: float = INTERVAL, step_fn=step,
@@ -206,10 +231,6 @@ class LiveDescriber:
         self.error: str | None = None
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._loop, name="live-describe", daemon=True)
-
-    def _listen(self, session: Path, windows: list[Path]) -> None:
-        if self.speech:
-            self.speech = listen_windows(session, windows, self._speech_model)
 
     def start(self) -> "LiveDescriber":
         from salience_media import ffmpeg
@@ -235,14 +256,15 @@ class LiveDescriber:
             due = time.monotonic() + self.interval
             try:
                 idle = self.idle_fn(self.session)
-                # Out of a match the machine is free, so catch up at full width.
+                # Out of a match the machine is free: transcribe first, so this
+                # look can describe what that frees, then catch up at full width.
+                if self.speech and idle:
+                    self.speech = self.listen_fn(self.session, self._speech_model)
                 extra = {"workers": IDLE_WORKERS} if idle else {}
                 if self.speech:
-                    extra["listen"] = self._listen
+                    extra.update(listen=listen_windows, heard=heard_spans)
                 self.described += self.step_fn(
                     self.session, seen=self.seen, stopping=self._stop, **extra)
-                if self.speech and idle and not self._stop.is_set():
-                    self.speech = self.listen_fn(self.session, self._speech_model)
             except Exception as exc:  # noqa: BLE001 -- never take the recording down
                 # The final run describes and transcribes whatever this missed.
                 self.error = f"{type(exc).__name__}: {exc}"

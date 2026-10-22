@@ -175,6 +175,10 @@ class Transcriber:
         options = onnxruntime.SessionOptions()
         # 0 lets onnxruntime take every core: right after a session, wrong mid-match.
         options.intra_op_num_threads = cpu_threads
+        # Idle threads sleep instead of spinning. 120s of mic (2026-10-22): every core
+        # 13.3s and 232 CPU-seconds spinning, 6.0s and 35 without; 2 threads, the
+        # same 9.9s at 27 CPU-seconds or 17. Spun cycles are the game's.
+        options.add_session_config_entry("session.intra_op.allow_spinning", "0")
         self._model = onnx_asr.load_model(
             MODEL, quantization=QUANTIZATION, sess_options=options).with_timestamps()
 

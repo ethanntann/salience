@@ -86,6 +86,19 @@ def test_pruned_segments_keep_what_was_heard(tmp_path):
     assert heard == [voice.Utterance(31.0, 32.0, "lol")]
 
 
+def test_transcribed_is_the_cached_stretches_and_limit_0_loads_no_model(tmp_path, monkeypatch):
+    """Mid-match the step reads only what is heard: no speech model, ever."""
+    session = _session(tmp_path, segments=3)
+    voice.transcribe_session(session, transcriber=FakeWhisper([(1.0, 2.0, "a")]),
+                             runner=_ffmpeg, limit=2)
+    monkeypatch.setattr("pipeline_v2.audio.Transcriber", None)  # would raise if built
+
+    heard = voice.transcribe_session(session, runner=_ffmpeg, limit=0)
+
+    assert voice.transcribed(session) == [(0.0, 30.0), (30.0, 60.0)]
+    assert heard == [voice.Utterance(1.0, 2.0, "a")]
+
+
 def test_no_mic_track_is_silence_not_an_error(tmp_path):
     session = _session(tmp_path, segments=1)
 

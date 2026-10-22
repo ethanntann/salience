@@ -89,6 +89,80 @@ def test_a_step_cuts_ready_windows_and_describes_each_once(tmp_path, monkeypatch
     assert asked == [{4.0, 12.0, 20.0}]  # the second step had nothing new to cut
 
 
+def test_a_window_waits_until_all_of_it_is_transcribed(tmp_path, monkeypatch):
+    """Mid-match nothing is transcribed, so a window not yet heard is held, not
+    described without its speech, and comes up again once it is heard."""
+    _segments(tmp_path, [30.0, 60.0])
+    _gameplay(monkeypatch, [(0.0, 1e9)])
+    monkeypatch.setattr("pipeline_v2.cache.clip_sha", lambda path: path.name)
+    cut: list[set] = []
+
+    def harvest(session, clip_dir, *, skip, **_):
+        requests = clips_mod.coverage_requests(clips_mod.read_segments(session))
+        wanted = [(i, r) for i, r in enumerate(requests) if not skip(r)]
+        cut.append({r.at for _, r in wanted})
+        clip_dir.mkdir(exist_ok=True)
+        for i, _ in wanted:
+            (clip_dir / f"{i:03d}-coverage.mkv").write_bytes(b"w")
+        return [{"video_file": f"{i:03d}-coverage.mkv"} for i, _ in wanted]
+
+    def describe(cfg, paths, max_calls, workers):
+        for path in paths:
+            yield path, (8.0, None, None)
+
+    heard = [(0.0, 30.0)]
+    attached: list[list[str]] = []
+    seen: set = set()
+    kwargs = dict(
+        seen=seen, cfg=SimpleNamespace(), harvest_fn=harvest, describe_fn=describe,
+        store_fn=lambda *a: None, connect=_Conn, heard=lambda s: heard,
+        listen=lambda s, windows: attached.append([w.name for w in windows]))
+
+    first = live.step(tmp_path, **kwargs)
+    heard.append((30.0, 60.0))  # the lobby transcribed the second segment
+    second = live.step(tmp_path, **kwargs)
+
+    # 4, 12, 20 lie in the first segment; 28 straddles both; 36, 44, 52 the second.
+    assert cut == [{4.0, 12.0, 20.0}, {28.0, 36.0, 44.0, 52.0}]
+    assert (first, second) == (3, 4)
+    assert len(attached) == 2
+
+
+def test_between_matches_speech_is_transcribed_before_the_step(tmp_path):
+    order: list[str] = []
+    done = threading.Event()
+
+    def step(session, seen, **kw):
+        order.append("step:" + ",".join(sorted(k for k in kw if k in ("listen", "heard"))))
+        done.set()
+        return 0
+
+    describer = live.LiveDescriber(
+        tmp_path, interval=0.01, step_fn=step, idle_fn=lambda s: True,
+        listen_fn=lambda s, holder: order.append("listen") or True).start()
+    assert done.wait(2.0)
+    describer.stop()
+
+    assert order[:2] == ["listen", "step:heard,listen"]
+
+
+def test_without_speech_windows_are_not_held(tmp_path):
+    passed: list[dict] = []
+    done = threading.Event()
+
+    def step(session, seen, **kw):
+        passed.append(kw)
+        done.set()
+        return 0
+
+    describer = live.LiveDescriber(tmp_path, interval=0.01, step_fn=step, speech=False,
+                                   idle_fn=lambda s: False).start()
+    assert done.wait(2.0)
+    describer.stop()
+
+    assert "heard" not in passed[0] and "listen" not in passed[0]
+
+
 def test_a_failing_step_never_stops_the_recording(tmp_path):
     calls = threading.Event()
 
