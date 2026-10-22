@@ -48,22 +48,30 @@ from pipeline_v2.capture import gameplay as gameplay_mod
 # Not a judgement of quality: a knock the player found boring still outranks a
 # rotation they loved. That is exactly why it is labelled as a fallback.
 _OUTCOME_ORDER = {"elimination": 2, "knock": 1}
-VICTORY_TIER = 3
 
 
 def event_tier(clip) -> int:
-    """What happened, coarsely: a win, then eliminations, knocks, the rest.
+    """What happened, coarsely: a win or an elimination, then knocks, the rest.
 
     Ranking goes by this first and by taste within a tier. Measured out of
     sample (taste trained on session 1, scored on session 2's 320 ratings),
     taste alone agreed with the player 86.9% of the time, the tier alone
-    92.3%, the tier then taste 96.5%. A win is its own tier because the model
-    files the Victory Royale banner under `other`/`no_event`, and the player
-    kept it; that moved one more kept moment into the top 10.
+    92.3%, the tier then taste 96.5%. The model files the Victory Royale banner
+    under `other`/`no_event`, so a win is read from the summary.
+
+    A win used to be a tier above kills. The player kept 6 of 17 win windows,
+    the same rate as kills (42 of 121), and none of the 6 on sessions 5 and 6.
+    Each session ranked by the other four (2026-10-22): wins first put 21 of
+    32 keeps in the top 10, wins among the kills 24, better or equal on every
+    session.
     """
-    if "victory royale" in (clip.summary or "").lower():
-        return VICTORY_TIER
+    if is_victory(clip):
+        return _OUTCOME_ORDER["elimination"]
     return _OUTCOME_ORDER.get((clip.payload or {}).get("outcome"), 0)
+
+
+def is_victory(clip) -> bool:
+    return "victory royale" in (clip.summary or "").lower()
 
 # What an exported highlight adds around its 8s coverage window: the approach
 # matters to a viewer even though the model only needed the window itself.
@@ -519,7 +527,7 @@ def fight_extent(clip, by_start: dict, pad: tuple[float, float]) -> tuple[float,
         # the cap rather than a second highlight of the same moment (session 3
         # ranked the final kill and its Victory Royale banner #1 and #2).
         after = by_start.get(round(end, 1))
-        if after is not None and event_tier(after) == VICTORY_TIER:
+        if after is not None and is_victory(after):
             end += stride
     return start - pad[0], end + pad[1]
 

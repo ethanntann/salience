@@ -70,8 +70,9 @@ python -m pipeline_v2.capture.highlights <session folder>   # re-rank with new r
 - **Game vocabulary, not captions.** The describer gets a Fortnite word bank
   (`pipeline_v2/games/fortnite.py`): each term with the visible cue that earns
   it (a crack, a box, piece control, a third party) and a ban on scenery.
-- **Ranking is what happened, then taste.** A win, then eliminations, then
-  knocks; within each, a logistic ranker trained on the player's own ratings
+- **Ranking is what happened, then taste.** Wins and eliminations, then
+  knocks (a win was kept no more often than a kill, and ranking wins first
+  cost 3 of 32 top-10 keeps); within each, a logistic ranker trained on the player's own ratings
   of the descriptions. Taste alone lost to that order out of sample.
 - **What was said counts only if it matters to you.** The mic is transcribed
   locally and kept as a separate signal. Its weight is chosen by

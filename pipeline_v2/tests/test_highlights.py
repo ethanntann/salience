@@ -340,8 +340,8 @@ def test_windows_outside_gameplay_are_skipped_but_keep_their_numbers(tmp_path, i
     assert manifest["gameplay"]["excluded_windows"] == 5
 
 
-def test_a_win_outranks_kills_and_kills_outrank_taste():
-    """Out of sample, what happened then taste beat taste alone (96.5% vs 86.9%)."""
+def test_a_win_ranks_with_kills_and_both_outrank_the_rest():
+    """A win was kept as often as a kill; above kills it cost 3 of 32 top-10 keeps."""
     from types import SimpleNamespace
 
     win = SimpleNamespace(summary="A Victory Royale banner appears", payload={"outcome": "other"})
@@ -350,7 +350,7 @@ def test_a_win_outranks_kills_and_kills_outrank_taste():
 
     tiers = [highlights.event_tier(c) for c in (win, kill, walk)]
 
-    assert tiers == sorted(tiers, reverse=True) and len(set(tiers)) == 3
+    assert tiers[0] == tiers[1] > tiers[2]
 
 
 def _windows(tmp_path, kinds):
