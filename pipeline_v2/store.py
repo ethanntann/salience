@@ -57,6 +57,15 @@ create table if not exists preferences (
     decided_at real not null
 );
 
+-- What a rating says beyond keep or skip: a keep the player loves (trained
+-- on at double weight), or why a skip was skipped (spray, bot, dull), which
+-- is what separates kills a binary label leaves alike.
+create table if not exists rating_notes (
+    clip_sha   text primary key references clips(clip_sha) on delete cascade,
+    love       integer not null default 0 check(love in (0, 1)),
+    reason     text
+);
+
 -- A reviewer saying "that description is wrong", per description (clip and
 -- prompt version), because the ranker reads only description text: an
 -- inaccurate one is a ranking error. The flags are the accuracy test set any

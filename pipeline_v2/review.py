@@ -13,6 +13,9 @@ from pipeline_v2 import prompt
 from pipeline_v2 import config
 from pipeline_v2.http_media import serve_video
 
+# Why a skip was skipped, keyed 1-3 on the page.
+SKIP_REASONS = ("spray", "bot", "dull")
+
 PAGE = """<!doctype html>
 <meta charset="utf-8"><title>Salience review</title>
 <style>
@@ -31,6 +34,8 @@ PAGE = """<!doctype html>
   kbd { background:#222933; border-radius:4px; padding:1px 6px; font-size:12px; }
   #done { font-size:19px; }
   #wrong.on { background:#5a1d1d; border-color:#a33; }
+  .reasons { color:#94a0ae; font-size:13px; align-items:center; }
+  .reasons button { padding:5px 12px; font-size:13px; }
 </style>
 <div id="progress"></div>
 <video id="v" controls autoplay muted></video>
@@ -40,7 +45,14 @@ PAGE = """<!doctype html>
 <div class="keys">
   <button onclick="rate(0)">Skip &nbsp;<kbd>J</kbd></button>
   <button onclick="rate(1)">Keep &nbsp;<kbd>K</kbd></button>
+  <button onclick="rate(1, {love: true})">Love &nbsp;<kbd>L</kbd></button>
   <button id="wrong" onclick="toggleWrong()">Description wrong &nbsp;<kbd>W</kbd></button>
+</div>
+<div class="keys reasons">
+  <span>Skip because:</span>
+  <button onclick="rate(0, {reason: 'spray'})">Spray &nbsp;<kbd>1</kbd></button>
+  <button onclick="rate(0, {reason: 'bot'})">Bot &nbsp;<kbd>2</kbd></button>
+  <button onclick="rate(0, {reason: 'dull'})">Dull &nbsp;<kbd>3</kbd></button>
 </div>
 <script>
 let current = null;
@@ -75,12 +87,12 @@ async function load() {
   document.getElementById('meta').textContent = d.name + (d.analysis_start_sec == null ? '' :
     ' · Description window: ' + d.analysis_start_sec.toFixed(1) + '–' + d.analysis_end_sec.toFixed(1) + 's');
 }
-async function rate(label) {
+async function rate(label, extra) {
   if (!current || rating) return;
   rating = true;
   try {
     const r = await fetch('/api/rate', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({sha: current.sha, label, wrong})});
+      body: JSON.stringify(Object.assign({sha: current.sha, label, wrong}, extra || {}))});
     if (!r.ok) throw new Error('Decision was not saved. Please retry.');
     await load();
   } catch (error) {
@@ -91,6 +103,10 @@ addEventListener('keydown', e => {
   if (e.key === 'j' || e.key === 'J') rate(0);
   if (e.key === 'k' || e.key === 'K') rate(1);
   if (e.key === 'w' || e.key === 'W') toggleWrong();
+  if (e.key === 'l' || e.key === 'L') rate(1, {love: true});
+  if (e.key === '1') rate(0, {reason: 'spray'});
+  if (e.key === '2') rate(0, {reason: 'bot'});
+  if (e.key === '3') rate(0, {reason: 'dull'});
 });
 load();
 </script>
@@ -244,6 +260,11 @@ class Handler(BaseHTTPRequestHandler):
                 payload.get("sha"), str
             ):
                 raise ValueError("provide a clip sha and a 0/1 label")
+            love = payload.get("love") is True
+            reason = payload.get("reason")
+            if (love and payload["label"] != 1) or (
+                    reason is not None and (payload["label"] != 0 or reason not in SKIP_REASONS)):
+                raise ValueError("love is a keep; a reason is one of a skip's")
         except (ValueError, TypeError):
             self._json({"error": "invalid preference"}, 400)
             return
@@ -260,6 +281,11 @@ class Handler(BaseHTTPRequestHandler):
                     " values (?, ?, strftime('%s','now'))",
                     (payload["sha"], payload["label"]),
                 )
+                conn.execute("delete from rating_notes where clip_sha=?", (payload["sha"],))
+                if love or reason:
+                    conn.execute(
+                        "insert into rating_notes (clip_sha, love, reason) values (?, ?, ?)",
+                        (payload["sha"], int(love), reason))
                 # Rating again replaces the flag too, so un-flagging sticks.
                 conn.execute(
                     "delete from description_flags where clip_sha=? and prompt_ver=?",
@@ -288,7 +314,7 @@ def serve(port: int = 8777, variant: str | None = None, only: Path | None = None
     if not pending.get("done"):
         print(
             f"rate clips:    http://localhost:{port}/   "
-            f"({pending['remaining']} waiting, J = skip, K = keep, W = description wrong)"
+            f"({pending['remaining']} waiting, J = skip, K = keep, L = love, 1-3 = skip because, W = description wrong)"
         )
     print("Ctrl+C to stop")
     with ThreadingHTTPServer(("127.0.0.1", port), Handler) as server:

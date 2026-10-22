@@ -32,6 +32,9 @@ MIN_SPEECH_GAIN = 0.01
 # Held-out blocks for choosing the weight: neighbouring windows of one session
 # are near-duplicates, so they must fall in the same fold.
 CV_BLOCK_SECONDS = 120.0
+# A keep the player marked as loved counts as two. Not yet measured: there
+# were no loved ratings to measure it on when it was added.
+LOVE_WEIGHT = 2.0
 
 
 def _cv_group(clip, fallback: str) -> str:
@@ -116,6 +119,7 @@ def ranked_fights(
         row["clip_sha"]: int(row["label"])
         for row in conn.execute("select clip_sha, label from preferences")
     }
+    loved = {row[0] for row in conn.execute("select clip_sha from rating_notes where love = 1")}
 
     groups = engagements.group(
         [c.path for c in stored], event_of=facts_mod.event_from_filename
@@ -146,7 +150,8 @@ def ranked_fights(
         candidate = example(
             clip,
             own_label if own_label is not None else pref.label,
-            1.0 if own_label is not None else pref.weight,
+            (LOVE_WEIGHT if clip.clip_sha in loved else 1.0)
+            if own_label is not None else pref.weight,
         )
         if taste_mod.has_features(candidate, mode):
             training.append(candidate)

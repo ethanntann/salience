@@ -119,3 +119,29 @@ def test_only_queues_clips_under_one_folder(conn, tmp_path, monkeypatch):
     pending = review._next_clip(conn)
 
     assert (pending["name"], pending["remaining"]) == ("b.mp4", 1)
+
+
+def test_love_and_skip_reasons_are_kept_and_replaced_on_rerating(server, conn):
+    _rate(server, {"sha": "one", "label": 1, "love": True})
+    assert tuple(conn.execute("select love, reason from rating_notes").fetchone()) == (1, None)
+
+    _rate(server, {"sha": "one", "label": 0, "reason": "bot"})
+    assert tuple(conn.execute("select love, reason from rating_notes").fetchone()) == (0, "bot")
+    assert conn.execute("select label from preferences").fetchone()[0] == 0
+
+    _rate(server, {"sha": "one", "label": 1})
+    assert conn.execute("select count(*) from rating_notes").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("payload", [
+    {"sha": "one", "label": 0, "love": True},  # a loved skip
+    {"sha": "one", "label": 1, "reason": "bot"},  # a keep with a skip's reason
+    {"sha": "one", "label": 0, "reason": "because"},
+])
+def test_notes_that_contradict_the_label_are_refused(server, conn, payload):
+    request = urllib.request.Request(server + "/api/rate", data=json.dumps(payload).encode())
+    with pytest.raises(urllib.error.HTTPError) as error:
+        urllib.request.urlopen(request, timeout=5)
+    assert error.value.code == 400
+    error.value.close()
+    assert conn.execute("select count(*) from preferences").fetchone()[0] == 0
