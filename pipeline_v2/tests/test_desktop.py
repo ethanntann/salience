@@ -91,3 +91,46 @@ def test_custom_quality_records_at_the_apps_fps_and_bitrate(tmp_path, monkeypatc
         app.set_custom_quality(144, 12, tmp_path / "settings.env")
     monkeypatch.setenv(app.BITRATE_KEY, "999")  # a hand-edited settings file
     assert app.custom_quality() == (60, "25M")
+
+
+def test_the_app_opens_at_a_session_or_its_rating():
+    from pipeline_v2.capture import desktop
+
+    assert desktop.target("20261022-184935") == "#/session/20261022-184935"
+    assert desktop.target("20261022-184935", "rate") == "#/rate/20261022-184935"
+    assert desktop.target("", "rate") == "#/rate"
+    assert desktop.target("", "anything") == "#/"
+
+
+def test_a_trim_outside_the_clip_or_under_a_second_is_refused(tmp_path, monkeypatch):
+    session = _session(tmp_path, {"highlights": [{"rank": 1, "clip": "a.mkv", "file": "01-a.mkv"}]})
+    monkeypatch.setattr(server, "_probe_seconds", lambda path: 20.0)
+    ran = []
+    monkeypatch.setattr(server, "_run", lambda command: ran.append(command) or True)
+
+    assert not server.trim_highlight(session, "01-a.mkv", 5.0, 5.5)  # half a second
+    assert not server.trim_highlight(session, "01-a.mkv", 12.0, 25.0)  # past the end
+    assert not server.trim_highlight(session, "01-a.mkv", 9.0, 3.0)
+    assert ran == []
+
+
+def test_a_mixed_highlight_is_played_with_its_mix_alone(tmp_path, monkeypatch):
+    """Mixing the mix with the game track again played the game twice."""
+    from pipeline_v2 import config, http_media
+
+    clip = tmp_path / "01-a.mkv"
+    clip.write_bytes(b"three tracks")
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(http_media, "_audio_tracks", lambda path: [http_media.MIXED_TITLE, "game", "mic"])
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(command)
+        Path(command[-1]).write_bytes(b"mp4")
+        return type("Done", (), {"returncode": 0})()
+
+    monkeypatch.setattr(http_media.subprocess, "run", run)
+    http_media.playable(clip)
+
+    assert "amix" not in " ".join(commands[0])
+    assert commands[0][commands[0].index("-map", commands[0].index("0:v:0")) + 1] == "0:a:0"

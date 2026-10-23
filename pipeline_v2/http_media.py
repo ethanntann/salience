@@ -14,16 +14,22 @@ _LOCKS: dict[str, threading.Lock] = {}
 _LOCKS_GUARD = threading.Lock()
 
 
-def _audio_tracks(path: Path) -> int:
+# The title an exported highlight's first track carries when it is already
+# the game and the mic mixed (`capture.highlights.mix_tracks`).
+MIXED_TITLE = "game + mic"
+
+
+def _audio_tracks(path: Path) -> list[str]:
+    """Each audio track's title ("" when untitled), in order."""
     try:
         out = subprocess.run(
             ["ffprobe", "-v", "error", "-select_streams", "a",
-             "-show_entries", "stream=index", "-of", "csv=p=0", str(path)],
+             "-show_entries", "stream=index:stream_tags=title", "-of", "csv=p=0", str(path)],
             capture_output=True, text=True, timeout=30,
         ).stdout
     except (OSError, subprocess.SubprocessError):
-        return 0
-    return len([line for line in out.splitlines() if line.strip()])
+        return []
+    return [(line.split(",", 1) + [""])[1].strip() for line in out.splitlines() if line.strip()]
 
 
 def playable(path: Path) -> Path:
@@ -42,8 +48,9 @@ def playable(path: Path) -> Path:
     from pipeline_v2 import config
 
     stat = path.stat()
+    # "v2": copies made before a mixed first track was recognised hear the game twice.
     key = hashlib.sha256(
-        f"{path.resolve()}|{stat.st_size}|{stat.st_mtime_ns}".encode()
+        f"v2|{path.resolve()}|{stat.st_size}|{stat.st_mtime_ns}".encode()
     ).hexdigest()[:24]
     target = config.DATA_DIR / "playable" / f"{key}.mp4"
     if target.is_file():
@@ -55,8 +62,13 @@ def playable(path: Path) -> Path:
         if target.is_file():
             return target
         target.parent.mkdir(parents=True, exist_ok=True)
-        tracks = _audio_tracks(path)
-        if tracks >= 2:
+        titles = _audio_tracks(path)
+        tracks = len(titles)
+        if tracks >= 2 and titles[0] == MIXED_TITLE:
+            # Already the game and the mic mixed; mixing it with the game track
+            # again played the game twice (2026-10-23).
+            audio = ["-map", "0:v:0", "-map", "0:a:0", "-c:a", "copy"]
+        elif tracks >= 2:
             audio = ["-filter_complex",
                      "[0:a:0][0:a:1]amix=inputs=2:normalize=0[mixed]",
                      "-map", "0:v:0", "-map", "[mixed]", "-c:a", "aac", "-b:a", "160k"]

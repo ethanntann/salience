@@ -29,13 +29,22 @@ def _running_port() -> int | None:
         return None
 
 
-def show_running(session: str = "", timeout: float = 2.0) -> bool:
+VIEWS = ("session", "rate")
+
+
+def target(session: str = "", view: str = "session") -> str:
+    """The app's address for a view of a session: `#/session/<id>`, `#/rate/<id>`."""
+    view = view if view in VIEWS else "session"
+    return f"#/{view}/{session}" if session else ("#/rate" if view == "rate" else "#/")
+
+
+def show_running(session: str = "", timeout: float = 2.0, view: str = "session") -> bool:
     """Ask an open window to come forward (at `session`); False if none answers."""
     port = _running_port()
     if port is None:
         return False
     request = urllib.request.Request(
-        f"http://127.0.0.1:{port}/api/show", data=json.dumps({"session": session}).encode(),
+        f"http://127.0.0.1:{port}/api/show", data=json.dumps({"session": session, "view": view}).encode(),
         headers={"Content-Type": "application/json"}, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=timeout):
@@ -44,14 +53,14 @@ def show_running(session: str = "", timeout: float = 2.0) -> bool:
         return False
 
 
-def launch(session: Path | None = None) -> None:
-    """Open the app, at `session` when given; an open one is brought forward."""
+def launch(session: Path | None = None, view: str = "session") -> None:
+    """Open the app at a view of `session`; an open one is brought forward."""
     name = session.name if session is not None else ""
-    if show_running(name):
+    if show_running(name, view=view):
         return
     executable = Path(sys.executable)
     windowless = executable.with_name("pythonw.exe")
     command = [str(windowless if windowless.is_file() else executable),
-               "-m", "pipeline_v2.capture.desktop", *([name] if name else [])]
+               "-m", "pipeline_v2.capture.desktop", *([f"{view}/{name}"] if name else [])]
     subprocess.Popen(command, cwd=os.getcwd(),
                      creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

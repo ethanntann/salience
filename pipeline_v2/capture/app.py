@@ -23,13 +23,11 @@ import os
 import sys
 import threading
 import time
-import webbrowser
 from pathlib import Path
 
 APP_DIR = Path(os.environ.get("APPDATA", Path.home())) / "Salience"
 SETTINGS = APP_DIR / "settings.env"
 LOG = APP_DIR / "salience.log"
-REVIEW_PORT = 8777
 
 # What a player gets without a developer .env: the describer, prompt and prices
 # measured best (README, "Measured"). The budget is a runaway guard on the
@@ -291,12 +289,12 @@ def set_resolution(name: str, path: Path = SETTINGS) -> None:
     os.environ[RESOLUTION_KEY] = name
 
 
-def open_app(session: Path | None = None) -> None:
-    """The desktop app, at `session`; the highlights folder if it cannot start."""
+def open_app(session: Path | None = None, view: str = "session") -> None:
+    """The desktop app, at a view of `session`; the highlights folder if it cannot start."""
     try:
         from pipeline_v2.capture import desktop
 
-        desktop.launch(session)
+        desktop.launch(session, view)
     except Exception as exc:  # noqa: BLE001 -- the highlights must still be reachable
         print(f"app failed: {type(exc).__name__}: {exc}", flush=True)
         out = session / "highlights" if session is not None else None
@@ -387,31 +385,6 @@ def _icon_image(recording: bool):
     return image
 
 
-class _Review:
-    """The rating page, served once and pointed at the latest session."""
-
-    def __init__(self):
-        self._thread: threading.Thread | None = None
-
-    def open(self, session: Path | None) -> None:
-        from pipeline_v2 import review
-        from pipeline_v2.capture import highlights, rating
-
-        variant = highlights._configured_variant()
-        if self._thread is None:
-            self._thread = threading.Thread(
-                target=review.serve, kwargs=dict(
-                    port=REVIEW_PORT, variant=variant, only=session,
-                    playable=rating.playable, on_rated=rating.rated),
-                name="review", daemon=True)
-            self._thread.start()
-            time.sleep(0.5)
-        else:
-            review._VARIANT = variant
-            review._ONLY = str(session.resolve()) if session else None
-        webbrowser.open(f"http://localhost:{REVIEW_PORT}/")
-
-
 def hide_child_consoles() -> None:
     """Start every child process without a console window.
 
@@ -482,7 +455,6 @@ def main() -> int:
                             make_highlights=make_highlights, notify=notify,
                             game_running=game_running)
     controller.last_session = latest_session(_recording_args().out)
-    review = _Review()
     quitting = threading.Event()
 
     def worker() -> None:
@@ -530,7 +502,7 @@ def main() -> int:
         pystray.MenuItem("Open latest highlights folder",
                          lambda *_: open_folder(
                              controller.last_session and controller.last_session / "highlights")),
-        pystray.MenuItem("Rate latest session", lambda *_: review.open(controller.last_session)),
+        pystray.MenuItem("Rate latest session", lambda *_: open_app(controller.last_session, "rate")),
         pystray.MenuItem("Open recordings folder",
                          lambda *_: open_folder(_recording_args().out)),
         pystray.Menu.SEPARATOR,

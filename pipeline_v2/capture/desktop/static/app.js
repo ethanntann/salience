@@ -182,7 +182,7 @@ async function showSession(id, file) {
     ${missing}
     ${current ? `<div class="split">
       <section class="stage" aria-label="Now playing">
-        <div class="screen" id="screen"><video id="player" controls autoplay src="/video/${enc(s.id)}/${enc(current.file)}"></video></div>
+        <div class="screen" id="screen"><video id="player" controls autoplay src="/video/${enc(s.id)}/${enc(current.file)}?v=${enc(current.length)}"></video></div>
         <div class="caption">
           <div class="words">
             <div class="title"><h2>${esc(current.title)}</h2>${current.loved ? HEART : ""}</div>
@@ -191,9 +191,28 @@ async function showSession(id, file) {
           </div>
           <div class="actions">
             ${current.reel ? '<button class="button" id="reel">9:16 reel</button>' : ""}
+            <button class="button" id="trim">Trim</button>
+            <button class="button" id="export">Export MP4</button>
             <button class="button icon" id="delete" aria-label="Delete this highlight">${BIN}</button>
           </div>
         </div>
+        <div class="trimmer" id="trimmer" hidden>
+          <div class="trim-track" id="track">
+            <div class="trim-keep" id="keep"></div>
+            <input type="range" id="trim-start" min="0" max="1" step="0.1" value="0" aria-label="Trim start">
+            <input type="range" id="trim-end" min="0" max="1" step="0.1" value="1" aria-label="Trim end">
+          </div>
+          <div class="trim-row">
+            <span id="trim-label"></span>
+            <div class="actions">
+              ${current.trimmed ? '<button class="button ghost" id="restore">Restore original</button>' : ""}
+              <button class="button ghost" id="trim-cancel">Cancel</button>
+              <button class="button" id="trim-preview">Preview</button>
+              <button class="button primary" id="trim-save">Save trim</button>
+            </div>
+          </div>
+        </div>
+        <div class="saved" id="saved" hidden></div>
       </section>
       <section class="list" aria-labelledby="ranked">
         <h3 id="ranked">${s.highlights.length} highlights</h3>
@@ -216,6 +235,72 @@ async function showSession(id, file) {
       page.querySelector("#player").src = vertical
         ? `/reel/${enc(s.id)}/${enc(current.reel)}` : `/video/${enc(s.id)}/${enc(current.file)}`;
       reel.textContent = vertical ? "16:9 original" : "9:16 reel";
+    });
+  }
+  const player = page.querySelector("#player");
+  const trimmer = page.querySelector("#trimmer");
+  if (trimmer) {
+    const first = page.querySelector("#trim-start");
+    const last = page.querySelector("#trim-end");
+    const clock = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}.${Math.floor((t % 1) * 10)}`;
+    let previewing = false;
+    const paint = () => {
+      const length = Number(last.max) || 1;
+      let a = Number(first.value), b = Number(last.value);
+      if (b - a < 1) { if (document.activeElement === first) first.value = a = Math.max(0, b - 1); else last.value = b = Math.min(length, a + 1); }
+      const keep = page.querySelector("#keep");
+      keep.style.left = `${(a / length) * 100}%`;
+      keep.style.width = `${((b - a) / length) * 100}%`;
+      page.querySelector("#trim-label").textContent = `${clock(a)} to ${clock(b)} · keeps ${(b - a).toFixed(1)}s of ${length.toFixed(1)}s`;
+    };
+    const ready = () => {
+      const length = Math.floor(player.duration * 10) / 10;
+      first.max = last.max = String(length);
+      if (Number(last.value) <= 1) last.value = String(length);
+      paint();
+    };
+    page.querySelector("#trim").addEventListener("click", () => {
+      trimmer.hidden = !trimmer.hidden;
+      if (!trimmer.hidden) { if (player.readyState >= 1) ready(); else player.addEventListener("loadedmetadata", ready, { once: true }); }
+    });
+    first.addEventListener("input", () => { paint(); player.currentTime = Number(first.value); });
+    last.addEventListener("input", () => { paint(); player.currentTime = Number(last.value); });
+    player.addEventListener("timeupdate", () => {
+      if (previewing && player.currentTime >= Number(last.value)) { player.pause(); previewing = false; }
+    });
+    page.querySelector("#trim-preview").addEventListener("click", () => {
+      previewing = true; player.currentTime = Number(first.value); player.play();
+    });
+    page.querySelector("#trim-cancel").addEventListener("click", () => { trimmer.hidden = true; previewing = false; });
+    page.querySelector("#trim-save").addEventListener("click", async (e) => {
+      e.target.disabled = true; e.target.textContent = "Saving…";
+      const done = await api("/api/trim", { session: s.id, file: current.file,
+        start: Number(first.value), end: Number(last.value) }).catch(() => ({ ok: false }));
+      if (!done.ok) { e.target.disabled = false; e.target.textContent = "Save trim"; alert("That trim could not be saved."); return; }
+      await library(true);
+      route();
+    });
+    const restore = page.querySelector("#restore");
+    if (restore) restore.addEventListener("click", async () => {
+      await api("/api/restore", { session: s.id, file: current.file });
+      await library(true);
+      route();
+    });
+  }
+  const exporter = page.querySelector("#export");
+  if (exporter) {
+    exporter.addEventListener("click", async () => {
+      exporter.disabled = true;
+      const done = await api("/api/export", { session: s.id, file: current.file }).catch(() => ({ ok: false }));
+      exporter.disabled = false;
+      const saved = page.querySelector("#saved");
+      if (done.cancelled) return;
+      saved.hidden = false;
+      saved.innerHTML = done.ok
+        ? `Saved <b>${esc(done.path.split(/[\/]/).pop())}</b> <button class="button ghost" id="reveal">Show in folder</button>`
+        : "That export could not be made.";
+      const reveal = saved.querySelector("#reveal");
+      if (reveal) reveal.addEventListener("click", () => api("/api/reveal", { path: done.path }));
     });
   }
   const remove = page.querySelector("#delete");

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -140,6 +141,7 @@ def session_view(session: Path, conn) -> dict:
             "length": _clock(lengths.get(h["file"])),
             "loved": bool(clip and clip.clip_sha in loved),
             "asked": bool(h.get("asked")), "added": h.get("trigger") == highlights.RATED_TRIGGER,
+            "trimmed": (out / ORIGINALS / h["file"]).is_file(),
         })
     segments = clips_mod.read_segments(session)
     started = datetime.strptime(session.name, "%Y%m%d-%H%M%S")
@@ -231,10 +233,87 @@ def delete_highlight(session: Path, name: str) -> bool:
     return True
 
 
+ORIGINALS = ".originals"  # a trimmed highlight's untrimmed file, for "Restore original"
+MIN_TRIM = 1.0  # seconds: shorter is not a clip
+_NO_CONSOLE = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def _run(command: list[str]) -> bool:
+    return subprocess.run(command, capture_output=True, creationflags=_NO_CONSOLE).returncode == 0
+
+
+def _refresh(out: Path, name: str) -> None:
+    """After a highlight's file changed: its still, length and reel are made again."""
+    (out / THUMBS / (Path(name).stem + ".jpg")).unlink(missing_ok=True)
+    cache = out / THUMBS / "lengths.json"
+    try:
+        known = json.loads(cache.read_text(encoding="utf-8"))
+        known.pop(name, None)
+        cache.write_text(json.dumps(known), encoding="utf-8")
+    except (OSError, ValueError):
+        pass
+    manifest = highlights._manifest(out) or {}
+    reel = next((h.get("reel") for h in manifest.get("highlights", []) if h.get("file") == name), "")
+    if reel:
+        threading.Thread(target=highlights.make_reel, args=(out / name, out / highlights.REEL_DIR / reel),
+                         name="reel", daemon=True).start()
+
+
+def trim_highlight(session: Path, name: str, start: float, end: float) -> bool:
+    """Keep [start, end) of a highlight, re-encoded so the cut is exact.
+
+    Stream-copied, a cut can only start on a keyframe (every 2s), which is the
+    difference between a clip that opens on the shot and one that opens late.
+    NVENC re-encodes it in about a second. Every audio track is kept with its
+    title, the mix still first. The first trim keeps the untrimmed file aside.
+    """
+    out = session / "highlights"
+    source = out / name
+    length = _probe_seconds(source) if source.is_file() else None
+    if length is None or not (0 <= start < end <= length + 0.05) or end - start < MIN_TRIM:
+        return False
+    original = out / ORIGINALS / name
+    with highlights._HIGHLIGHTS_LOCK:
+        if not original.is_file():
+            original.parent.mkdir(exist_ok=True)
+            shutil.copy2(source, original)
+        partial = out / f"trimming-{name}"
+        base = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-ss", f"{start:.3f}", "-i", str(source),
+                "-t", f"{end - start:.3f}", "-map", "0", "-map_metadata", "0"]
+        tail = ["-c:a", "aac", "-b:a", "192k", str(partial)]
+        if not (_run(base + ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "19", "-b:v", "0"] + tail)
+                or _run(base + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18"] + tail)):
+            partial.unlink(missing_ok=True)
+            return False
+        partial.replace(source)
+    _refresh(out, name)
+    return True
+
+
+def restore_highlight(session: Path, name: str) -> bool:
+    out = session / "highlights"
+    original = out / ORIGINALS / name
+    if not original.is_file():
+        return False
+    with highlights._HIGHLIGHTS_LOCK:
+        original.replace(out / name)
+    _refresh(out, name)
+    return True
+
+
+def export_mp4(source: Path, destination: Path) -> bool:
+    """An MP4 anything plays: the video copied, and the one mixed track a phone hears."""
+    if destination.suffix.lower() != ".mp4":
+        destination = destination.with_suffix(".mp4")
+    return _run(["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", str(source), "-map", "0:v:0",
+                 "-map", "0:a:0?", "-c", "copy", "-movflags", "+faststart", str(destination)])
+
+
 class Handler(review.Handler):
     """The rating page's routes, under the app's own."""
 
     show = None  # set by the window: bring it forward, at a session
+    save_as = None  # set by the window: a Save dialog, (suggested name) -> path or None
 
     def _static(self, name: str) -> None:
         path = (STATIC / name).resolve()
@@ -316,6 +395,32 @@ class Handler(review.Handler):
             name = str(data.get("file", ""))
             ok = FILE_NAME.match(name) is not None and delete_highlight(session, name)
             return self._json({"ok": ok}, 200 if ok else 404)
+        name = str(data.get("file", ""))
+        if self.path in ("/api/trim", "/api/restore", "/api/export"):
+            if session is None or not FILE_NAME.match(name) or not (session / "highlights" / name).is_file():
+                return self._json({"ok": False}, 404)
+        if self.path == "/api/trim":
+            try:
+                start, end = float(data.get("start")), float(data.get("end"))
+            except (TypeError, ValueError):
+                return self._json({"ok": False}, 400)
+            ok = trim_highlight(session, name, start, end)
+            return self._json({"ok": ok}, 200 if ok else 400)
+        if self.path == "/api/restore":
+            return self._json({"ok": restore_highlight(session, name)})
+        if self.path == "/api/export":
+            suggested = f"Salience {session.name} {Path(name).stem}.mp4"
+            chosen = Handler.save_as(suggested) if Handler.save_as is not None else None
+            if not chosen:
+                return self._json({"ok": False, "cancelled": True})
+            target = Path(chosen).with_suffix(".mp4")
+            ok = export_mp4(session / "highlights" / name, target)
+            return self._json({"ok": ok, "path": str(target) if ok else ""})
+        if self.path == "/api/reveal":
+            path = Path(str(data.get("path", "")))
+            if path.is_file():
+                subprocess.Popen(["explorer", "/select,", str(path)], creationflags=_NO_CONSOLE)
+            return self._json({"ok": path.is_file()})
         if self.path == "/api/settings":
             from pipeline_v2.capture import app
 
@@ -332,7 +437,7 @@ class Handler(review.Handler):
             return self._json(settings())
         if self.path == "/api/show":
             if Handler.show is not None:
-                Handler.show(str(data.get("session", "")))
+                Handler.show(str(data.get("session", "")), str(data.get("view", "session")))
             return self._json({"ok": True})
         return self.send_error(404)
 
