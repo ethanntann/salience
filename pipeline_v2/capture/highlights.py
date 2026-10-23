@@ -87,18 +87,61 @@ REEL_DIR = "reels"
 REEL_SIZE = (1080, 1920)
 
 
+# The game and the mic as one track, at the levels they were recorded at; the
+# limiter only catches a shout over gunfire summing past full scale.
+MIXED_TITLE = "game + mic"
+_MIX = "amix=inputs={n}:normalize=0,alimiter=limit=0.97"
+
+
+def _audio_tracks(source: Path, runner=subprocess.run) -> list[str]:
+    """Each audio track's title ("" when untitled), in order."""
+    probe = runner(["ffprobe", "-v", "error", "-select_streams", "a",
+                    "-show_entries", "stream=index:stream_tags=title", "-of", "csv=p=0",
+                    str(source)], capture_output=True, text=True)
+    if probe.returncode != 0:
+        return []
+    return [(line.split(",", 1) + [""])[1].strip() for line in (probe.stdout or "").splitlines()
+            if line.strip()]
+
+
+def mix_tracks(path: Path, runner=subprocess.run) -> bool:
+    """Put the game and the mic, mixed, first and default in an exported highlight.
+
+    The recording keeps them as separate tracks, the game's the default, and a
+    player plays the default alone: the player heard none of their own mic in
+    their highlights (2026-10-23). The separate tracks stay after the mix, for
+    editing. Video is copied; only the mix is encoded. False leaves `path` as it was.
+    """
+    tracks = _audio_tracks(path, runner)
+    if len(tracks) < 2 or tracks[0] == MIXED_TITLE:
+        return False
+    inputs = "".join(f"[0:a:{i}]" for i in range(len(tracks)))
+    temporary = path.with_name(path.stem + ".mixing" + path.suffix)
+    done = runner(["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", str(path),
+                   "-filter_complex", f"{inputs}{_MIX.format(n=len(tracks))}[mix]",
+                   "-map", "0:v", "-map", "[mix]", "-map", "0:a",
+                   "-c", "copy", "-c:a:0", "aac", "-b:a:0", "192k",
+                   "-metadata:s:a:0", f"title={MIXED_TITLE}",
+                   "-metadata:s:a:1", "title=game", "-metadata:s:a:2", "title=mic",
+                   "-disposition:a", "0", "-disposition:a:0", "default",
+                   str(temporary)], capture_output=True)
+    if done.returncode != 0 or not temporary.is_file():
+        temporary.unlink(missing_ok=True)
+        return False
+    temporary.replace(path)
+    return True
+
+
 def make_reel(source: Path, destination: Path, runner=subprocess.run) -> bool:
     """A 9:16 copy of one exported highlight. False if it could not be made."""
-    probe = runner(["ffprobe", "-v", "error", "-select_streams", "a",
-                    "-show_entries", "stream=index", "-of", "csv=p=0", str(source)],
-                   capture_output=True, text=True)
-    tracks = len((probe.stdout or "").split()) if probe.returncode == 0 else 0
+    tracks = _audio_tracks(source, runner)
     width, height = REEL_SIZE
     video = (f"[0:v]crop=trunc(ih*{width}/{height}/2)*2:ih,"
              f"scale={width}:{height}:flags=lanczos,setsar=1[v]")
-    if tracks > 1:
-        inputs = "".join(f"[0:a:{i}]" for i in range(tracks))
-        graph, audio = f"{video};{inputs}amix=inputs={tracks}:normalize=0[a]", ["-map", "[a]"]
+    if len(tracks) > 1 and tracks[0] != MIXED_TITLE:
+        inputs = "".join(f"[0:a:{i}]" for i in range(len(tracks)))
+        graph = f"{video};{inputs}{_MIX.format(n=len(tracks))}[a]"
+        audio = ["-map", "[a]"]
     else:
         graph, audio = video, (["-map", "0:a:0"] if tracks else [])
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -781,9 +824,11 @@ def run(
         kind, _, item = job
         destination = out / name(position, job)
         if kind == "raw":
-            return clips_mod.cut_span(session, *item, destination) is not None
-        if not (coverage and export(session, item, destination, extent(item))):
+            if clips_mod.cut_span(session, *item, destination) is None:
+                return False
+        elif not (coverage and export(session, item, destination, extent(item))):
             shutil.copy2(Path(item.path), destination)
+        mix_tracks(destination)
         return True
 
     # Side by side: each is a stream copy waiting on the disk, and one after

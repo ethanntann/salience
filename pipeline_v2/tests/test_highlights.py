@@ -18,6 +18,7 @@ from pipeline_v2.capture import clips, highlights
 
 VARIANT = "v3.6-ownkills-window@minimax-m3"
 _MAKE_REEL = highlights.make_reel  # before the fixture stubs it
+_MIX_TRACKS = highlights.mix_tracks
 
 
 @pytest.fixture(autouse=True)
@@ -29,6 +30,7 @@ def _deaf(monkeypatch):
     monkeypatch.setattr(highlights, "unembedded", lambda clip_dir: 0)
     # Nor NVENC; reels have their own test.
     monkeypatch.setattr(highlights, "make_reel", lambda source, destination: False)
+    monkeypatch.setattr(highlights, "mix_tracks", lambda path: False)
 
 
 def _session(tmp_path: Path, outcomes: list[str]) -> Path:
@@ -487,7 +489,7 @@ def test_a_reel_is_cropped_to_9_16_with_both_tracks_mixed(tmp_path):
     def runner(command, **kwargs):
         calls.append(command)
         if command[0] == "ffprobe":
-            return SimpleNamespace(returncode=0, stdout="1 2")
+            return SimpleNamespace(returncode=0, stdout="1\n2\n")
         Path(command[-1]).write_bytes(b"reel")
         return SimpleNamespace(returncode=0)
 
@@ -498,6 +500,48 @@ def test_a_reel_is_cropped_to_9_16_with_both_tracks_mixed(tmp_path):
     assert "crop=trunc(ih*1080/1920/2)*2:ih" in graph and "scale=1080:1920" in graph
     assert "[0:a:0][0:a:1]amix=inputs=2" in graph
     assert reel.is_file()
+
+
+def test_a_highlight_plays_the_game_and_the_mic_mixed_by_default(tmp_path):
+    """A player plays the default track only; the mic was its own, unheard."""
+    calls = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        if command[0] == "ffprobe":
+            return SimpleNamespace(returncode=0, stdout="1\n2\n")
+        Path(command[-1]).write_bytes(b"mixed")
+        return SimpleNamespace(returncode=0)
+
+    clip = tmp_path / "01-x.mkv"
+    clip.write_bytes(b"two tracks")
+
+    assert _MIX_TRACKS(clip, runner=runner)
+
+    command = calls[1]
+    assert "[0:a:0][0:a:1]amix=inputs=2" in command[command.index("-filter_complex") + 1]
+    maps = [command[i + 1] for i, arg in enumerate(command) if arg == "-map"]
+    assert maps == ["0:v", "[mix]", "0:a"]  # the mix first, the separate tracks kept
+    assert "-disposition:a:0" in command and f"title={highlights.MIXED_TITLE}" in command
+    assert clip.read_bytes() == b"mixed"
+
+
+def test_an_already_mixed_highlight_is_left_and_its_reel_uses_the_mix(tmp_path):
+    calls = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        if command[0] == "ffprobe":
+            return SimpleNamespace(returncode=0, stdout=f"1,{highlights.MIXED_TITLE}\n2,game\n3,mic\n")
+        Path(command[-1]).write_bytes(b"reel")
+        return SimpleNamespace(returncode=0)
+
+    assert not _MIX_TRACKS(tmp_path / "01-x.mkv", runner=runner)
+    assert _MAKE_REEL(tmp_path / "01-x.mkv", tmp_path / "reels" / "01-x.mp4", runner=runner)
+
+    reel = calls[-1]
+    assert "amix" not in reel[reel.index("-filter_complex") + 1]
+    assert reel[reel.index("[v]") + 1:reel.index("[v]") + 3] == ["-map", "0:a:0"]
 
 
 def test_every_kept_highlight_gets_a_reel_after_the_folder_is_made(tmp_path, isolated_data):
