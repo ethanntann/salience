@@ -351,7 +351,7 @@ function playerControls(s, current) {
   const line = page.querySelector("#timeline");
   const el = (id) => page.querySelector(`#${id}`);
   const MIN = 1.0; // seconds: the shortest trim the server accepts
-  let length = 0, a = 0, b = 0, trimming = false, dragging = null, vertical = false;
+  let length = 0, a = 0, b = 0, trimming = false, dragging = null, vertical = false, shownPaused = null;
 
   const pct = (t) => `${length ? (t / length) * 100 : 0}%`;
   const paint = () => {
@@ -369,10 +369,15 @@ function playerControls(s, current) {
       el("h-end").style.left = pct(b);
       el("trimnote").textContent = `Keeps ${tenths(a)} to ${tenths(b)} · ${(Math.round(b * 10) / 10 - Math.round(a * 10) / 10).toFixed(1)}s`;
     }
+    // Only when it changes: replacing the icon every frame swapped the element
+    // under the pointer between press and release, and the click was lost.
     const paused = video.paused;
-    el("play").innerHTML = paused ? PLAY : PAUSE;
-    el("play").setAttribute("aria-label", paused ? "Play" : "Pause");
-    el("big-play").hidden = !paused;
+    if (paused !== shownPaused) {
+      shownPaused = paused;
+      el("play").innerHTML = paused ? PLAY : PAUSE;
+      el("play").setAttribute("aria-label", paused ? "Play" : "Pause");
+      el("big-play").hidden = !paused;
+    }
   };
   const loop = () => { if (!page.contains(video)) return; paint(); requestAnimationFrame(loop); };
   const ready = () => {

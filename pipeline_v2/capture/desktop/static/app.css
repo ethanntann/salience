@@ -205,6 +205,8 @@ h2 { margin: 0; font: 600 22px/1.25 var(--display); }
 .ctl { width: 40px; height: 40px; border-radius: 8px; border: none; background: transparent; color: var(--ink);
   display: flex; align-items: center; justify-content: center; }
 .ctl:hover { background: var(--surface); }
+/* A click on an icon is a click on its button. */
+button svg { pointer-events: none; }
 .controls .time { font-size: 13px; font-variant-numeric: tabular-nums; }
 .controls .faint { color: var(--faint); }
 .killnote { font-size: 12px; color: #FF8FB4; margin-left: 4px; }
