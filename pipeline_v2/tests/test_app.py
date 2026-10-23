@@ -255,3 +255,38 @@ def test_recording_resolution_defaults_to_full_size_and_follows_the_menu(tmp_pat
     monkeypatch.setenv(app.RESOLUTION_KEY, "4k")  # a hand-edited settings file
     assert app.resolution() == "full"
     monkeypatch.delenv(app.RESOLUTION_KEY)
+
+
+def test_autoclip_is_on_until_turned_off_and_off_asks_the_recorder_to_finish(tmp_path, monkeypatch):
+    monkeypatch.delenv(app.AUTOCLIP_KEY, raising=False)
+    monkeypatch.setattr(app, "STOP_REQUEST", tmp_path / "stop.request")
+    started = []
+    monkeypatch.setattr(app, "start_tray", lambda: started.append(1))
+    monkeypatch.setattr(app, "tray_running", lambda: True)
+    assert app.autoclip_on()  # the tray ran before the switch existed
+
+    app.set_autoclip(False, tmp_path / "settings.env")
+    assert not app.autoclip_on() and (tmp_path / "stop.request").is_file()
+    assert app.read_settings(tmp_path / "settings.env")[app.AUTOCLIP_KEY] == "off"
+
+    monkeypatch.setattr(app, "tray_running", lambda: False)
+    app.set_autoclip(True, tmp_path / "settings.env")
+    assert app.autoclip_on() and started == [1]
+    assert not (tmp_path / "stop.request").exists()  # a stale request must not stop the new one
+    monkeypatch.delenv(app.AUTOCLIP_KEY)
+
+
+def test_a_running_tray_records_with_what_the_app_set_since(tmp_path, monkeypatch):
+    """`load_environment` only fills gaps; settings changed by the app must win."""
+    monkeypatch.setenv(app.QUALITY_KEY, "high")
+    app.write_setting(app.QUALITY_KEY, "max", tmp_path / "settings.env")
+    app.reload_settings(tmp_path / "settings.env")
+    assert app.quality() == "max"
+    monkeypatch.delenv(app.QUALITY_KEY)
+
+
+def test_the_recorders_status_reaches_the_app(tmp_path):
+    app.write_status("recording", "Recording", 1000.0, "20261022-184935", tmp_path / "status.json")
+    status = app.read_status(tmp_path / "status.json")
+    assert (status["state"], status["started"], status["session"]) == ("recording", 1000.0, "20261022-184935")
+    assert app.read_status(tmp_path / "missing.json") == {}

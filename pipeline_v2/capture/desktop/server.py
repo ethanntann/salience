@@ -107,6 +107,30 @@ def _lengths(out: Path, files: list[str]) -> dict[str, float | None]:
     return known
 
 
+KEYFRAME_GRID = 2.0  # seconds: where a stream-copied cut can start (`clips.cut_span`)
+
+
+def kill_at(clip, inside: list, length: float | None) -> float | None:
+    """Where the window's moment sits in its exported highlight, in seconds.
+
+    The export grew the window over the rest of its fight and started the cut
+    on a keyframe; the same steps, from the same descriptions, find it again.
+    None when that cannot be known (no timing, or the answer is off the clip).
+    """
+    side = clips_mod._read_sidecar(Path(clip.path))
+    try:
+        moment = float(side["segment_start_sec"]) + float(side.get("event_sec", 4.0))
+    except (KeyError, TypeError, ValueError):
+        return None
+    span = highlights.fight_extent(clip, highlights.window_index([(0.0, c) for c in inside]),
+                                   (highlights.HIGHLIGHT_LEAD, highlights.HIGHLIGHT_LAG))
+    if span is None:
+        return None
+    start = max(0.0, span[0] // KEYFRAME_GRID * KEYFRAME_GRID)
+    at = moment - start
+    return round(at, 2) if length and 0 <= at <= length else None
+
+
 def session_view(session: Path, conn) -> dict:
     """One session as the app shows it: when, how long, its highlights, what is left to rate."""
     out = session / "highlights"
@@ -141,7 +165,10 @@ def session_view(session: Path, conn) -> dict:
             "length": _clock(lengths.get(h["file"])),
             "loved": bool(clip and clip.clip_sha in loved),
             "asked": bool(h.get("asked")), "added": h.get("trigger") == highlights.RATED_TRIGGER,
-            "trimmed": (out / ORIGINALS / h["file"]).is_file(),
+            "trimmed": (trimmed := (out / ORIGINALS / h["file"]).is_file()),
+            "kill": (kill_at(clip, inside, lengths.get(h["file"]))
+                     if clip and not trimmed and not (h.get("asked") and not clip) else None),
+            "seconds": lengths.get(h["file"]),
         })
     segments = clips_mod.read_segments(session)
     started = datetime.strptime(session.name, "%Y%m%d-%H%M%S")
@@ -206,8 +233,25 @@ def settings() -> dict:
         "resolution": app.resolution(),
         "resolutions": {k: label for k, (_, label) in app.RESOLUTIONS.items()},
         "starts_with_windows": bool(app.starts_with_windows()),
+        "autoclip": app.autoclip_on(),
         "has_key": bool(os.environ.get("FIREWORKS_API_KEY")),
     }
+
+
+# How old the tray's last word can be before it counts as gone (it writes on
+# every change of state, and the app checks it is still running anyway).
+def recorder_status() -> dict:
+    """What the background recorder is doing, for the sidebar."""
+    from pipeline_v2.capture import app
+
+    running = app.tray_running()
+    status = app.read_status() if running else {}
+    state = status.get("state") if running else "off"
+    if running and state not in ("waiting", "recording", "highlights"):
+        state = "waiting"
+    return {"autoclip": app.autoclip_on(), "running": running, "state": state,
+            "started": status.get("started"), "session": status.get("session"),
+            "has_key": bool(os.environ.get("FIREWORKS_API_KEY"))}
 
 
 def delete_highlight(session: Path, name: str) -> bool:
@@ -349,6 +393,8 @@ class Handler(review.Handler):
             return self._json(library())
         if url.path == "/api/settings":
             return self._json(settings())
+        if url.path == "/api/status":
+            return self._json(recorder_status())
         if url.path == "/api/rate/next":
             session = session_dir(parse_qs(url.query).get("session", [""])[0])
             review._ONLY = str((session / "windows").resolve()) if session else None
@@ -421,6 +467,29 @@ class Handler(review.Handler):
             if path.is_file():
                 subprocess.Popen(["explorer", "/select,", str(path)], creationflags=_NO_CONSOLE)
             return self._json({"ok": path.is_file()})
+        if self.path == "/api/autoclip":
+            from pipeline_v2.capture import app
+
+            on = bool(data.get("on"))
+            if on and not os.environ.get("FIREWORKS_API_KEY"):
+                return self._json({**recorder_status(), "need_key": True}, 409)
+            app.set_autoclip(on)
+            return self._json(recorder_status())
+        if self.path == "/api/startup":
+            from pipeline_v2.capture import app
+
+            app.set_starts_with_windows(bool(data.get("on")))
+            return self._json(settings())
+        if self.path == "/api/key":
+            from pipeline_v2.capture import app
+
+            key = str(data.get("key", "")).strip()
+            problem = app.check_key(key) if key else "Paste your Fireworks API key first."
+            if problem is not None:
+                return self._json({"ok": False, "error": problem}, 400)
+            app.write_setting("FIREWORKS_API_KEY", key)
+            os.environ["FIREWORKS_API_KEY"] = key
+            return self._json({"ok": True, **settings()})
         if self.path == "/api/settings":
             from pipeline_v2.capture import app
 

@@ -25,6 +25,12 @@ def main(argv: list[str]) -> int:
     # Every ffmpeg the app starts would otherwise open, and flash, a console.
     app.hide_child_consoles()
     running = server.start()
+    import os
+
+    # The app is what the player opens; the recorder comes with it while
+    # auto-clip is on (after a restart with Start with Windows off, say).
+    if app.autoclip_on() and os.environ.get("FIREWORKS_API_KEY") and not app.tray_running():
+        app.start_tray()
     port = running.server_address[1]
     port_file = desktop._port_file()
     port_file.parent.mkdir(parents=True, exist_ok=True)

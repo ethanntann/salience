@@ -29,10 +29,14 @@
         Settings
       </a>
     </div>
-    <div class="status">
-      <b><span class="dot"></span> Ready to record</b>
-      <span>Starts on its own when Fortnite opens. Nothing to press.</span>
-      <span id="status-quality"></span>
+    <div class="status" id="recorder">
+      <div class="status-top">
+        <span id="autoclip-label">Auto-clip</span>
+        <button class="switch" id="autoclip" role="switch" aria-checked="false" aria-labelledby="autoclip-label"><span></span></button>
+      </div>
+      <b><span class="dot" id="rec-dot"></span> <span id="rec-state">…</span></b>
+      <span id="rec-detail"></span>
+      <small id="status-quality"></small>
     </div>
   </nav>
   <main class="page" id="page" tabindex="-1"></main>

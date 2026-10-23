@@ -19,6 +19,7 @@ a tray or a game. `main` is the thin pystray shell around it.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import threading
@@ -289,6 +290,80 @@ def set_resolution(name: str, path: Path = SETTINGS) -> None:
     os.environ[RESOLUTION_KEY] = name
 
 
+# The app and the background recorder (this tray) are two processes. The app
+# reads what the tray is doing from STATUS, and asks it to stop with
+# STOP_REQUEST; the tray finishes any recording, makes its highlights, and exits.
+STATUS = APP_DIR / "status.json"
+STOP_REQUEST = APP_DIR / "stop.request"
+AUTOCLIP_KEY = "SALIENCE_AUTOCLIP"
+LOGIN_FLAG = "--login"  # how Windows starts the tray at sign-in
+MUTEX = "Local\\SalienceTray"
+
+
+def reload_settings(path: Path = SETTINGS) -> None:
+    """The settings file over this process's own copy: the app changes it while
+    the tray runs, and a session must record with what the player chose."""
+    for key, value in read_settings(path).items():
+        os.environ[key] = value
+
+
+def autoclip_on() -> bool:
+    """Whether the recorder should run. Unset is on: the tray ran before the switch did."""
+    return os.environ.get(AUTOCLIP_KEY, "on").strip().lower() != "off"
+
+
+def tray_running() -> bool:
+    if os.name != "nt":
+        return False
+    import ctypes
+
+    handle = ctypes.windll.kernel32.OpenMutexW(0x00100000, False, MUTEX)  # SYNCHRONIZE
+    if handle:
+        ctypes.windll.kernel32.CloseHandle(handle)
+    return bool(handle)
+
+
+def start_tray() -> None:
+    """The background recorder, with no window of its own."""
+    import subprocess
+
+    pythonw = Path(sys.executable).with_name("pythonw.exe")
+    subprocess.Popen([str(pythonw if pythonw.is_file() else sys.executable), "-m",
+                      "pipeline_v2.capture.app"], cwd=os.getcwd(),
+                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+
+def set_autoclip(on: bool, path: Path = SETTINGS) -> None:
+    """On starts the recorder now; off asks it to finish what it is doing and stop."""
+    write_setting(AUTOCLIP_KEY, "on" if on else "off", path)
+    os.environ[AUTOCLIP_KEY] = "on" if on else "off"
+    if on:
+        STOP_REQUEST.unlink(missing_ok=True)
+        if not tray_running():
+            start_tray()
+    elif tray_running():
+        STOP_REQUEST.write_text("", encoding="utf-8")
+
+
+def write_status(state: str, status: str, started: float | None, session: str | None,
+                 path: Path | None = None) -> None:
+    from pipeline_v2.jsonio import write_json
+
+    try:
+        write_json(path or STATUS, {"state": state, "status": status, "started": started,
+                                    "session": session, "updated": time.time(),
+                                    "pid": os.getpid()})
+    except OSError:
+        pass
+
+
+def read_status(path: Path | None = None) -> dict:
+    try:
+        return json.loads((path or STATUS).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
 def open_app(session: Path | None = None, view: str = "session") -> None:
     """The desktop app, at a view of `session`; the highlights folder if it cannot start."""
     try:
@@ -308,7 +383,7 @@ def _single_instance() -> bool:
         return True
     import ctypes
 
-    ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\SalienceTray")
+    ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX)
     return ctypes.windll.kernel32.GetLastError() != 183  # ERROR_ALREADY_EXISTS
 
 
@@ -362,7 +437,8 @@ def set_starts_with_windows(enabled: bool) -> None:
     import winreg
 
     pythonw = Path(sys.executable).with_name("pythonw.exe")
-    command = f'"{pythonw if pythonw.exists() else sys.executable}" -m pipeline_v2.capture.app'
+    command = (f'"{pythonw if pythonw.exists() else sys.executable}" -m pipeline_v2.capture.app'
+               f" {LOGIN_FLAG}")
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
         if enabled:
             winreg.SetValueEx(key, "Salience", 0, winreg.REG_SZ, command)
@@ -413,9 +489,12 @@ def main() -> int:
     if sys.stdout is None:  # pythonw: no console, so keep the log on disk
         sys.stdout = sys.stderr = open(LOG, "a", encoding="utf-8", buffering=1)
     hide_child_consoles()
+    load_environment()
+    if LOGIN_FLAG in sys.argv[1:] and not autoclip_on():
+        return 0  # started with Windows, but the player turned auto-clip off
     if not _single_instance():
         return 0
-    load_environment()
+    STOP_REQUEST.unlink(missing_ok=True)
     if not os.environ.get("FIREWORKS_API_KEY") and not setup_key():
         return 1
 
@@ -434,6 +513,7 @@ def main() -> int:
             pass
 
     def start_session(hwnd):
+        reload_settings()  # what the app set since this tray started
         return record.Session(_recording_args(), hwnd).start()
 
     def make_highlights(session: Path) -> dict:
@@ -459,67 +539,53 @@ def main() -> int:
 
     def worker() -> None:
         shown = None
+        started = None
+        stopping = False
         while not quitting.is_set():
+            if STOP_REQUEST.exists():
+                STOP_REQUEST.unlink(missing_ok=True)
+                # Paused ends a recording the way the game closing does: its
+                # highlights are made before the tray goes.
+                stopping = True
+                controller.set_paused(True)
             try:
                 controller.tick()
             except Exception as exc:  # noqa: BLE001 -- the tray must outlive a bad tick
                 print(f"tick failed: {type(exc).__name__}: {exc}", flush=True)
             if (controller.state, controller.paused) != shown:
                 shown = (controller.state, controller.paused)
+                started = time.time() if controller.state == "recording" else None
                 icon.icon = _icon_image(controller.state == "recording")
                 icon.title = f"Salience: {controller.status}"
                 icon.update_menu()
+                write_status(controller.state, controller.status, started,
+                             controller.last_session.name if controller.last_session else None)
+            if stopping and controller.state == "waiting":
+                break
             quitting.wait(TICK)
         if controller.session is not None:
             controller.session.stop()  # quitting mid-session keeps the footage
-
-    def open_folder(path: Path | None) -> None:
-        if path is not None and path.exists():
-            os.startfile(path)  # noqa: S606
-
-    def change_key(*_):
-        threading.Thread(target=setup_key, daemon=True).start()
-
-    def quit_app(*_):
+        write_status("off", "Auto-clip is off", None, None)
         quitting.set()
         icon.stop()
 
-    def toggle_start(*_):
-        set_starts_with_windows(not starts_with_windows())
+    def turn_off(*_):
+        # As the app's switch does: finish this session, then stop.
+        set_autoclip(False)
 
-    def toggle_pause(*_):
-        controller.set_paused(not controller.paused)
-
+    # Everything else is the app's (Settings); the tray says it is there.
     menu = pystray.Menu(
         pystray.MenuItem(lambda _: controller.status, None, enabled=False),
-        pystray.MenuItem("Stop recording now", lambda *_: controller.request_stop(),
-                         visible=lambda _: controller.state == "recording"),
-        pystray.MenuItem("Pause auto-recording", toggle_pause,
-                         checked=lambda _: controller.paused),
-        pystray.Menu.SEPARATOR,
         pystray.MenuItem("Open Salience", lambda *_: open_app(controller.last_session),
                          default=True),
-        pystray.MenuItem("Open latest highlights folder",
-                         lambda *_: open_folder(
-                             controller.last_session and controller.last_session / "highlights")),
-        pystray.MenuItem("Rate latest session", lambda *_: open_app(controller.last_session, "rate")),
-        pystray.MenuItem("Open recordings folder",
-                         lambda *_: open_folder(_recording_args().out)),
+        pystray.MenuItem("Stop recording now", lambda *_: controller.request_stop(),
+                         visible=lambda _: controller.state == "recording"),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Recording quality", pystray.Menu(*(
-            pystray.MenuItem(label, lambda *_, name=name: set_quality(name),
-                             checked=lambda _, name=name: quality() == name, radio=True)
-            for name, label in QUALITY_LABELS.items()))),
-        pystray.MenuItem("Resolution", pystray.Menu(*(
-            pystray.MenuItem(label, lambda *_, name=name: set_resolution(name),
-                             checked=lambda _, name=name: resolution() == name, radio=True)
-            for name, (_, label) in RESOLUTIONS.items()))),
-        pystray.MenuItem("Change Fireworks key...", change_key),
-        pystray.MenuItem("Start with Windows", toggle_start,
-                         checked=lambda _: starts_with_windows()),
-        pystray.MenuItem("Quit", quit_app),
+        pystray.MenuItem("Turn off auto-clip", turn_off),
     )
     icon.menu = menu
+    write_status(controller.state, controller.status, None,
+                 controller.last_session.name if controller.last_session else None)
     threading.Thread(target=worker, name="salience-worker", daemon=True).start()
     icon.run()
     quitting.set()

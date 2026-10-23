@@ -11,6 +11,14 @@ const HEART = '<svg width="20" height="20" viewBox="0 0 24 24" fill="#FF5C93" ro
 const TICK = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0D0F13" stroke-width="2.2" aria-hidden="true"><path d="M5 12l4 4L19 6"></path></svg>';
 const BIN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg>';
 
+const PLAY = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+const PAUSE = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>';
+const SOUND = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"></path><path d="M16 9a4 4 0 0 1 0 6"></path></svg>';
+const MUTED = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"></path><path d="M16 9l5 6M21 9l-5 6"></path></svg>';
+const FULL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg>';
+const clockOf = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+const tenths = (t) => { const r = Math.round(t * 10) / 10; return `${clockOf(r)}.${Math.round((r % 1) * 10) % 10}`; };
+
 let libraryCache = null;
 let leaving = null; // the current view's clean-up (key handlers)
 
@@ -90,6 +98,72 @@ function qualityLine(set) {
   const res = set.resolutions[set.resolution] || "Full size";
   return `${res.replace(" (your screen's)", "")} · ${set.fps} fps · ${set.mbps} Mbps · game + mic`;
 }
+
+// The background recorder (the tray process), in the sidebar
+
+let recorder = null;
+let lastState = null;
+
+async function postJson(path, body) {
+  const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+  return { status: response.status, data: await response.json().catch(() => ({})) };
+}
+
+function paintRecorder() {
+  const r = recorder;
+  if (!r) return;
+  const on = r.autoclip;
+  const sw = document.getElementById("autoclip");
+  sw.setAttribute("aria-checked", String(on));
+  let dot = "", state, detail;
+  if (!on && r.running) { state = "Turning off…"; detail = "Finishing this session first."; }
+  else if (!on) { state = "Auto-clip is off"; detail = "Nothing is recorded. Turn it on to clip your games."; }
+  else if (!r.has_key) { state = "Needs your key"; detail = "Add your Fireworks key in Settings to start."; }
+  else if (!r.running) { state = "Starting…"; detail = "The recorder is starting in the background."; }
+  else if (r.state === "recording") {
+    dot = "recording";
+    const since = r.started ? Math.max(0, Date.now() / 1000 - r.started) : 0;
+    state = `Recording · ${clockOf(since)}`;
+    detail = "Fortnite is open. Highlights are made when you finish.";
+  } else if (r.state === "highlights") {
+    dot = "highlights"; state = "Making highlights…"; detail = "They open here when ready.";
+  } else { dot = "ready"; state = "Ready"; detail = "Starts recording on its own when Fortnite opens. Nothing to press."; }
+  document.getElementById("rec-dot").className = `dot ${dot}`;
+  document.getElementById("rec-state").textContent = state;
+  document.getElementById("rec-detail").textContent = detail;
+}
+
+async function pollRecorder() {
+  try { recorder = await api("/api/status"); } catch (error) { return; }
+  // A session just finished: its highlights are new.
+  if (lastState === "highlights" && recorder.state !== "highlights") {
+    libraryCache = null;
+    if (!location.hash.startsWith("#/rate") && !location.hash.startsWith("#/settings")) route();
+    refreshChrome();
+  }
+  lastState = recorder.state;
+  paintRecorder();
+}
+
+async function setAutoclip(on) {
+  const { status, data } = await postJson("/api/autoclip", { on });
+  recorder = data.autoclip === undefined ? recorder : data;
+  paintRecorder();
+  if (status === 409 && data.need_key) {
+    location.hash = "#/settings";
+    setTimeout(() => {
+      const key = document.getElementById("key");
+      if (key) { key.focus(); document.getElementById("key-note").textContent = "Add your key, then turn Auto-clip on."; }
+    }, 300);
+  }
+  if (location.hash.startsWith("#/settings")) route();
+}
+
+document.getElementById("autoclip").addEventListener("click", () => setAutoclip(!(recorder && recorder.autoclip)));
+setInterval(pollRecorder, 3000);
+setInterval(paintRecorder, 1000); // the recording clock
+pollRecorder();
 
 // Library
 
@@ -182,34 +256,49 @@ async function showSession(id, file) {
     ${missing}
     ${current ? `<div class="split">
       <section class="stage" aria-label="Now playing">
-        <div class="screen" id="screen"><video id="player" controls autoplay src="/video/${enc(s.id)}/${enc(current.file)}?v=${enc(current.length)}"></video></div>
+        <div class="player" id="player-box">
+          <div class="screen" id="screen">
+            <video id="player" autoplay playsinline src="/video/${enc(s.id)}/${enc(current.file)}?v=${enc(current.length)}"></video>
+            <button class="big-play" id="big-play" aria-label="Play" hidden>${PLAY}</button>
+          </div>
+          <div class="bar">
+            <div class="timeline" id="timeline" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0">
+              <div class="rail"></div>
+              <div class="played" id="played"></div>
+              <div class="cut" id="cut-left"></div><div class="cut" id="cut-right"></div>
+              <div class="keep" id="keep"></div>
+              <button class="handle" id="h-start" aria-label="Trim start"></button>
+              <button class="handle" id="h-end" aria-label="Trim end"></button>
+              ${current.kill != null ? '<span class="kill" id="kill" title="The kill"></span>' : ""}
+              <span class="head" id="head"></span>
+            </div>
+            <div class="controls">
+              <button class="ctl" id="play" aria-label="Play">${PLAY}</button>
+              <span class="time"><span id="now">0:00</span> <span class="faint">/ <span id="total">0:00</span></span></span>
+              ${current.kill != null ? `<span class="killnote">● kill at ${esc(clockOf(current.kill))}</span>` : ""}
+              <span class="grow"></span>
+              <span class="trimnote" id="trimnote" hidden></span>
+              <button class="ctl" id="mute" aria-label="Mute">${SOUND}</button>
+              <button class="ctl" id="full" aria-label="Full screen">${FULL}</button>
+            </div>
+          </div>
+        </div>
         <div class="caption">
           <div class="words">
             <div class="title"><h2>${esc(current.title)}</h2>${current.loved ? HEART : ""}</div>
             <p>${esc(current.summary)}</p>
             <span class="when">${current.said ? `You said: <i style="color:var(--ink)">“${esc(current.said)}”</i> · ` : ""}${current.at ? `${esc(current.at)} into the session` : ""}</span>
           </div>
-          <div class="actions">
+          <div class="actions" id="watch-actions">
             ${current.reel ? '<button class="button" id="reel">9:16 reel</button>' : ""}
             <button class="button" id="trim">Trim</button>
             <button class="button" id="export">Export MP4</button>
             <button class="button icon" id="delete" aria-label="Delete this highlight">${BIN}</button>
           </div>
-        </div>
-        <div class="trimmer" id="trimmer" hidden>
-          <div class="trim-track" id="track">
-            <div class="trim-keep" id="keep"></div>
-            <input type="range" id="trim-start" min="0" max="1" step="0.1" value="0" aria-label="Trim start">
-            <input type="range" id="trim-end" min="0" max="1" step="0.1" value="1" aria-label="Trim end">
-          </div>
-          <div class="trim-row">
-            <span id="trim-label"></span>
-            <div class="actions">
-              ${current.trimmed ? '<button class="button ghost" id="restore">Restore original</button>' : ""}
-              <button class="button ghost" id="trim-cancel">Cancel</button>
-              <button class="button" id="trim-preview">Preview</button>
-              <button class="button primary" id="trim-save">Save trim</button>
-            </div>
+          <div class="actions" id="trim-actions" hidden>
+            ${current.trimmed ? '<button class="button ghost" id="restore">Restore original</button>' : ""}
+            <button class="button ghost" id="trim-cancel">Cancel</button>
+            <button class="button primary" id="trim-save">Save trim</button>
           </div>
         </div>
         <div class="saved" id="saved" hidden></div>
@@ -225,68 +314,7 @@ async function showSession(id, file) {
     </div>` : '<div class="empty"><h2>No highlights in this session</h2></div>'}`;
 
   page.querySelector("#folder").addEventListener("click", () => api("/api/open-folder", { session: s.id }));
-  const reel = page.querySelector("#reel");
-  if (reel) {
-    let vertical = false;
-    reel.addEventListener("click", () => {
-      vertical = !vertical;
-      const screen = page.querySelector("#screen");
-      screen.classList.toggle("reel", vertical);
-      page.querySelector("#player").src = vertical
-        ? `/reel/${enc(s.id)}/${enc(current.reel)}` : `/video/${enc(s.id)}/${enc(current.file)}`;
-      reel.textContent = vertical ? "16:9 original" : "9:16 reel";
-    });
-  }
-  const player = page.querySelector("#player");
-  const trimmer = page.querySelector("#trimmer");
-  if (trimmer) {
-    const first = page.querySelector("#trim-start");
-    const last = page.querySelector("#trim-end");
-    const clock = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}.${Math.floor((t % 1) * 10)}`;
-    let previewing = false;
-    const paint = () => {
-      const length = Number(last.max) || 1;
-      let a = Number(first.value), b = Number(last.value);
-      if (b - a < 1) { if (document.activeElement === first) first.value = a = Math.max(0, b - 1); else last.value = b = Math.min(length, a + 1); }
-      const keep = page.querySelector("#keep");
-      keep.style.left = `${(a / length) * 100}%`;
-      keep.style.width = `${((b - a) / length) * 100}%`;
-      page.querySelector("#trim-label").textContent = `${clock(a)} to ${clock(b)} · keeps ${(b - a).toFixed(1)}s of ${length.toFixed(1)}s`;
-    };
-    const ready = () => {
-      const length = Math.floor(player.duration * 10) / 10;
-      first.max = last.max = String(length);
-      if (Number(last.value) <= 1) last.value = String(length);
-      paint();
-    };
-    page.querySelector("#trim").addEventListener("click", () => {
-      trimmer.hidden = !trimmer.hidden;
-      if (!trimmer.hidden) { if (player.readyState >= 1) ready(); else player.addEventListener("loadedmetadata", ready, { once: true }); }
-    });
-    first.addEventListener("input", () => { paint(); player.currentTime = Number(first.value); });
-    last.addEventListener("input", () => { paint(); player.currentTime = Number(last.value); });
-    player.addEventListener("timeupdate", () => {
-      if (previewing && player.currentTime >= Number(last.value)) { player.pause(); previewing = false; }
-    });
-    page.querySelector("#trim-preview").addEventListener("click", () => {
-      previewing = true; player.currentTime = Number(first.value); player.play();
-    });
-    page.querySelector("#trim-cancel").addEventListener("click", () => { trimmer.hidden = true; previewing = false; });
-    page.querySelector("#trim-save").addEventListener("click", async (e) => {
-      e.target.disabled = true; e.target.textContent = "Saving…";
-      const done = await api("/api/trim", { session: s.id, file: current.file,
-        start: Number(first.value), end: Number(last.value) }).catch(() => ({ ok: false }));
-      if (!done.ok) { e.target.disabled = false; e.target.textContent = "Save trim"; alert("That trim could not be saved."); return; }
-      await library(true);
-      route();
-    });
-    const restore = page.querySelector("#restore");
-    if (restore) restore.addEventListener("click", async () => {
-      await api("/api/restore", { session: s.id, file: current.file });
-      await library(true);
-      route();
-    });
-  }
+  if (current) playerControls(s, current);
   const exporter = page.querySelector("#export");
   if (exporter) {
     exporter.addEventListener("click", async () => {
@@ -313,6 +341,143 @@ async function showSession(id, file) {
       refreshChrome();
     });
   }
+}
+
+// The player: one timeline for watching and trimming
+
+function playerControls(s, current) {
+  const box = page.querySelector("#player-box");
+  const video = page.querySelector("#player");
+  const line = page.querySelector("#timeline");
+  const el = (id) => page.querySelector(`#${id}`);
+  const MIN = 1.0; // seconds: the shortest trim the server accepts
+  let length = 0, a = 0, b = 0, trimming = false, dragging = null, vertical = false;
+
+  const pct = (t) => `${length ? (t / length) * 100 : 0}%`;
+  const paint = () => {
+    const t = video.currentTime || 0;
+    el("played").style.width = pct(t);
+    el("head").style.left = pct(t);
+    el("now").textContent = clockOf(t);
+    line.setAttribute("aria-valuenow", t.toFixed(1));
+    if (trimming) {
+      el("cut-left").style.width = pct(a);
+      el("cut-right").style.left = pct(b);
+      el("keep").style.left = pct(a);
+      el("keep").style.width = pct(b - a);
+      el("h-start").style.left = pct(a);
+      el("h-end").style.left = pct(b);
+      el("trimnote").textContent = `Keeps ${tenths(a)} to ${tenths(b)} · ${(Math.round(b * 10) / 10 - Math.round(a * 10) / 10).toFixed(1)}s`;
+    }
+    const paused = video.paused;
+    el("play").innerHTML = paused ? PLAY : PAUSE;
+    el("play").setAttribute("aria-label", paused ? "Play" : "Pause");
+    el("big-play").hidden = !paused;
+  };
+  const loop = () => { if (!page.contains(video)) return; paint(); requestAnimationFrame(loop); };
+  const ready = () => {
+    length = video.duration || 0;
+    el("total").textContent = clockOf(length);
+    line.setAttribute("aria-valuemax", length.toFixed(1));
+    const kill = el("kill");
+    if (kill) kill.style.left = pct(current.kill);
+    if (!b) b = length;
+    paint();
+  };
+  video.addEventListener("loadedmetadata", ready);
+  if (video.readyState >= 1) ready();
+  requestAnimationFrame(loop);
+
+  const toggle = () => {
+    if (video.paused) {
+      if (trimming && (video.currentTime < a || video.currentTime >= b - 0.05)) video.currentTime = a;
+      video.play();
+    } else video.pause();
+  };
+  el("play").addEventListener("click", toggle);
+  el("big-play").addEventListener("click", toggle);
+  video.addEventListener("click", toggle);
+  video.addEventListener("timeupdate", () => {
+    if (trimming && !dragging && video.currentTime >= b) video.currentTime = a; // a trim previews on a loop
+  });
+  el("mute").addEventListener("click", () => {
+    video.muted = !video.muted;
+    el("mute").innerHTML = video.muted ? MUTED : SOUND;
+    el("mute").setAttribute("aria-label", video.muted ? "Unmute" : "Mute");
+  });
+  el("full").addEventListener("click", () => {
+    if (document.fullscreenElement) document.exitFullscreen(); else box.requestFullscreen();
+  });
+
+  // Scrubbing and the trim handles share the timeline.
+  const at = (e) => {
+    const r = line.getBoundingClientRect();
+    return Math.min(length, Math.max(0, ((e.clientX - r.left) / r.width) * length));
+  };
+  const move = (e) => {
+    const t = at(e);
+    if (dragging === "start") a = Math.min(t, b - MIN);
+    else if (dragging === "end") b = Math.max(t, a + MIN);
+    if (dragging) video.currentTime = dragging === "start" ? a : dragging === "end" ? b : t;
+    paint();
+  };
+  line.addEventListener("pointerdown", (e) => {
+    if (!length) return;
+    dragging = e.target.id === "h-start" ? "start" : e.target.id === "h-end" ? "end" : "seek";
+    if (dragging !== "seek") video.pause();
+    line.setPointerCapture(e.pointerId);
+    move(e);
+  });
+  line.addEventListener("pointermove", (e) => { if (dragging) move(e); });
+  const drop = () => { dragging = null; };
+  line.addEventListener("pointerup", drop);
+  line.addEventListener("pointercancel", drop);
+  line.addEventListener("keydown", (e) => {
+    const step = e.shiftKey ? 5 : 1;
+    if (e.key === "ArrowLeft") { e.preventDefault(); video.currentTime = Math.max(0, video.currentTime - step); }
+    if (e.key === "ArrowRight") { e.preventDefault(); video.currentTime = Math.min(length, video.currentTime + step); }
+  });
+  const keys = (e) => {
+    if (e.target.closest("input, textarea, select, button")) return;
+    if (e.key === " " || e.key === "k") { e.preventDefault(); toggle(); }
+  };
+  document.addEventListener("keydown", keys);
+  leaving = () => document.removeEventListener("keydown", keys);
+
+  const setTrimming = (on) => {
+    trimming = on;
+    box.classList.toggle("trimming", on);
+    el("trimnote").hidden = !on;
+    el("watch-actions").hidden = on;
+    el("trim-actions").hidden = !on;
+    if (on) { a = 0; b = length; video.pause(); }
+    paint();
+  };
+  el("trim").addEventListener("click", () => setTrimming(true));
+  el("trim-cancel").addEventListener("click", () => setTrimming(false));
+  el("trim-save").addEventListener("click", async (e) => {
+    e.target.disabled = true; e.target.textContent = "Saving…";
+    const done = await api("/api/trim", { session: s.id, file: current.file, start: a, end: b }).catch(() => ({ ok: false }));
+    if (!done.ok) { e.target.disabled = false; e.target.textContent = "Save trim"; alert("That trim could not be saved."); return; }
+    await library(true);
+    route();
+  });
+  const restore = el("restore");
+  if (restore) restore.addEventListener("click", async () => {
+    await api("/api/restore", { session: s.id, file: current.file });
+    await library(true);
+    route();
+  });
+  const reel = el("reel");
+  if (reel) reel.addEventListener("click", () => {
+    vertical = !vertical;
+    const t = video.currentTime;
+    el("screen").classList.toggle("reel", vertical);
+    video.src = vertical ? `/reel/${enc(s.id)}/${enc(current.reel)}` : `/video/${enc(s.id)}/${enc(current.file)}?v=${enc(current.length)}`;
+    video.addEventListener("loadedmetadata", () => { video.currentTime = t; }, { once: true });
+    reel.textContent = vertical ? "16:9 original" : "9:16 reel";
+    el("trim").disabled = vertical;
+  });
 }
 
 // Rating
@@ -448,14 +613,24 @@ async function showSettings() {
         <div class="summary"><b>${custom ? "Custom" : names[set.quality]}: ${esc((set.resolutions[set.resolution] || "").replace(" (your screen's)", ""))}, ${set.fps} fps, ${set.mbps} Mbps</b>
           <span>About ${perHour} GB of raw footage an hour</span></div>
       </section>
-      <section class="panel" aria-labelledby="ai">
-        <h2 id="ai">Describer</h2>
-        <div class="line"><div><div>Fireworks API key</div><span>${set.has_key ? "Set. Kept on this PC and sent only to Fireworks." : "Not set: highlights can't be described without it."}</span></div>
-          <span>Change it from the tray menu</span></div>
-      </section>
       <section class="panel" aria-labelledby="gen">
         <h2 id="gen">General</h2>
-        <div class="line"><div>Start Salience with Windows</div><span>${set.starts_with_windows ? "On" : "Off"} · change it from the tray menu</span></div>
+        <div class="line"><div><div id="auto-label"><b>Auto-clip my games</b></div><span>Runs the recorder in the background. It records when Fortnite opens and makes highlights when you finish. Closing this window doesn't stop it.</span></div>
+          <button class="switch" id="set-autoclip" role="switch" aria-checked="${set.autoclip}" aria-labelledby="auto-label"><span></span></button></div>
+        <div class="line"><div><div id="boot-label"><b>Start with Windows</b></div><span>Starts the recorder when you sign in, so it's ready before your first match. Only the small tray icon starts, not this window.</span></div>
+          <button class="switch" id="set-startup" role="switch" aria-checked="${set.starts_with_windows}" aria-labelledby="boot-label"><span></span></button></div>
+      </section>
+      <section class="panel" aria-labelledby="ai">
+        <h2 id="ai">Describer</h2>
+        <div class="field">
+          <label for="key">Fireworks API key</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <input id="key" class="search" style="flex:1 1 280px;width:auto" type="password" autocomplete="off"
+              placeholder="${set.has_key ? "Saved. Paste a new key to replace it" : "Paste your key from fireworks.ai"}">
+            <button class="button primary" id="save-key">Save</button>
+          </div>
+          <small id="key-note">${set.has_key ? "Saved on this PC and sent only to Fireworks." : "Highlights can't be described without it."}</small>
+        </div>
       </section>`;
 
     page.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", async () => {
@@ -471,6 +646,19 @@ async function showSettings() {
     page.querySelectorAll("[data-fps]").forEach((b) => b.addEventListener("click", async () => {
       set = await api("/api/settings", { custom: { fps: Number(b.dataset.fps), mbps: set.mbps } }); draw(); refreshChrome();
     }));
+    page.querySelector("#set-autoclip").addEventListener("click", () => setAutoclip(!set.autoclip));
+    page.querySelector("#set-startup").addEventListener("click", async () => {
+      set = await api("/api/startup", { on: !set.starts_with_windows }); draw();
+    });
+    page.querySelector("#save-key").addEventListener("click", async (e) => {
+      const key = page.querySelector("#key").value.trim();
+      e.target.disabled = true; e.target.textContent = "Checking…";
+      const { status, data } = await postJson("/api/key", { key });
+      if (status === 200) { set = data; draw(); pollRecorder();
+        page.querySelector("#key-note").textContent = "Saved. Fireworks accepted it."; return; }
+      e.target.disabled = false; e.target.textContent = "Save";
+      page.querySelector("#key-note").textContent = data.error || "That key could not be saved.";
+    });
     const slider = page.querySelector("#bitrate");
     slider.addEventListener("input", () => { page.querySelector("#mbps").textContent = `${slider.value} Mbps`; });
     slider.addEventListener("change", async () => {
