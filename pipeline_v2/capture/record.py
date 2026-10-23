@@ -44,6 +44,9 @@ def _parser() -> argparse.ArgumentParser:
                         help=f"recording directory (default: {DEFAULT_OUT})")
     parser.add_argument("--fps", type=int, default=QUALITY[DEFAULT_QUALITY][0])
     parser.add_argument("--bitrate", default=QUALITY[DEFAULT_QUALITY][1])
+    parser.add_argument("--height", type=int, default=None,
+                        help="record at this many lines, e.g. 1080 or 720 (default: the "
+                             "game window's own size; never scaled up)")
     parser.add_argument("--monitor", dest="window", action="store_false",
                         help="capture monitor 1 instead of the game window")
     # Kept so the command from earlier sessions still works; the window is the default.
@@ -125,7 +128,7 @@ def _wait_for_game(wait: float):
 
 
 class Session:
-    """One recording: capture, marks, input, detectors and live describing.
+    """One recording: capture, input, detectors and live describing.
 
     `start`, then `tick` about every 0.5s, then `stop`. The terminal command
     drives it from a Ctrl+C loop and the tray app from a thread, so neither
@@ -144,7 +147,6 @@ class Session:
     def start(self) -> "Session":
         from pipeline_v2.capture import clips
         from pipeline_v2.capture.input_activity import ActivitySampler
-        from pipeline_v2.capture.marks import MarkRecorder
         from pipeline_v2.capture.mouse import JOURNAL_NAME as MOUSE_JOURNAL, SHOTS_NAME, MouseMotion
         from pipeline_v2.capture.triggers import TriggerBus, detectors_for
         from pipeline_v2.capture import gfx
@@ -154,21 +156,22 @@ class Session:
         # Inside FFmpeg where it can (frames stay on the GPU: 3% of a core
         # against 63-112% through Python); the Python path for an FFmpeg
         # older than 8, which has no `gfxcapture`.
-        recorder = gfx.GfxRecorder if gfx.available() else WgcRecorder
+        gpu = gfx.available()
+        recorder = gfx.GfxRecorder if gpu else WgcRecorder
+        # Scaling is the GPU capture's; the Python fallback records the window's size.
+        sized = {"height": args.height} if gpu and args.height else {}
         self.rec = recorder(session, fps=args.fps, bitrate=args.bitrate,
                             monitor_index=None if self.hwnd else 1, window_hwnd=self.hwnd,
-                            audio=args.audio, mic_hint=args.mic or None)
+                            audio=args.audio, mic_hint=args.mic or None, **sized)
         self.rec.start()
-        self.marker = MarkRecorder(journal=session / "marks.tsv").start()
         self.activity = ActivitySampler(journal=session / "input.tsv").start()
         # On the input log's clock, so the two line up window for window.
         self.mouse = MouseMotion(journal=session / MOUSE_JOURNAL, shots=session / SHOTS_NAME,
                                  started=self.activity.started).start()
         print(f"recording -> {session}")
-        print(f"  target: {'game window' if self.hwnd else 'monitor 1'} @ {args.fps}fps {args.bitrate}")
+        print(f"  target: {'game window' if self.hwnd else 'monitor 1'} @ {args.fps}fps {args.bitrate}"
+              + (f" {args.height}p" if sized else ""))
         print(f"  audio : {'game + mic' if args.audio else 'OFF'}")
-        print("  F9    = mark this moment as worth keeping")
-        print("  F10   = mark it as nothing happening")
         # Detector moments are journalled as a hint and for measurement; with
         # full coverage they no longer decide what gets described.
         self.bus = TriggerBus(detectors_for(args.game)) if args.triggers else None
@@ -243,11 +246,6 @@ class Session:
         self.mouse.stop()
         if self.mouse.error:
             print(f"  mouse : {self.mouse.error}")
-        marks = self.marker.stop()
-        self.marker.save(self.path / "marks.json")
-        keeps = sum(1 for m in marks if m.kind == "keep")
-        if marks:
-            print(f"  marks : {keeps} keep, {len(marks) - keeps} dull -> marks.json")
         print(_summary(s))
         _save_stats(self.path, s, self.rec.error, getattr(self.rec, "audio_stats", None),
                     input_started=self.activity.started)
@@ -279,8 +277,8 @@ def main(argv: list[str] | None = None) -> int:
         stop = True
 
     # SIGTERM as well as SIGINT: the paired benchmark driver stops this with
-    # `terminate()`, which otherwise skips the cleanup below and loses both the
-    # marks and the audio statistics for that round.
+    # `terminate()`, which otherwise skips the cleanup below and loses the
+    # audio statistics for that round.
     signal.signal(signal.SIGINT, handle)
     signal.signal(signal.SIGTERM, handle)
     try:

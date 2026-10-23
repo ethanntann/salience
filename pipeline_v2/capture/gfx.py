@@ -47,14 +47,54 @@ def available(runner=subprocess.run) -> bool:
     return "gfxcapture AVOptions" in (out.stdout or "")
 
 
-def source(window_hwnd: int | None, monitor_index: int | None, capture_fps: int) -> str:
-    """The `gfxcapture` filter for one window, or a monitor (1-based)."""
+def source(window_hwnd: int | None, monitor_index: int | None, capture_fps: int,
+           size: tuple[int, int] | None = None) -> str:
+    """The `gfxcapture` filter for one window, or a monitor (1-based), at
+    `size` (width, height) when given, else the source's own."""
     target = (f"hwnd={window_hwnd}" if window_hwnd
               else f"monitor_idx={max(0, (monitor_index or 1) - 1)}")
     # scale_aspect: a resolution change mid-session keeps the whole picture
     # rather than cropping it to the first size.
-    return (f"gfxcapture={target}:max_framerate={capture_fps}:capture_cursor=0"
-            ":resize_mode=scale_aspect")
+    filter_ = (f"gfxcapture={target}:max_framerate={capture_fps}:capture_cursor=0"
+               ":resize_mode=scale_aspect")
+    if size is not None:
+        # Scaled by the capture itself, still on the GPU. `scale_d3d11` after
+        # it fails on FFmpeg 9 ("Unsupported pixel format") whatever format
+        # is asked for (2026-10-23).
+        filter_ += f":width={size[0]}:height={size[1]}:scale_mode=bicubic"
+    return filter_
+
+
+def source_size(window_hwnd: int | None) -> tuple[int, int] | None:
+    """The game window's client area, or the primary monitor, in pixels."""
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.WinDLL("user32")
+    # In real pixels: without this a 1920x1200 screen at 125% scaling reads as
+    # 1536x960 (2026-10-23), and "1080p" would leave it unscaled.
+    user32.SetThreadDpiAwarenessContext.restype = ctypes.c_void_p
+    user32.SetThreadDpiAwarenessContext.argtypes = [ctypes.c_void_p]
+    before = user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))  # per-monitor v2
+    try:
+        if window_hwnd:
+            rect = wintypes.RECT()
+            if not user32.GetClientRect(wintypes.HWND(window_hwnd), ctypes.byref(rect)):
+                return None
+            return rect.right - rect.left, rect.bottom - rect.top
+        return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)  # SM_CXSCREEN, SM_CYSCREEN
+    finally:
+        if before:
+            user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(before))
+
+
+def output_size(source: tuple[int, int] | None, height: int | None) -> tuple[int, int] | None:
+    """`height` lines at the source's shape, both sides even (NVENC wants
+    them so); None, the source's own size, when it is no taller than that."""
+    if not height or source is None or source[1] <= height or source[1] <= 0:
+        return None
+    width = round(source[0] * height / source[1] / 2) * 2
+    return width, height - height % 2
 
 
 def command(capture: str, fps: int, bitrate: str, segment_seconds: int,
@@ -111,8 +151,9 @@ class GfxRecorder:
                  encoder: str = "h264_nvenc", segment_seconds: int = 30,
                  monitor_index: int | None = None, window_hwnd: int | None = None,
                  audio: bool = False, mic_hint: str | None = None,
-                 capture_fps: int | None = None) -> None:
+                 capture_fps: int | None = None, height: int | None = None) -> None:
         self.directory = directory
+        self.height = height  # None: the window's own size
         self.fps = fps
         self.capture_fps = capture_fps or fps * 2
         self.bitrate = bitrate
@@ -156,7 +197,9 @@ class GfxRecorder:
         pipes = self._audio() if self.audio else []
         self._log = (self.directory / "ffmpeg.log").open("wb")
         self._process = subprocess.Popen(
-            command(source(self.window_hwnd, self.monitor_index, self.capture_fps),
+            command(source(self.window_hwnd, self.monitor_index, self.capture_fps,
+                           output_size(source_size(self.window_hwnd) if self.height else None,
+                                       self.height)),
                     self.fps, self.bitrate, self.segment_seconds,
                     self.directory / "part-%05d.mkv", self.directory / "segments.csv", pipes),
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

@@ -6,7 +6,7 @@ python -m pipeline_v2.capture.highlights <run>  # re-run the post-session pipeli
 python -m pipeline_v2 review --variant v3.9-said-window@deepseek-v4p1-flash --only <session>
 ```
 
-## During play: `record` → `wgc`, `audio_pump`, `input_activity`, `marks`, `live`
+## During play: `record` → `gfx`, `audio_pump`, `input_activity`, `live`
 
 - **Video:** Windows Graphics Capture of the Fortnite window (`--monitor` for
   the whole screen), captured at up to 60 fps and paced to a constant 30 fps
@@ -15,7 +15,8 @@ python -m pipeline_v2 review --variant v3.9-said-window@deepseek-v4p1-flash --on
   windows can be cut later without re-encoding.
 - **Audio:** game loopback and microphone as two separate AAC tracks.
 - **Input:** key-down presses, held keys and `GetLastInputInfo` activity, polled
-  every 0.5s into `input.tsv`. F9/F10 marks go to `marks.json`.
+  every 0.5s into `input.tsv`. There are no hotkeys: nothing for the player
+  to press (removed 2026-10-23; old sessions' `marks.json` stays readable).
 - **Detectors** journal moments to `triggers.jsonl` and cost nothing. They no
   longer decide what is described (see below).
 

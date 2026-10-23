@@ -217,6 +217,7 @@ def _recording_args():
     args = record._parser().parse_args([])
     args.mic = os.environ.get("SALIENCE_MIC", "")  # "" = Windows' default mic
     args.fps, args.bitrate = record.QUALITY[quality()]
+    args.height = RESOLUTIONS[resolution()][0]
     return args
 
 
@@ -240,6 +241,27 @@ def set_quality(name: str, path: Path = SETTINGS) -> None:
     """Remembered for the next recording; one already running keeps its own."""
     write_setting(QUALITY_KEY, name, path)
     os.environ[QUALITY_KEY] = name
+
+
+RESOLUTION_KEY = "SALIENCE_RESOLUTION"
+# Lines recorded, and the menu's label. Never scaled up: a 1080p screen set to
+# 1080p records as it is. Smaller is less disk at the same bitrate's sharpness.
+RESOLUTIONS = {
+    "full": (None, "Full size (your screen's)"),
+    "1080": (1080, "1080p"),
+    "720": (720, "720p"),
+}
+
+
+def resolution() -> str:
+    chosen = os.environ.get(RESOLUTION_KEY, "").strip().lower()
+    return chosen if chosen in RESOLUTIONS else "full"
+
+
+def set_resolution(name: str, path: Path = SETTINGS) -> None:
+    """Remembered for the next recording; one already running keeps its own."""
+    write_setting(RESOLUTION_KEY, name, path)
+    os.environ[RESOLUTION_KEY] = name
 
 
 def _single_instance() -> bool:
@@ -475,6 +497,10 @@ def main() -> int:
             pystray.MenuItem(label, lambda *_, name=name: set_quality(name),
                              checked=lambda _, name=name: quality() == name, radio=True)
             for name, label in QUALITY_LABELS.items()))),
+        pystray.MenuItem("Resolution", pystray.Menu(*(
+            pystray.MenuItem(label, lambda *_, name=name: set_resolution(name),
+                             checked=lambda _, name=name: resolution() == name, radio=True)
+            for name, (_, label) in RESOLUTIONS.items()))),
         pystray.MenuItem("Change Fireworks key...", change_key),
         pystray.MenuItem("Start with Windows", toggle_start,
                          checked=lambda _: starts_with_windows()),

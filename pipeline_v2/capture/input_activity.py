@@ -13,8 +13,7 @@ works in Valorant, in Fortnite, and in a title nobody has adapted yet.
 `GetAsyncKeyState` is a **polling** API. It reads keyboard state on demand,
 installs no hook, injects into no process and records no text -- only how many
 of a fixed set of keys changed state. That distinction matters for software
-shipped to players whose anti-cheat is watching, and it is the same mechanism
-`marks.py` already uses.
+shipped to players whose anti-cheat is watching.
 
 Two channels, because one was not enough. Counting key-down transitions is
 discrete and misses continuous work: 40% of windows in a real 24.8-minute

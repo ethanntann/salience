@@ -50,3 +50,24 @@ def test_only_ffmpeg_8_and_later_can_capture():
 
     assert gfx.available(runner("Filter gfxcapture\ngfxcapture AVOptions:\n"))
     assert not gfx.available(runner("Unknown filter 'gfxcapture'.\n"))
+
+
+def test_a_smaller_resolution_keeps_the_screens_shape_with_even_sides():
+    assert gfx.output_size((1920, 1200), 720) == (1152, 720)  # 16:10
+    assert gfx.output_size((2560, 1440), 1080) == (1920, 1080)
+    assert gfx.output_size((1366, 768), 720) == (1280, 720)
+
+
+def test_a_resolution_is_never_scaled_up():
+    """A 1080p screen asked for 1080p records as it is, not resampled."""
+    assert gfx.output_size((1920, 1080), 1080) is None
+    assert gfx.output_size((1280, 720), 1080) is None
+    assert gfx.output_size((1920, 1200), None) is None
+    assert gfx.output_size(None, 720) is None
+
+
+def test_the_capture_scales_itself_only_when_asked():
+    assert ":width=" not in gfx.source(42, None, 120)
+    sized = gfx.source(42, None, 120, (1152, 720))
+    assert sized.endswith(":width=1152:height=720:scale_mode=bicubic")
+    assert "hwnd=42" in sized and "resize_mode=scale_aspect" in sized

@@ -244,3 +244,14 @@ def test_recording_quality_defaults_to_60fps_and_follows_the_menu(tmp_path, monk
     monkeypatch.setenv(app.QUALITY_KEY, "nonsense")  # a hand-edited settings file
     assert app.quality() == "high"
     monkeypatch.delenv(app.QUALITY_KEY)
+
+
+def test_recording_resolution_defaults_to_full_size_and_follows_the_menu(tmp_path, monkeypatch):
+    monkeypatch.delenv(app.RESOLUTION_KEY, raising=False)
+    assert app._recording_args().height is None
+    app.set_resolution("720", tmp_path / "settings.env")
+    assert app.read_settings(tmp_path / "settings.env")[app.RESOLUTION_KEY] == "720"
+    assert app._recording_args().height == 720
+    monkeypatch.setenv(app.RESOLUTION_KEY, "4k")  # a hand-edited settings file
+    assert app.resolution() == "full"
+    monkeypatch.delenv(app.RESOLUTION_KEY)
