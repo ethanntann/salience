@@ -180,26 +180,26 @@ h2 { margin: 0; font: 600 22px/1.25 var(--display); }
 .big-play svg { width: 28px; height: 28px; }
 .player-bar { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 10px; background: var(--rail); }
 .timeline { position: relative; height: 20px; cursor: pointer; touch-action: none; display: flex; align-items: center; }
-.timeline .rail, .timeline .played { position: absolute; left: 0; height: 6px; border-radius: 6px; pointer-events: none; }
-.timeline .rail { right: 0; background: #262C37; }
-.timeline .played { background: var(--accent); width: 0; }
-.timeline .head { position: absolute; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--ink);
+.timeline .tl-rail, .timeline .tl-played { position: absolute; left: 0; height: 6px; border-radius: 6px; pointer-events: none; }
+.timeline .tl-rail { right: 0; background: #262C37; }
+.timeline .tl-played { background: var(--accent); width: 0; }
+.timeline .tl-head { position: absolute; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--ink);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); pointer-events: none; }
-.timeline .kill { position: absolute; top: -6px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%;
+.timeline .tl-kill { position: absolute; top: -6px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%;
   background: var(--love); box-shadow: 0 0 0 3px var(--rail); pointer-events: none; }
-.timeline .cut, .timeline .keep, .timeline .handle { display: none; }
+.timeline .tl-cut, .timeline .tl-keep, .timeline .tl-handle { display: none; }
 .trimming .timeline { height: 48px; }
-.trimming .timeline .rail { height: 40px; }
-.trimming .timeline .played { display: none; }
-.trimming .timeline .head { width: 2px; height: 48px; margin-left: -1px; border-radius: 1px; box-shadow: none; }
-.trimming .timeline .kill { top: -12px; }
-.trimming .timeline .cut { display: block; position: absolute; height: 40px; background: rgba(13, 15, 19, 0.75);
+.trimming .timeline .tl-rail { height: 40px; }
+.trimming .timeline .tl-played { display: none; }
+.trimming .timeline .tl-head { width: 2px; height: 48px; margin-left: -1px; border-radius: 1px; box-shadow: none; }
+.trimming .timeline .tl-kill { top: -12px; }
+.trimming .timeline .tl-cut { display: block; position: absolute; height: 40px; background: rgba(13, 15, 19, 0.75);
   pointer-events: none; }
 .trimming #cut-left { left: 0; border-radius: 6px 0 0 6px; }
 .trimming #cut-right { right: 0; border-radius: 0 6px 6px 0; }
-.trimming .timeline .keep { display: block; position: absolute; height: 40px; border: 2px solid var(--accent);
+.trimming .timeline .tl-keep { display: block; position: absolute; height: 40px; border: 2px solid var(--accent);
   border-radius: 6px; background: rgba(255, 122, 89, 0.12); pointer-events: none; }
-.trimming .timeline .handle { display: block; position: absolute; width: 14px; height: 44px; margin-left: -7px; padding: 0;
+.trimming .timeline .tl-handle { display: block; position: absolute; width: 14px; height: 44px; margin-left: -7px; padding: 0;
   border: none; border-radius: 5px; background: var(--accent); cursor: ew-resize; touch-action: none; }
 .controls { display: flex; align-items: center; gap: 8px; }
 .ctl { width: 40px; height: 40px; border-radius: 8px; border: none; background: transparent; color: var(--ink);

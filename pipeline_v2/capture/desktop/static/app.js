@@ -262,14 +262,14 @@ async function showSession(id, file) {
           </div>
           <div class="player-bar">
             <div class="timeline" id="timeline" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0">
-              <div class="rail"></div>
-              <div class="played" id="played"></div>
-              <div class="cut" id="cut-left"></div><div class="cut" id="cut-right"></div>
-              <div class="keep" id="keep"></div>
-              <button class="handle" id="h-start" aria-label="Trim start"></button>
-              <button class="handle" id="h-end" aria-label="Trim end"></button>
-              ${current.kill != null ? '<span class="kill" id="kill" title="The kill"></span>' : ""}
-              <span class="head" id="head"></span>
+              <div class="tl-rail"></div>
+              <div class="tl-played" id="played"></div>
+              <div class="tl-cut" id="cut-left"></div><div class="tl-cut" id="cut-right"></div>
+              <div class="tl-keep" id="keep"></div>
+              <button class="tl-handle" id="h-start" aria-label="Trim start"></button>
+              <button class="tl-handle" id="h-end" aria-label="Trim end"></button>
+              ${current.kill != null ? '<span class="tl-kill" id="kill" title="The kill"></span>' : ""}
+              <span class="tl-head" id="head"></span>
             </div>
             <div class="controls">
               <button class="ctl" id="play" aria-label="Play">${PLAY}</button>
