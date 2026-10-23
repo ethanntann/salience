@@ -32,8 +32,9 @@ MIN_SPEECH_GAIN = 0.01
 # Held-out blocks for choosing the weight: neighbouring windows of one session
 # are near-duplicates, so they must fall in the same fold.
 CV_BLOCK_SECONDS = 120.0
-# A keep the player marked as loved counts as two. Not yet measured: there
-# were no loved ratings to measure it on when it was added.
+# A keep the player marked as loved counts as two. Measured on 4 loved keeps
+# (2026-10-23, six sessions each ranked by the other five): 1, 2 and 4 all put
+# 31 of 39 keeps in the top 10 and the loved ones at #1-#3; nothing to choose yet.
 LOVE_WEIGHT = 2.0
 
 
