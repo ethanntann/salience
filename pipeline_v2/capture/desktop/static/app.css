@@ -23,6 +23,8 @@
 }
 
 * { box-sizing: border-box; }
+/* `hidden` always wins: a class's own `display` overrode it, and the play button never went away. */
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: var(--ground); color: var(--ink);
   font: 14px/1.5 var(--text); -webkit-font-smoothing: antialiased; }
 a { color: var(--link); text-decoration: none; }
@@ -174,7 +176,7 @@ h2 { margin: 0; font: 600 22px/1.25 var(--display); }
 .big-play { position: absolute; width: 72px; height: 72px; border-radius: 50%; border: none;
   background: rgba(236, 238, 242, 0.92); color: var(--ground); display: flex; align-items: center; justify-content: center; }
 .big-play svg { width: 28px; height: 28px; }
-.bar { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 10px; background: var(--rail); }
+.player-bar { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 10px; background: var(--rail); }
 .timeline { position: relative; height: 20px; cursor: pointer; touch-action: none; display: flex; align-items: center; }
 .timeline .rail, .timeline .played { position: absolute; left: 0; height: 6px; border-radius: 6px; pointer-events: none; }
 .timeline .rail { right: 0; background: #262C37; }

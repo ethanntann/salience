@@ -261,7 +261,7 @@ async function showSession(id, file) {
             <video id="player" autoplay playsinline src="/video/${enc(s.id)}/${enc(current.file)}?v=${enc(current.length)}"></video>
             <button class="big-play" id="big-play" aria-label="Play" hidden>${PLAY}</button>
           </div>
-          <div class="bar">
+          <div class="player-bar">
             <div class="timeline" id="timeline" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0">
               <div class="rail"></div>
               <div class="played" id="played"></div>
