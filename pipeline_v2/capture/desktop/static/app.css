@@ -171,6 +171,8 @@ h2 { margin: 0; font: 600 22px/1.25 var(--display); }
 /* Player: one timeline for watching and trimming */
 .player { border-radius: 14px; overflow: hidden; border: 1px solid #262C37; background: #000; }
 .player .screen { border: none; border-radius: 0; }
+/* The bar and its controls always fit in the window: the video gives way, never them. */
+.player .screen { max-height: calc(100vh - 290px); min-height: 200px; }
 .player:fullscreen { display: flex; flex-direction: column; border-radius: 0; }
 .player:fullscreen .screen { flex: 1; aspect-ratio: auto; }
 .big-play { position: absolute; width: 72px; height: 72px; border-radius: 50%; border: none;

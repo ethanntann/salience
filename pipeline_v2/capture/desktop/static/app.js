@@ -253,7 +253,6 @@ async function showSession(id, file) {
       <div><h1>${esc(when(s.started))}</h1><p class="sub">${esc(facts(s))} · ranked by your taste from ${lib.ratings.toLocaleString()} ratings</p></div>
       <button class="button ghost" id="folder">Show in folder</button>
     </header>
-    ${missing}
     ${current ? `<div class="split">
       <section class="stage" aria-label="Now playing">
         <div class="player" id="player-box">
@@ -311,7 +310,8 @@ async function showSession(id, file) {
           <span class="words"><b>${esc(h.title)}</b><span>${esc(info(h))}</span></span>
         </a>`).join("")}
       </section>
-    </div>` : '<div class="empty"><h2>No highlights in this session</h2></div>'}`;
+    </div>` : '<div class="empty"><h2>No highlights in this session</h2></div>'}
+    ${missing}`;
 
   page.querySelector("#folder").addEventListener("click", () => api("/api/open-folder", { session: s.id }));
   if (current) playerControls(s, current);
@@ -438,7 +438,7 @@ function playerControls(s, current) {
     if (e.key === "ArrowRight") { e.preventDefault(); video.currentTime = Math.min(length, video.currentTime + step); }
   });
   const keys = (e) => {
-    if (e.target.closest("input, textarea, select, button")) return;
+    if (e.target.closest("input, textarea, select")) return;
     if (e.key === " " || e.key === "k") { e.preventDefault(); toggle(); }
   };
   document.addEventListener("keydown", keys);
