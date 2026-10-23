@@ -38,6 +38,7 @@ import json
 import re
 import shutil
 import subprocess
+import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -154,6 +155,12 @@ def make_reel(source: Path, destination: Path, runner=subprocess.run) -> bool:
 
 
 def reels(session: Path, reel_fn=None) -> int:
+    """`_reels`, with the manifest to itself: the rating page adds highlights too."""
+    with _HIGHLIGHTS_LOCK:
+        return _reels(session, reel_fn)
+
+
+def _reels(session: Path, reel_fn=None) -> int:
     """A 9:16 reel of every highlight `run` kept; how many were made.
 
     Its own step, run after the highlights folder has opened: 10 reels take
@@ -182,6 +189,139 @@ def reels(session: Path, reel_fn=None) -> int:
             highlight["reel"] = reel
     write_json(out / "highlights.json", manifest)
     return sum(1 for h in kept if h["reel"])
+
+
+def release_windows(session: Path) -> int:
+    """Delete the copies of the session's described windows; how many went.
+
+    Run once the session's highlights and reels are made: from then on a window
+    is only ever watched again on the rating page, which re-cuts it from the raw
+    footage (`clips.recut_window`). Its mic level is measured first, being the
+    one thing ranking reads from the copy itself. A copy whose raw footage is
+    gone, or that the rating page has open, is kept.
+    """
+    from types import SimpleNamespace
+
+    from pipeline_v2 import cache, store
+
+    clip_dir = session / "windows"
+    copies = sorted(clip_dir.glob("*.mkv")) if clip_dir.is_dir() else []
+    if not copies:
+        return 0
+    conn = store.connect()
+    try:
+        described = {row[0] for row in conn.execute("select clip_sha from descriptions")}
+    finally:
+        conn.close()
+    hashed = [(clip, cache.clip_sha(clip)) for clip in copies]
+    done = [(clip, sha) for clip, sha in hashed if sha in described]
+    voice([SimpleNamespace(path=str(clip), clip_sha=sha) for clip, sha in done])
+    freed = 0
+    for clip, sha in done:
+        try:
+            freed += clips_mod.release_window(clip, sha)
+        except OSError:
+            pass  # open in the rating page; the next session's release takes it
+    return freed
+
+
+# A window the player kept on the rating page becomes a highlight there and
+# then, the same way the ranked ones were made (lead-in, the rest of its fight,
+# game and mic mixed, a reel), so a moment the ranking missed is one key away.
+RATED_TRIGGER = "rating"
+_HIGHLIGHTS_LOCK = threading.Lock()  # one manifest writer at a time
+
+
+def _manifest(out: Path) -> dict | None:
+    try:
+        return json.loads((out / "highlights.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def add_kept(clip_sha: str, reel_fn=None) -> str | None:
+    """Export a window kept on the rating page into its session's highlights.
+
+    The new file's name, or None: not a recorded session's window, already a
+    highlight, or not cuttable.
+    """
+    from pipeline_v2 import store
+    from pipeline_v2.jsonio import write_json
+
+    with _HIGHLIGHTS_LOCK:
+        conn = store.connect()
+        try:
+            row = conn.execute("select path from clips where clip_sha = ?", (clip_sha,)).fetchone()
+            if row is None:
+                return None
+            path = Path(row[0])
+            session = path.parent.parent
+            _, inside = _session_clips(conn, path.parent)
+            said = store.transcripts(conn).get(clip_sha, "")
+        finally:
+            conn.close()
+        clip = next((c for c in inside if c.clip_sha == clip_sha), None)
+        if clip is None or not (session / "segments.csv").is_file():
+            return None
+        out = session / "highlights"
+        manifest = _manifest(out) or {"session": str(session), "highlights": []}
+        entries = manifest.setdefault("highlights", [])
+        if any(h.get("clip") == path.name for h in entries):
+            return None
+        position = max((int(h.get("rank") or 0) for h in entries), default=0) + 1
+        name = f"{position:02d}-{path.name}"
+        destination = out / name
+        span = fight_extent(clip, window_index([(0.0, c) for c in inside]),
+                            (HIGHLIGHT_LEAD, HIGHLIGHT_LAG))
+        if not _export(session, clip, destination, span):
+            out.mkdir(parents=True, exist_ok=True)
+            if path.is_file():
+                shutil.copy2(path, destination)
+            elif clips_mod.recut_window(path, destination) is None:
+                return None
+        mix_tracks(destination)
+        reel = Path(name).with_suffix(".mp4").name
+        made = (reel_fn or make_reel)(destination, out / REEL_DIR / reel)
+        payload = clip.payload or {}
+        entries.append(asdict(Highlight(
+            rank=position, clip=path.name, score=0.0, summary=clip.summary or "",
+            outcome=str(payload.get("outcome")), trigger=RATED_TRIGGER, said=said,
+            file=name, reel=reel if made else "")))
+        write_json(out / "highlights.json", manifest)
+        return name
+
+
+def drop_kept(clip_sha: str) -> bool:
+    """Undo `add_kept` when the player re-rates that window a skip. Highlights
+    the ranking chose are the player's to delete, never this."""
+    from pipeline_v2 import store
+    from pipeline_v2.jsonio import write_json
+
+    with _HIGHLIGHTS_LOCK:
+        conn = store.connect()
+        try:
+            row = conn.execute("select path from clips where clip_sha = ?", (clip_sha,)).fetchone()
+        finally:
+            conn.close()
+        if row is None:
+            return False
+        path = Path(row[0])
+        out = path.parent.parent / "highlights"
+        manifest = _manifest(out)
+        if manifest is None:
+            return False
+        entries = manifest.get("highlights", [])
+        gone = [h for h in entries if h.get("clip") == path.name
+                and h.get("trigger") == RATED_TRIGGER]
+        if not gone:
+            return False
+        for h in gone:
+            (out / h["file"]).unlink(missing_ok=True)
+            if h.get("reel"):
+                (out / REEL_DIR / h["reel"]).unlink(missing_ok=True)
+        manifest["highlights"] = [h for h in entries if h not in gone]
+        write_json(out / "highlights.json", manifest)
+        return True
 
 
 def _sidecar(clip_path) -> dict:
@@ -242,13 +382,21 @@ def listen(session: Path, clip_dir: Path) -> int:
     """
     from pipeline_v2.capture import voice
 
-    files = [p for p in clip_dir.glob("*") if p.suffix in (".mkv", ".mp4")]
     print("  speech: transcribing what the mic heard...", flush=True)
     try:
-        return voice.attach(session, sorted(files))
+        return voice.attach(session, window_files(clip_dir))
     except ImportError:
         print("  speech: skipped (pip install -e .[audio] to rank by what was said)")
         return 0
+
+
+def window_files(clip_dir: Path) -> list[Path]:
+    """Every window of a folder: copies on disk and released ones (sidecar only)."""
+    files = {p for p in clip_dir.glob("*") if p.suffix in (".mkv", ".mp4")}
+    files |= {clip for sidecar in clip_dir.glob("*.capture.json")
+              if clips_mod.released(clip := sidecar.with_name(
+                  sidecar.name[:-len(".capture.json")] + ".mkv"))}
+    return sorted(files)
 
 
 def undescribed(clip_dir: Path) -> int:
@@ -434,7 +582,7 @@ def voice(clips: list) -> dict[str, float]:
 
     def measured(clip) -> dict:
         record = _sidecar(clip.path)
-        if MIC_LEVEL_KEY not in record and record:
+        if MIC_LEVEL_KEY not in record and record and Path(clip.path).is_file():
             record[MIC_LEVEL_KEY] = levels.loudness(Path(clip.path), voice_mod.MIC_TRACK)
             try:
                 write_json(Path(clip.path).with_suffix(".capture.json"), record)
@@ -807,7 +955,7 @@ def run(
     asks = voice_mod.clip_requests(utterances)
     pinned = asked_for(ordered, asks)
     picked = [pair for pair in pick(ordered, top, pad, extent if coverage else None, pinned)
-              if Path(pair[1].path).is_file()]
+              if Path(pair[1].path).is_file() or clips_mod.released(Path(pair[1].path))]
     # Asked for, then asked for where nothing was looked at, then the rest.
     jobs = ([("window", score, clip) for score, clip in picked if clip in pinned]
             + [("raw", 0.0, span) for span in unwindowed(ordered, asks)]
@@ -827,7 +975,10 @@ def run(
             if clips_mod.cut_span(session, *item, destination) is None:
                 return False
         elif not (coverage and export(session, item, destination, extent(item))):
-            shutil.copy2(Path(item.path), destination)
+            if Path(item.path).is_file():
+                shutil.copy2(Path(item.path), destination)
+            elif clips_mod.recut_window(Path(item.path), destination) is None:
+                return False  # released, and its raw footage would not cut
         mix_tracks(destination)
         return True
 
@@ -876,7 +1027,9 @@ def run(
 
     # Only once highlights exist, and only for an exact segment set: never a
     # glob broad enough to touch clips/, highlights/ or a journal.
-    if prune_raw and kept and len(cut) == len(journalled):
+    # Never under a released window: the raw footage is then its only copy.
+    if (prune_raw and kept and len(cut) == len(journalled)
+            and not any(clips_mod.released(p) for p in window_files(clip_dir))):
         for segment in clips_mod.read_segments(session):
             segment.path.unlink(missing_ok=True)
         manifest["pruned_raw"] = True

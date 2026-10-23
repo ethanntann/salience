@@ -369,7 +369,9 @@ def harvest(
             continue  # a gap in the footage; refuse rather than splice
         clip = out_dir / f"{index:03d}-{request.kind}.mkv"
         sidecar = clip.with_suffix(".capture.json")
-        if clip.is_file() and sidecar.is_file():
+        # A released window (`release_window`) counts as cut: cutting it again
+        # would store it under a new hash, as a new window, described twice.
+        if sidecar.is_file() and (clip.is_file() or released(clip)):
             # Already cut. Resumable because a long harvest gets interrupted --
             # this one was, at index 47 of 73 -- and re-encoding an hour of
             # footage again to reach the tail is the expensive way to recover.
@@ -488,6 +490,75 @@ def write_coverage(run_dir: Path, stride: float = COVERAGE_STRIDE) -> list[ClipR
         "".join(json.dumps(asdict(r)) + "\n" for r in requests), encoding="utf-8"
     )
     return requests
+
+
+# A window's copy is only needed until it is described: the raw segments hold
+# the same footage, and a window is re-cut from them in about a second when it
+# is watched (5.0 of session 7's 13 GB were these copies). Its sidecar stays,
+# and records the copy's content hash here, because the store, the ratings and
+# the paid answers are all keyed by it, and a re-cut is never byte-identical
+# (the muxer writes a random segment ID).
+RELEASED_KEY = "released_sha"
+
+
+def _read_sidecar(clip: Path) -> dict:
+    try:
+        return json.loads(clip.with_suffix(".capture.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def window_sha(clip: Path) -> str | None:
+    """The content hash a window is stored under, whether or not its copy is on disk."""
+    from pipeline_v2 import cache
+
+    if clip.is_file():
+        return cache.clip_sha(clip)
+    return _read_sidecar(clip).get(RELEASED_KEY)
+
+
+def released(clip: Path) -> bool:
+    return not clip.is_file() and bool(_read_sidecar(clip).get(RELEASED_KEY))
+
+
+def recuttable(clip: Path) -> bool:
+    """Whether every raw segment under `clip`'s window is still on disk."""
+    record = _read_sidecar(clip)
+    try:
+        start, end = float(record["segment_start_sec"]), float(record["segment_end_sec"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    # Listed segments are only those on disk, so a lost one is a gap or a short end.
+    covering = segments_covering(read_segments(clip.parent.parent), start, end)
+    return (bool(covering) and covering[0].start <= start + 1e-3
+            and covering[-1].end >= end - 1e-3)
+
+
+def release_window(clip: Path, sha: str) -> bool:
+    """Delete a described window's copy, keeping its sidecar (and its hash).
+
+    Refused while the raw footage under it is not all on disk: the copy is
+    then the only way left to watch, rate or re-cut the window.
+    """
+    from pipeline_v2.jsonio import write_json
+
+    record = _read_sidecar(clip)
+    if not clip.is_file() or not record or not recuttable(clip):
+        return False
+    write_json(clip.with_suffix(".capture.json"), {**record, RELEASED_KEY: sha})
+    clip.unlink()
+    return True
+
+
+def recut_window(clip: Path, destination: Path, runner=subprocess.run) -> Path | None:
+    """`clip`'s window cut again from the raw segments, to `destination`."""
+    record = _read_sidecar(clip)
+    try:
+        start, end = float(record["segment_start_sec"]), float(record["segment_end_sec"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    done = cut_span(clip.parent.parent, start, end, destination, runner=runner)
+    return destination if done is not None else None
 
 
 def _same_window(previous: dict, request: ClipRequest, start: float, end: float) -> bool:

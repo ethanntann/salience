@@ -333,12 +333,14 @@ class _Review:
 
     def open(self, session: Path | None) -> None:
         from pipeline_v2 import review
-        from pipeline_v2.capture import highlights
+        from pipeline_v2.capture import highlights, rating
 
         variant = highlights._configured_variant()
         if self._thread is None:
             self._thread = threading.Thread(
-                target=review.serve, kwargs=dict(port=REVIEW_PORT, variant=variant, only=session),
+                target=review.serve, kwargs=dict(
+                    port=REVIEW_PORT, variant=variant, only=session,
+                    playable=rating.playable, on_rated=rating.rated),
                 name="review", daemon=True)
             self._thread.start()
             time.sleep(0.5)
@@ -405,9 +407,13 @@ def main() -> int:
         out = session / "highlights"
         if out.is_dir() and hasattr(os, "startfile"):
             os.startfile(out)  # noqa: S606 -- the player's own folder
+        def afterwards() -> None:
+            highlights.reels(session)
+            # Last: every step before it may still read the window copies.
+            highlights.release_windows(session)
+
         # Behind the "ready" toast, not before it: 10 reels are 12s of encoding.
-        threading.Thread(target=highlights.reels, args=(session,), name="reels",
-                         daemon=True).start()
+        threading.Thread(target=afterwards, name="reels", daemon=True).start()
         return manifest
 
     controller = Controller(find_game=game_window, start_session=start_session,

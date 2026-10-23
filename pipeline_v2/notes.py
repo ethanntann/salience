@@ -52,7 +52,8 @@ def window_notes(conn: sqlite3.Connection, clip: Path, sha: str, variant: str) -
     if row:
         notes.append(f'Said on the player\'s own microphone during these frames: "{row[0]}"')
     before = _previous_window(clip)
-    if before is not None and before.is_file() and _adjacent(before, clip):
+    # By its sidecar: a described window's copy may be gone (`clips.release_window`).
+    if before is not None and _adjacent(before, clip):
         summary = conn.execute(
             "select d.summary from descriptions d join clips c using (clip_sha)"
             " where c.path = ? and d.prompt_ver = ?", (str(before), variant)).fetchone()

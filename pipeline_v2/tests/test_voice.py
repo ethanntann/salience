@@ -152,6 +152,24 @@ def test_attach_stores_speech_per_clip(tmp_path, isolated_data):
     assert changed == 1  # an empty transcript is recorded but changes nothing
 
 
+def test_a_released_window_gets_its_speech_by_its_recorded_hash(tmp_path, isolated_data):
+    """Its copy is gone (`clips.release_window`); the sidecar still says what it was."""
+    session = _session(tmp_path)
+    windows = session / "windows"
+    windows.mkdir()
+    gone = windows / "a.mkv"
+    gone.with_suffix(".capture.json").write_text(json.dumps(
+        {"segment_start_sec": 32.0, "segment_end_sec": 40.0, "released_sha": "was-a"}),
+        encoding="utf-8")
+
+    voice.attach(session, [gone], transcriber=FakeWhisper([(34.0, 35.0, "let's go")]),
+                 runner=_ffmpeg)
+
+    conn = store.connect()
+    assert store.transcripts(conn) == {"was-a": "let's go"}
+    conn.close()
+
+
 def test_speech_minutes_apart_is_two_utterances_not_one_long_one():
     """Whisper returned "But it's ... walking retard though" as one segment
     from 922s to 1036s, which put it in every window of those two minutes."""

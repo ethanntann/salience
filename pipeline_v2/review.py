@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sqlite3
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from pipeline_v2 import store
@@ -149,6 +150,13 @@ def _within_args() -> tuple:
     return (_ONLY + "%",) if _ONLY else ()
 
 
+# What the capture app plugs in (`capture.rating`): how a window whose copy is
+# gone is watched, and what a rating does beyond being stored. Never imported
+# from here: this module must import without the capture subsystem.
+_PLAYABLE = lambda path: path if path.is_file() else None  # noqa: E731
+_ON_RATED = lambda sha, label: None  # noqa: E731
+
+
 def _next_clip(conn: sqlite3.Connection) -> dict:
     variant = _variant()
     rated = conn.execute("select count(*) from preferences").fetchone()[0]
@@ -238,8 +246,8 @@ class Handler(BaseHTTPRequestHandler):
         if row is None:
             self.send_error(404)
             return
-        path = Path(row["path"])
-        if not path.exists():
+        path = _PLAYABLE(Path(row["path"]))
+        if path is None:
             self.send_error(404)
             return
 
@@ -299,13 +307,18 @@ class Handler(BaseHTTPRequestHandler):
                     )
         finally:
             conn.close()
+        threading.Thread(target=_ON_RATED, args=(payload["sha"], payload["label"]),
+                         name="rated-highlight", daemon=True).start()
         self._json({"ok": True})
 
 
-def serve(port: int = 8777, variant: str | None = None, only: Path | None = None) -> None:
-    global _VARIANT, _ONLY
+def serve(port: int = 8777, variant: str | None = None, only: Path | None = None,
+          playable=None, on_rated=None) -> None:
+    global _VARIANT, _ONLY, _PLAYABLE, _ON_RATED
     _VARIANT = variant
     _ONLY = str(Path(only).resolve()) if only else None
+    _PLAYABLE = playable or _PLAYABLE
+    _ON_RATED = on_rated or _ON_RATED
     conn = store.connect()
     pending = _next_clip(conn)
     conn.close()

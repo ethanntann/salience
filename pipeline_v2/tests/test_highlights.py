@@ -592,3 +592,56 @@ def test_kill_fields_count_beside_the_words_so_one_phrase_cannot_swing_a_keep():
     pistol = Clip(summary="eliminates X", payload={"kill_weapon_class": "pistol", "kill_hits": 1,
                                                     "kill_damage": 104})
     assert highlights._trait_fields(pistol) == -1.0  # its 104 is stacked hits, not a one-pump
+
+
+def test_a_window_kept_on_the_rating_page_becomes_a_highlight(tmp_path, isolated_data):
+    """The moment the ranking missed is one key away, numbered after the rest."""
+    session = _session(tmp_path, ["elimination", "knock", "no_event"])
+    _run(session, top=1)
+
+    name = highlights.add_kept(f"sha{session.name}2")
+
+    out = session / "highlights"
+    assert name == "02-002-input_burst.mkv" and (out / name).is_file()
+    manifest = json.loads((out / "highlights.json").read_text(encoding="utf-8"))
+    assert [(h["file"], h["trigger"]) for h in manifest["highlights"]] == [
+        ("01-000-input_burst.mkv", "input_burst"), (name, highlights.RATED_TRIGGER)]
+    assert highlights.add_kept(f"sha{session.name}2") is None  # once
+    assert highlights.add_kept(f"sha{session.name}0") is None  # already ranked in
+
+
+def test_re_rated_a_skip_only_the_rating_pages_highlight_goes(tmp_path, isolated_data):
+    session = _session(tmp_path, ["elimination", "knock"])
+    _run(session, top=1)
+    name = highlights.add_kept(f"sha{session.name}1")
+
+    assert highlights.drop_kept(f"sha{session.name}1")
+    assert not highlights.drop_kept(f"sha{session.name}0")  # the ranking's: the player's call
+
+    out = session / "highlights"
+    assert not (out / name).exists() and (out / "01-000-input_burst.mkv").is_file()
+    manifest = json.loads((out / "highlights.json").read_text(encoding="utf-8"))
+    assert [h["file"] for h in manifest["highlights"]] == ["01-000-input_burst.mkv"]
+
+
+def test_a_released_window_can_still_be_a_highlight(tmp_path, isolated_data, monkeypatch):
+    """Exported from the raw footage; never skipped because its copy is gone."""
+    session = _session(tmp_path, ["elimination"])
+    clip = session / "clips" / "000-input_burst.mkv"
+    record = json.loads(clip.with_suffix(".capture.json").read_text(encoding="utf-8"))
+    clip.with_suffix(".capture.json").write_text(json.dumps(
+        {**record, "segment_start_sec": 16.0, "segment_end_sec": 24.0,
+         clips.RELEASED_KEY: f"sha{session.name}0"}), encoding="utf-8")
+    clip.unlink()
+
+    def recut(source, destination, runner=None):
+        destination.write_bytes(b"from raw")
+        return destination
+
+    monkeypatch.setattr(clips, "recut_window", recut)
+    manifest = highlights.run(
+        session, coverage=False, describe_fn=lambda *a, **k: None,
+        harvest_fn=lambda s, d: [{}])
+
+    assert [h["clip"] for h in manifest["highlights"]] == ["000-input_burst.mkv"]
+    assert (session / "highlights" / "01-000-input_burst.mkv").read_bytes() == b"from raw"

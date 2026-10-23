@@ -6,6 +6,7 @@ import argparse
 from contextlib import closing
 import json
 import os
+import shutil
 from pathlib import Path
 import sys
 
@@ -186,6 +187,16 @@ def describe_many(cfg, clips: list[Path], max_calls: int | None, workers: int = 
         duration, clip_facts, window = _prepare(clip)
         if not window:
             return None
+        try:
+            return described(clip, duration, clip_facts, window)
+        finally:
+            # The frames exist only to be sent; kept, they were 2.8 GB of JPEGs
+            # (2026-10-23) that every later describe extracts again anyway.
+            frames_dir = Path(window[0].path).parent.parent
+            if frames_dir.parent == config.FRAME_DIR:
+                shutil.rmtree(frames_dir, ignore_errors=True)
+
+    def described(clip: Path, duration, clip_facts, window):
         if noted:
             from dataclasses import replace
 

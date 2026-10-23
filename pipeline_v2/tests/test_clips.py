@@ -515,3 +515,72 @@ def test_a_span_is_cut_from_a_snapped_keyframe_and_clipped_to_footage(tmp_path):
 
 def test_a_span_with_no_footage_is_refused(tmp_path):
     assert clips.cut_span(tmp_path, 0.0, 10.0, tmp_path / "h.mkv") is None
+
+
+def _released_run(tmp_path: Path):
+    """A run with one window cut, its copy then released."""
+    run = tmp_path / "session" / "run"
+    run.mkdir(parents=True)
+    _write_segments_csv(run, _segments(run, 6))
+    clips.append(run / clips.JOURNAL_NAME, ClipRequest(100.0, "voice_reaction", "v"))
+    calls = []
+
+    def runner(command, **_):
+        calls.append(command)
+        Path(command[-1]).write_bytes(b"clip")
+        return FakeResult()
+
+    [record] = clips.harvest(run, runner=runner)
+    clip = run / "clips" / record["video_file"]
+    assert clips.release_window(clip, "sha-of-the-copy")
+    return run, clip, runner, calls
+
+
+def test_a_released_window_keeps_its_sidecar_and_its_hash(tmp_path):
+    _, clip, _, _ = _released_run(tmp_path)
+
+    assert not clip.is_file() and clip.with_suffix(".capture.json").is_file()
+    assert clips.released(clip)
+    assert clips.window_sha(clip) == "sha-of-the-copy"
+
+
+def test_a_released_window_is_never_cut_again(tmp_path):
+    """A re-cut is a new hash: a new window, described and paid for twice."""
+    run, clip, runner, calls = _released_run(tmp_path)
+
+    again = clips.harvest(run, runner=runner)
+
+    assert len(again) == 1 and len(calls) == 1
+    assert not clip.is_file()
+
+
+def test_a_window_is_kept_while_its_raw_footage_is_not_all_there(tmp_path):
+    run = tmp_path / "session" / "run"
+    run.mkdir(parents=True)
+    _write_segments_csv(run, _segments(run, 6))
+    clips.append(run / clips.JOURNAL_NAME, ClipRequest(100.0, "voice_reaction", "v"))
+
+    def runner(command, **_):
+        Path(command[-1]).write_bytes(b"clip")
+        return FakeResult()
+
+    [record] = clips.harvest(run, runner=runner)
+    clip = run / "clips" / record["video_file"]
+    (run / "part-00003.mkv").unlink()  # under the window at 100s
+
+    assert not clips.release_window(clip, "sha")
+    assert clip.is_file() and not clips.released(clip)
+
+
+def test_a_released_window_is_recut_from_its_own_span(tmp_path):
+    _, clip, runner, calls = _released_run(tmp_path)
+    record = clips._read_sidecar(clip)
+
+    out = clips.recut_window(clip, tmp_path / "watch.mkv", runner=runner)
+
+    assert out == tmp_path / "watch.mkv" and out.is_file()
+    command = calls[-1]
+    start = float(command[command.index("-ss") + 1])
+    length = float(command[command.index("-t") + 1])
+    assert round(length, 3) == round(record["segment_end_sec"] - record["segment_start_sec"], 3)
+    assert start >= 0

@@ -177,7 +177,7 @@ def attach(session: Path, clip_files: list[Path], *, transcriber=None,
 
     `limit` as for `transcribe_session`: 0 attaches what is already heard
     without loading the speech model."""
-    from pipeline_v2 import cache, store
+    from pipeline_v2 import store
 
     placed = []
     for clip in clip_files:
@@ -195,8 +195,11 @@ def attach(session: Path, clip_files: list[Path], *, transcriber=None,
     conn = store.connect()
     try:
         for clip, start, end in placed:
+            sha = clips_mod.window_sha(clip)  # a released window has only its sidecar
+            if sha is None:
+                continue
             changed += store.put_transcript(
-                conn, cache.clip_sha(clip), said_between(utterances, start, end), SOURCE
+                conn, sha, said_between(utterances, start, end), SOURCE
             )
         conn.commit()
     finally:

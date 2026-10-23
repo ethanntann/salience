@@ -220,6 +220,23 @@ def test_describe_many_keeps_order_and_never_pays_past_the_limit(monkeypatch):
     assert {"c1", "c3"}.isdisjoint(budgeted) and len(budgeted) == 2
 
 
+def test_a_windows_frames_are_deleted_once_it_is_described(monkeypatch):
+    """They exist only to be sent: kept, 2.8 GB of JPEGs."""
+    from pipeline_v2 import config
+
+    frames = config.FRAME_DIR / "somesha" / "window"
+    frames.mkdir(parents=True)
+    (frames / "window-000.jpg").write_bytes(b"jpg")
+    monkeypatch.setattr(cli, "_prepare", lambda clip: (
+        8.0, None, [SimpleNamespace(path=frames / "window-000.jpg")]))
+    monkeypatch.setattr(cli.vlm, "describe", lambda *a, **k: SimpleNamespace(cached=True))
+
+    list(cli.describe_many(None, [Path("c0")], max_calls=1, workers=1))
+
+    assert not (config.FRAME_DIR / "somesha").exists()
+    assert config.FRAME_DIR.is_dir()
+
+
 def test_speech_runs_only_between_matches(tmp_path):
     states = iter([False, True, False, True])
     looked, listened = threading.Event(), []
