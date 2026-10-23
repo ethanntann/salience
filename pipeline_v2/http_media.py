@@ -48,6 +48,7 @@ def playable(path: Path) -> Path:
     target = config.DATA_DIR / "playable" / f"{key}.mp4"
     if target.is_file():
         return target
+    _prune(target.parent)
     with _LOCKS_GUARD:
         lock = _LOCKS.setdefault(key, threading.Lock())
     with lock:  # a browser fires several range requests at once
@@ -74,6 +75,24 @@ def playable(path: Path) -> Path:
             return path  # serve the original rather than nothing
         os.replace(partial, target)
     return target
+
+
+# Copies kept for replaying: each is made in about a second, so only the ones
+# just watched are worth keeping. Unbounded, it held a copy of every window
+# ever rated: 1,502 files, 21.3 GB (2026-10-23).
+PLAYABLE_KEEP = 30
+
+
+def _prune(folder: Path) -> None:
+    try:
+        made = sorted(folder.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+    except OSError:
+        return
+    for stale in made[:-PLAYABLE_KEEP]:
+        try:
+            stale.unlink()
+        except OSError:
+            pass  # still being played
 
 
 def serve_video(handler, path: Path) -> None:

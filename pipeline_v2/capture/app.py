@@ -216,7 +216,7 @@ def _recording_args():
 
     args = record._parser().parse_args([])
     args.mic = os.environ.get("SALIENCE_MIC", "")  # "" = Windows' default mic
-    args.fps, args.bitrate = record.QUALITY[quality()]
+    args.fps, args.bitrate = custom_quality() if quality() == CUSTOM else record.QUALITY[quality()]
     args.height = RESOLUTIONS[resolution()][0]
     return args
 
@@ -230,11 +230,38 @@ QUALITY_LABELS = {
 }
 
 
+# The desktop app's own frame rate and bitrate, beside the presets.
+CUSTOM = "custom"
+FPS_KEY, BITRATE_KEY = "SALIENCE_FPS", "SALIENCE_BITRATE_MBPS"
+FRAME_RATES = (30, 60)
+BITRATES = range(4, 51)  # Mbps: below 4 fights smear; above 50 NVENC adds nothing visible
+
+
 def quality() -> str:
     from pipeline_v2.capture import record
 
     chosen = os.environ.get(QUALITY_KEY, "").strip().lower()
-    return chosen if chosen in record.QUALITY else record.DEFAULT_QUALITY
+    return chosen if chosen in record.QUALITY or chosen == CUSTOM else record.DEFAULT_QUALITY
+
+
+def custom_quality() -> tuple[int, str]:
+    """(fps, bitrate) set in the app; the High preset's for anything unreadable."""
+    try:
+        fps = int(os.environ.get(FPS_KEY, ""))
+        mbps = int(os.environ.get(BITRATE_KEY, ""))
+    except ValueError:
+        return 60, "25M"
+    if fps not in FRAME_RATES or mbps not in BITRATES:
+        return 60, "25M"
+    return fps, f"{mbps}M"
+
+
+def set_custom_quality(fps: int, mbps: int, path: Path = SETTINGS) -> None:
+    if fps not in FRAME_RATES or mbps not in BITRATES:
+        raise ValueError(f"{fps} fps / {mbps} Mbps is outside what can be recorded")
+    for key, value in ((FPS_KEY, str(fps)), (BITRATE_KEY, str(mbps)), (QUALITY_KEY, CUSTOM)):
+        write_setting(key, value, path)
+        os.environ[key] = value
 
 
 def set_quality(name: str, path: Path = SETTINGS) -> None:
