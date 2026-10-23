@@ -291,6 +291,19 @@ def set_resolution(name: str, path: Path = SETTINGS) -> None:
     os.environ[RESOLUTION_KEY] = name
 
 
+def open_app(session: Path | None = None) -> None:
+    """The desktop app, at `session`; the highlights folder if it cannot start."""
+    try:
+        from pipeline_v2.capture import desktop
+
+        desktop.launch(session)
+    except Exception as exc:  # noqa: BLE001 -- the highlights must still be reachable
+        print(f"app failed: {type(exc).__name__}: {exc}", flush=True)
+        out = session / "highlights" if session is not None else None
+        if out is not None and out.is_dir() and hasattr(os, "startfile"):
+            os.startfile(out)  # noqa: S606 -- the player's own folder
+
+
 def _single_instance() -> bool:
     """False if another copy is already running (a named mutex per user)."""
     if os.name != "nt":
@@ -454,8 +467,8 @@ def main() -> int:
         manifest = highlights.run(session, top=10)
         highlights.report(manifest)
         out = session / "highlights"
-        if out.is_dir() and hasattr(os, "startfile"):
-            os.startfile(out)  # noqa: S606 -- the player's own folder
+        if out.is_dir():
+            open_app(session)
         def afterwards() -> None:
             highlights.reels(session)
             # Last: every step before it may still read the window copies.
@@ -512,10 +525,11 @@ def main() -> int:
         pystray.MenuItem("Pause auto-recording", toggle_pause,
                          checked=lambda _: controller.paused),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Open latest highlights",
-                         lambda *_: open_folder(
-                             controller.last_session and controller.last_session / "highlights"),
+        pystray.MenuItem("Open Salience", lambda *_: open_app(controller.last_session),
                          default=True),
+        pystray.MenuItem("Open latest highlights folder",
+                         lambda *_: open_folder(
+                             controller.last_session and controller.last_session / "highlights")),
         pystray.MenuItem("Rate latest session", lambda *_: review.open(controller.last_session)),
         pystray.MenuItem("Open recordings folder",
                          lambda *_: open_folder(_recording_args().out)),

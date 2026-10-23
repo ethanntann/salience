@@ -113,7 +113,12 @@ def session_view(session: Path, conn) -> dict:
         manifest = json.loads((out / "highlights.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         manifest = {}
-    entries = [h for h in manifest.get("highlights", []) if (out / h.get("file", "")).is_file()]
+    entries = []
+    for h in manifest.get("highlights", []):
+        # Manifests before 2026-10-19 name only the window; the file is `NN-<window>`.
+        name = h.get("file") or (f"{int(h['rank']):02d}-{h['clip']}" if h.get("rank") and h.get("clip") else "")
+        if name and (out / name).is_file():
+            entries.append({**h, "file": name})
     lengths = _lengths(out, [h["file"] for h in entries])
     windows = session / "windows"
     _, inside = highlights._session_clips(conn, windows) if windows.is_dir() else (None, [])

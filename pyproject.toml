@@ -21,13 +21,18 @@ capture = ["soundcard>=0.4", "windows-capture>=2.0"]
 obs = ["obsws-python>=1.6"]
 audio = ["soundfile>=0.12", "onnx-asr[cpu,hub]>=0.12"]
 # The tray app (`pipeline_v2.capture.app`): icon and menu. Its dialogs are tkinter.
-app = ["pystray>=0.19", "pillow>=10"]
+app = ["pystray>=0.19", "pillow>=10", "pywebview>=6.2"]
+# pywebview: the desktop app's window (`pipeline_v2.capture.desktop`), on the
+# WebView2 runtime Windows 11 ships with.
 
 [project.scripts]
 salience = "pipeline_v2.cli:main"
 
 [tool.setuptools]
 package-dir = {salience_api = "backend/salience_api"}
+
+[tool.setuptools.package-data]
+"pipeline_v2.capture.desktop" = ["static/*"]
 
 [tool.setuptools.packages.find]
 where = [".", "backend"]
