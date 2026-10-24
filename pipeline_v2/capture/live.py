@@ -195,6 +195,20 @@ def heard_spans(session: Path) -> list[tuple[float, float]]:
     return voice.transcribed(session)
 
 
+def laugh_step(session: Path, holder: dict, detect=None) -> bool:
+    """Detect laughter in a batch of segments between matches. False once the
+    model is unavailable, so the caller stops asking."""
+    from pipeline_v2.capture import reactions
+
+    try:
+        if "laughs" not in holder:
+            holder["laughs"] = reactions.Detector(cpu_threads=LIVE_SPEECH_THREADS)
+    except ImportError:
+        return False
+    (detect or reactions.listen)(session, detector=holder["laughs"], limit=LISTEN_BATCH)
+    return True
+
+
 def listen_step(session: Path, holder: dict, transcribe=None) -> bool:
     """Transcribe a batch of the mic between matches. False once the speech
     model is unavailable, so the caller stops asking."""
@@ -218,13 +232,16 @@ class LiveDescriber:
     """
 
     def __init__(self, session: Path, interval: float = INTERVAL, step_fn=step,
-                 speech: bool = True, idle_fn=between_matches, listen_fn=listen_step):
+                 speech: bool = True, idle_fn=between_matches, listen_fn=listen_step,
+                 laugh_fn=laugh_step):
         self.session = session
         self.interval = interval
         self.step_fn = step_fn
         self.speech = speech
         self.idle_fn = idle_fn
         self.listen_fn = listen_fn
+        self.laugh_fn = laugh_fn
+        self.laughter = speech
         self._speech_model: dict = {}
         self.seen: set[float] = set()
         self.described = 0
@@ -260,6 +277,8 @@ class LiveDescriber:
                 # look can describe what that frees, then catch up at full width.
                 if self.speech and idle:
                     self.speech = self.listen_fn(self.session, self._speech_model)
+                if self.laughter and idle and not self._stop.is_set():
+                    self.laughter = self.laugh_fn(self.session, self._speech_model)
                 extra = {"workers": IDLE_WORKERS} if idle else {}
                 if self.speech:
                     extra.update(listen=listen_windows, heard=heard_spans)

@@ -25,6 +25,7 @@ _MIX_TRACKS = highlights.mix_tracks
 def _deaf(monkeypatch):
     """No Whisper in unit tests; speech has its own tests in test_voice."""
     monkeypatch.setattr(highlights, "listen", lambda session, clip_dir: 0)
+    monkeypatch.setattr(highlights, "hear_laughs", lambda session: [])
     # Nor the developer's real Fortnite log; gating has its own tests.
     monkeypatch.setattr(highlights, "find_gameplay", lambda session: {"spans": None})
     monkeypatch.setattr(highlights, "unembedded", lambda clip_dir: 0)
@@ -660,3 +661,21 @@ def test_quiet_moments_become_highlights_once_the_player_keeps_them(tmp_path, is
 
     monkeypatch.setattr(highlights, "quiet_keeps", lambda conn: highlights.QUIET_KEEPS_TO_LEARN)
     assert len(_run(session)["highlights"]) == 2
+
+
+def test_laughter_makes_a_quiet_moment_a_highlight(tmp_path, isolated_data, monkeypatch):
+    """A funny moment has no kill; friends laughing is what marks it."""
+    from pipeline_v2.capture import reactions
+
+    session = _session(tmp_path, ["no_event", "no_event"])
+    for i, clip in enumerate(sorted((session / "clips").glob("*.mkv"))):
+        side = clip.with_suffix(".capture.json")
+        record = json.loads(side.read_text(encoding="utf-8"))
+        side.write_text(json.dumps({**record, "segment_start_sec": 8.0 * i, "segment_end_sec": 8.0 * i + 8.0}),
+                        encoding="utf-8")
+    monkeypatch.setattr(highlights, "hear_laughs",
+                        lambda session: [reactions.Laugh(13.0, 14.5, 0.99, "game")])  # past the first window's 4s
+
+    manifest = _run(session)
+
+    assert [(h["clip"], h["laughed"]) for h in manifest["highlights"]] == [("001-input_burst.mkv", True)]

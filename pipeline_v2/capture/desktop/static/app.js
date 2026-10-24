@@ -68,7 +68,7 @@ function card(s, h) {
       <img src="${thumb(s, h)}" alt="" loading="lazy">
       <span class="tag rank">${esc(h.rank)}</span>
       ${h.length ? `<span class="tag length">${esc(h.length)}</span>` : ""}
-      ${h.added ? '<span class="tag added">From rating</span>' : ""}
+      ${h.added ? '<span class="tag added">From rating</span>' : h.laughed ? '<span class="tag added">Laughter</span>' : ""}
       ${h.loved ? `<span class="heart">${HEART}</span>` : ""}
     </div>
     <div>
@@ -291,7 +291,7 @@ async function showSession(id, file) {
           <div class="words">
             <div class="title"><h2>${esc(current.title)}</h2>${current.loved ? HEART : ""}</div>
             <p>${esc(current.summary)}</p>
-            <span class="when">${current.said ? `You said: <i style="color:var(--ink)">“${esc(current.said)}”</i> · ` : ""}${current.at ? `${esc(current.at)} into the session` : ""}</span>
+            <span class="when">${current.laughed ? "Someone laughed · " : ""}${current.said ? `You said: <i style="color:var(--ink)">“${esc(current.said)}”</i> · ` : ""}${current.at ? `${esc(current.at)} into the session` : ""}</span>
           </div>
           <div class="actions" id="watch-actions">
             ${current.reel ? '<button class="button" id="reel">9:16 reel</button>' : ""}

@@ -43,6 +43,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from pipeline_v2.capture import clips as clips_mod
+from pipeline_v2.capture import reactions
 from pipeline_v2.capture import gameplay as gameplay_mod
 
 # What the vision model saw, as a fallback order when there is no taste model.
@@ -346,6 +347,7 @@ class Highlight:
     trigger: str
     said: str = ""
     asked: bool = False  # the player said "clip that" for it
+    laughed: bool = False  # laughter in it or just after, on the mic or the PC's audio
     file: str = ""  # its name in highlights/
     reel: str = ""  # its 9:16 copy in reels/, once `reels` has made it
 
@@ -397,6 +399,19 @@ def window_files(clip_dir: Path) -> list[Path]:
               if clips_mod.released(clip := sidecar.with_name(
                   sidecar.name[:-len(".capture.json")] + ".mkv"))}
     return sorted(files)
+
+
+def hear_laughs(session: Path) -> list:
+    """Laughter on the mic and the PC's audio (`reactions`). Never in the way of
+    the highlights: without the model, or if it fails, there is none."""
+    print("  laughter: listening to the mic and the PC's audio...", flush=True)
+    try:
+        return reactions.listen(session)
+    except ImportError:
+        return []
+    except Exception as exc:  # noqa: BLE001 -- highlights are made without it
+        print(f"  laughter: skipped ({type(exc).__name__}: {exc})", flush=True)
+        return []
 
 
 def undescribed(clip_dir: Path) -> int:
@@ -927,6 +942,7 @@ def run(
     _step(f"cut {len(cut)} windows")
     # Before describing, so the embeddings built at its end include speech.
     heard = (listen_fn or listen)(session, clip_dir) if speech else 0
+    found_laughs = hear_laughs(session) if speech else []
     # `cut` includes windows already cut on an earlier run. Describing those
     # again is free (cached) but not fast: 300s of frame extraction on
     # session 1 to look up 235 answers it already had.
@@ -974,8 +990,14 @@ def run(
     # A highlight is a moment: a kill, a knock or a fight, or one the player
     # asked for. Of 59 keeps, 1 had none of these (2026-10-24), and a session
     # spent in a lobby made four idle lobby screens its "highlights".
+    def laughed(clip) -> bool:
+        span = _span(clip)
+        return span is not None and bool(reactions.laughed_in(found_laughs, *span))
+
+    # Laughter makes a moment one, as a kill does: a funny moment has no kill.
     moments = [(score, clip) for score, clip in ordered
-               if clip in pinned or learned_quiet or event_tier(clip) > 0 or in_fight(clip)]
+               if clip in pinned or learned_quiet or event_tier(clip) > 0 or in_fight(clip)
+               or laughed(clip)]
     picked = [pair for pair in pick(moments, top, pad, extent if coverage else None, pinned)
               if Path(pair[1].path).is_file() or clips_mod.released(Path(pair[1].path))]
     # Asked for, then asked for where nothing was looked at, then the rest.
@@ -1031,7 +1053,7 @@ def run(
             rank=position, clip=source.name, score=round(score, 4),
             summary=item.summary or "", outcome=str(payload.get("outcome")),
             trigger=str(_sidecar(source).get("trigger_source", "")),
-            said=said.get(item.clip_sha, ""), asked=item in pinned,
+            said=said.get(item.clip_sha, ""), asked=item in pinned, laughed=laughed(item),
             file=name(position, (kind, score, item)),
         ))
 

@@ -178,6 +178,7 @@ def session_view(session: Path, conn) -> dict:
             "length": _clock(lengths.get(h["file"])),
             "loved": bool(clip and clip.clip_sha in loved),
             "asked": bool(h.get("asked")), "added": h.get("trigger") == highlights.RATED_TRIGGER,
+            "laughed": bool(h.get("laughed")),
             "trimmed": (trimmed := (out / ORIGINALS / h["file"]).is_file()),
             # Marked only where there is one: a lobby window was marked "kill" (2026-10-24).
             "kill": (kill_at(clip, index(), lengths.get(h["file"]))

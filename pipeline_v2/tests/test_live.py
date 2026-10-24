@@ -139,7 +139,7 @@ def test_between_matches_speech_is_transcribed_before_the_step(tmp_path):
 
     describer = live.LiveDescriber(
         tmp_path, interval=0.01, step_fn=step, idle_fn=lambda s: True,
-        listen_fn=lambda s, holder: order.append("listen") or True).start()
+        laugh_fn=lambda s, holder: True, listen_fn=lambda s, holder: order.append("listen") or True).start()
     assert done.wait(2.0)
     describer.stop()
 
@@ -250,7 +250,7 @@ def test_speech_runs_only_between_matches(tmp_path):
 
     describer = live.LiveDescriber(
         tmp_path, interval=0.01, step_fn=lambda s, seen, **kw: 0, idle_fn=idle,
-        listen_fn=lambda s, holder: listened.append(1) or True).start()
+        laugh_fn=lambda s, holder: True, listen_fn=lambda s, holder: listened.append(1) or True).start()
     assert looked.wait(2.0)
     describer.stop()
 
