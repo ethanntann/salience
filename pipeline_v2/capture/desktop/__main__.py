@@ -11,6 +11,32 @@ from pipeline_v2.capture.desktop import server
 SESSION_ID = re.compile(r"^\d{8}-\d{6}$")
 
 
+def bring_forward(title: str) -> bool:
+    """Restore and raise this process's window called `title`."""
+    import ctypes
+    import os
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    found = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def each(hwnd, _):
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        text = ctypes.create_unicode_buffer(256)
+        user32.GetWindowTextW(hwnd, text, 256)
+        if pid.value == os.getpid() and text.value == title:
+            found.append(hwnd)
+        return True
+
+    user32.EnumWindows(each, 0)
+    for hwnd in found:
+        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        user32.SetForegroundWindow(hwnd)
+    return bool(found)
+
+
 def main(argv: list[str]) -> int:
     # `[<view>/]<session id>`: which screen to open at.
     view, _, session = (argv[0] if argv else "").rpartition("/")
@@ -39,16 +65,10 @@ def main(argv: list[str]) -> int:
         "Salience", f"http://127.0.0.1:{port}/" + desktop.target(session, view),
         width=1360, height=880, min_size=(980, 640), background_color="#0D0F13")
 
-    def show(at: str, at_view: str = "session") -> None:
-        window.restore()
-        window.show()
-        # Windows only lets a window that is already in front take focus;
-        # on-top for a moment puts it there.
-        window.on_top = True
-        window.on_top = False
-        if SESSION_ID.match(at or "") or at_view == "rate":
-            hash_ = desktop.target(at if SESSION_ID.match(at or "") else "", at_view)
-            window.evaluate_js(f"location.hash = '{hash_}'")
+    def show() -> None:
+        # Plain Win32, never pywebview's own calls: from a thread other than
+        # the window's, `on_top` waited forever and froze the window.
+        bring_forward("Salience")
 
     def save_as(suggested: str) -> str | None:
         from pathlib import Path

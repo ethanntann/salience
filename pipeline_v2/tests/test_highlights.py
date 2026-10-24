@@ -83,9 +83,7 @@ def test_without_labels_the_basis_says_fallback_not_taste(tmp_path, isolated_dat
 
     assert manifest["basis"].startswith("fallback")
     assert "review --variant" in manifest["basis"]  # and says how to fix it
-    assert [h["outcome"] for h in manifest["highlights"]] == [
-        "elimination", "knock", "no_event"
-    ]
+    assert [h["outcome"] for h in manifest["highlights"]] == ["elimination", "knock"]
 
 
 def test_top_limits_what_is_kept(tmp_path, isolated_data):
@@ -100,7 +98,7 @@ def test_top_limits_what_is_kept(tmp_path, isolated_data):
 
 def test_clips_from_other_folders_never_leak_in(tmp_path, isolated_data):
     """The control arm and other sessions share the variant, not the ranking."""
-    session = _session(tmp_path, ["no_event"])
+    session = _session(tmp_path, ["knock"])
     control = session / "control" / "000-control.mkv"
     control.parent.mkdir()
     control.write_bytes(b"clip")
@@ -480,7 +478,7 @@ def test_a_lobby_clip_that_is_kept_first_with_what_was_said(tmp_path, isolated_d
     assert first["said"] == "Bro look at him, clip that"
     assert cuts == [(49.5 - highlights.ASK_SPAN[0], 49.5 + highlights.ASK_SPAN[1])]
     assert (session / "highlights" / first["clip"]).is_file()
-    assert len(manifest["highlights"]) == 3
+    assert len(manifest["highlights"]) == 2  # the lobby window itself is no moment
 
 
 def test_a_reel_is_cropped_to_9_16_with_both_tracks_mixed(tmp_path):
@@ -645,3 +643,11 @@ def test_a_released_window_can_still_be_a_highlight(tmp_path, isolated_data, mon
 
     assert [h["clip"] for h in manifest["highlights"]] == ["000-input_burst.mkv"]
     assert (session / "highlights" / "01-000-input_burst.mkv").read_bytes() == b"from raw"
+
+
+def test_a_session_spent_in_the_lobby_has_no_highlights(tmp_path, isolated_data):
+    """Not four idle lobby screens (2026-10-24): no kill, knock or fight is no highlight."""
+    manifest = _run(_session(tmp_path, ["no_event", "no_event", "no_event"]))
+
+    assert manifest["highlights"] == []
+    assert "No kills, knocks or fights" in manifest["why"]

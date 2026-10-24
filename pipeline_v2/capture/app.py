@@ -519,9 +519,8 @@ def main() -> int:
     def make_highlights(session: Path) -> dict:
         manifest = highlights.run(session, top=10)
         highlights.report(manifest)
-        out = session / "highlights"
-        if out.is_dir():
-            open_app(session)
+        if manifest.get("highlights"):
+            open_app(session)  # nothing to show is a toast, not a window
         def afterwards() -> None:
             highlights.reels(session)
             # Last: every step before it may still read the window copies.

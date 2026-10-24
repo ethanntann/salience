@@ -47,6 +47,13 @@ def show_running(session: str = "", timeout: float = 2.0, view: str = "session")
         f"http://127.0.0.1:{port}/api/show", data=json.dumps({"session": session, "view": view}).encode(),
         headers={"Content-Type": "application/json"}, method="POST")
     try:
+        # Windows lets a process raise another's window only with its leave.
+        import ctypes
+
+        ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY
+    except (AttributeError, OSError):
+        pass
+    try:
         with urllib.request.urlopen(request, timeout=timeout):
             return True
     except OSError:

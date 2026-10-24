@@ -954,7 +954,12 @@ def run(
     utterances = voice_mod.heard(session) if speech else []
     asks = voice_mod.clip_requests(utterances)
     pinned = asked_for(ordered, asks)
-    picked = [pair for pair in pick(ordered, top, pad, extent if coverage else None, pinned)
+    # A highlight is a moment: a kill, a knock or a fight, or one the player
+    # asked for. Of 59 keeps, 1 had none of these (2026-10-24), and a session
+    # spent in a lobby made four idle lobby screens its "highlights".
+    moments = [(score, clip) for score, clip in ordered
+               if clip in pinned or event_tier(clip) > 0 or in_fight(clip)]
+    picked = [pair for pair in pick(moments, top, pad, extent if coverage else None, pinned)
               if Path(pair[1].path).is_file() or clips_mod.released(Path(pair[1].path))]
     # Asked for, then asked for where nothing was looked at, then the rest.
     jobs = ([("window", score, clip) for score, clip in picked if clip in pinned]
@@ -1023,6 +1028,8 @@ def run(
         "gameplay": _gameplay_note(played, journalled),
         "highlights": [asdict(h) for h in kept],
     }
+    if not kept:
+        manifest["why"] = "No kills, knocks or fights this session, so no highlights."
     write_json(out / "highlights.json", manifest)
 
     # Only once highlights exist, and only for an exact segment set: never a

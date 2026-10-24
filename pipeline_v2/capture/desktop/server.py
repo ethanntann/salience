@@ -356,7 +356,8 @@ def export_mp4(source: Path, destination: Path) -> bool:
 class Handler(review.Handler):
     """The rating page's routes, under the app's own."""
 
-    show = None  # set by the window: bring it forward, at a session
+    show = None  # set by the window: bring it forward
+    goto = None  # where the page is to go next, collected with /api/status
     save_as = None  # set by the window: a Save dialog, (suggested name) -> path or None
 
     def _static(self, name: str) -> None:
@@ -394,7 +395,8 @@ class Handler(review.Handler):
         if url.path == "/api/settings":
             return self._json(settings())
         if url.path == "/api/status":
-            return self._json(recorder_status())
+            goto, Handler.goto = Handler.goto, None
+            return self._json({**recorder_status(), "goto": goto})
         if url.path == "/api/rate/next":
             session = session_dir(parse_qs(url.query).get("session", [""])[0])
             review._ONLY = str((session / "windows").resolve()) if session else None
@@ -505,8 +507,16 @@ class Handler(review.Handler):
                 app.set_resolution(data["resolution"])
             return self._json(settings())
         if self.path == "/api/show":
+            from pipeline_v2.capture import desktop
+
+            # Answered at once: raising the window on this thread once waited
+            # forever on pywebview (2026-10-24), the tray took the app for gone
+            # and opened a second one. The page goes where it is sent itself.
+            session = str(data.get("session", ""))
+            Handler.goto = desktop.target(session if SESSION_ID.match(session) else "",
+                                          str(data.get("view", "session")))
             if Handler.show is not None:
-                Handler.show(str(data.get("session", "")), str(data.get("view", "session")))
+                threading.Thread(target=Handler.show, name="show", daemon=True).start()
             return self._json({"ok": True})
         return self.send_error(404)
 

@@ -136,6 +136,10 @@ function paintRecorder() {
 
 async function pollRecorder() {
   try { recorder = await api("/api/status"); } catch (error) { return; }
+  if (recorder.goto) {  // the tray asked for a session (it just finished)
+    libraryCache = null;
+    if (location.hash === recorder.goto) route(); else location.hash = recorder.goto;
+  }
   // A session just finished: its highlights are new.
   if (lastState === "highlights" && recorder.state !== "highlights") {
     libraryCache = null;
@@ -161,7 +165,7 @@ async function setAutoclip(on) {
 }
 
 document.getElementById("autoclip").addEventListener("click", () => setAutoclip(!(recorder && recorder.autoclip)));
-setInterval(pollRecorder, 3000);
+setInterval(pollRecorder, 2000);
 setInterval(paintRecorder, 1000); // the recording clock
 pollRecorder();
 
