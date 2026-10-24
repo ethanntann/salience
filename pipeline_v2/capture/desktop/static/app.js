@@ -7,8 +7,8 @@
 //   #/settings              the recording settings that are the player's
 
 const page = document.getElementById("page");
-const HEART = '<svg width="20" height="20" viewBox="0 0 24 24" fill="#FF5C93" role="img" aria-label="Loved"><path d="M12 21s-7.5-4.6-9.5-9.2C1.1 8.4 3.2 5 6.6 5c2 0 3.4 1.1 4.2 2.4h2.4C14 6.1 15.4 5 17.4 5c3.4 0 5.5 3.4 4.1 6.8C19.5 16.4 12 21 12 21z"></path></svg>';
-const TICK = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0D0F13" stroke-width="2.2" aria-hidden="true"><path d="M5 12l4 4L19 6"></path></svg>';
+const HEART = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" role="img" aria-label="Loved"><path d="M12 21s-7.5-4.6-9.5-9.2C1.1 8.4 3.2 5 6.6 5c2 0 3.4 1.1 4.2 2.4h2.4C14 6.1 15.4 5 17.4 5c3.4 0 5.5 3.4 4.1 6.8C19.5 16.4 12 21 12 21z"></path></svg>';
+const TICK = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12l4 4L19 6"></path></svg>';
 const BIN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg>';
 
 const PLAY = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
@@ -202,7 +202,7 @@ async function showLibrary() {
         || '<div class="empty"><h2>Nothing matches</h2><p>Try another word, or clear the filter.</p></div>'
       : `<section class="section">
           <div class="section-head">
-            <div><h2 style="display:inline">${esc(when(latest.started))}</h2><span class="meta">${esc(facts(latest))}</span></div>
+            <h2>${esc(when(latest.started))} <span class="meta">${esc(facts(latest))}</span></h2>
             <a href="#/session/${enc(latest.id)}" class="button ghost">Open session</a>
           </div>
           <div class="grid">${latest.highlights.map((h) => card(latest, h)).join("")}</div>
