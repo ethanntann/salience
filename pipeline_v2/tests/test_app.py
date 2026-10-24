@@ -290,3 +290,24 @@ def test_the_recorders_status_reaches_the_app(tmp_path):
     status = app.read_status(tmp_path / "status.json")
     assert (status["state"], status["started"], status["session"]) == ("recording", 1000.0, "20261022-184935")
     assert app.read_status(tmp_path / "missing.json") == {}
+
+
+def test_a_recent_session_without_highlights_is_made_up(tmp_path):
+    """Quit mid-recording, a crash, a shutdown: its highlights come next start."""
+    import os
+
+    def session(name, highlights, age_days):
+        path = tmp_path / name
+        path.mkdir()
+        (path / "segments.csv").write_text("part-00000.mkv,0,30\n", encoding="utf-8")
+        if highlights:
+            (path / "highlights").mkdir()
+            (path / "highlights" / "highlights.json").write_text("{}", encoding="utf-8")
+        old = 1_800_000_000 - age_days * 86400
+        os.utime(path / "segments.csv", (old, old))
+
+    session("20261023-200424", False, 0.5)
+    session("20261024-013405", True, 0.1)
+    session("20261001-100000", False, 20)  # long ago: left alone
+
+    assert [p.name for p in app.unfinished(tmp_path, now=1_800_000_000)] == ["20261023-200424"]

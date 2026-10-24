@@ -261,8 +261,10 @@ def recorder_status() -> dict:
     from pipeline_v2.capture import app
 
     running = app.tray_running()
-    status = app.read_status() if running else {}
-    state = status.get("state") if running else "off"
+    last = app.read_status()
+    status = last if running else {}
+    # Quit from its menu, the recorder stays closed until asked for again.
+    state = status.get("state") if running else ("closed" if last.get("state") == "closed" else "off")
     if running and state not in ("waiting", "recording", "highlights"):
         state = "waiting"
     return {"autoclip": app.autoclip_on(), "running": running, "state": state,

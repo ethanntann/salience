@@ -120,6 +120,7 @@ function paintRecorder() {
   if (!on && r.running) { state = "Turning off…"; detail = "Finishing this session first."; }
   else if (!on) { state = "Auto-clip is off"; detail = "Nothing is recorded. Turn it on to clip your games."; }
   else if (!r.has_key) { state = "Needs your key"; detail = "Add your Fireworks key in Settings to start."; }
+  else if (!r.running && r.state === "closed") { state = "Recorder closed"; detail = "You quit it from the tray. Click the switch to start it again."; }
   else if (!r.running) { state = "Starting…"; detail = "The recorder is starting in the background."; }
   else if (r.state === "recording") {
     dot = "recording";
@@ -164,7 +165,11 @@ async function setAutoclip(on) {
   if (location.hash.startsWith("#/settings")) route();
 }
 
-document.getElementById("autoclip").addEventListener("click", () => setAutoclip(!(recorder && recorder.autoclip)));
+document.getElementById("autoclip").addEventListener("click", () => {
+  // On but closed (quit from the tray): the switch starts it again rather than turning auto-clip off.
+  if (recorder && recorder.autoclip && !recorder.running && recorder.state === "closed") return setAutoclip(true);
+  setAutoclip(!(recorder && recorder.autoclip));
+});
 setInterval(pollRecorder, 2000);
 setInterval(paintRecorder, 1000); // the recording clock
 pollRecorder();

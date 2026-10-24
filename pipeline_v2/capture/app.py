@@ -201,6 +201,23 @@ class Controller:
         self.state = "waiting"
 
 
+# How far back a session without highlights is still made up: older ones were
+# left that way on purpose (recorded with --no-highlights, say).
+UNFINISHED_DAYS = 2
+
+
+def unfinished(root: Path, now: float | None = None) -> list[Path]:
+    """Recent sessions with footage and no highlights, oldest first."""
+    now = time.time() if now is None else now
+    try:
+        found = [p for p in root.iterdir() if (p / "segments.csv").is_file()
+                 and not (p / "highlights" / "highlights.json").is_file()
+                 and now - (p / "segments.csv").stat().st_mtime < UNFINISHED_DAYS * 86400]
+    except OSError:
+        return []
+    return sorted(found, key=lambda p: p.name)
+
+
 def latest_session(root: Path) -> Path | None:
     """The newest recording folder, so the menu works before this run records."""
     try:
@@ -535,8 +552,21 @@ def main() -> int:
                             game_running=game_running)
     controller.last_session = latest_session(_recording_args().out)
     quitting = threading.Event()
+    closing = threading.Event()  # quit from the menu, not auto-clip turned off
 
     def worker() -> None:
+        # A session that ended without highlights (quit mid-recording, a crash,
+        # the PC shut down) gets them now, before anything new is recorded.
+        for session in unfinished(_recording_args().out):
+            controller.state = "highlights"
+            write_status("highlights", "Making highlights...", None, session.name)
+            try:
+                make_highlights(session)
+            except Exception as exc:  # noqa: BLE001 -- the tray must still start
+                print(f"highlights for {session.name} failed: {type(exc).__name__}: {exc}", flush=True)
+            controller.state = "waiting"
+            if quitting.is_set():
+                return
         shown = None
         started = None
         stopping = False
@@ -564,13 +594,22 @@ def main() -> int:
             quitting.wait(TICK)
         if controller.session is not None:
             controller.session.stop()  # quitting mid-session keeps the footage
-        write_status("off", "Auto-clip is off", None, None)
+        if closing.is_set():
+            write_status("closed", "Salience was closed", None, None)
+        else:
+            write_status("off", "Auto-clip is off", None, None)
         quitting.set()
         icon.stop()
 
     def turn_off(*_):
         # As the app's switch does: finish this session, then stop.
         set_autoclip(False)
+
+    def quit_now(*_):
+        # At once: a recording stops with its footage kept, and its highlights
+        # are made the next time the recorder starts (`unfinished`).
+        closing.set()
+        quitting.set()
 
     # Everything else is the app's (Settings); the tray says it is there.
     menu = pystray.Menu(
@@ -581,6 +620,7 @@ def main() -> int:
                          visible=lambda _: controller.state == "recording"),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Turn off auto-clip", turn_off),
+        pystray.MenuItem("Quit Salience", quit_now),
     )
     icon.menu = menu
     write_status(controller.state, controller.status, None,
