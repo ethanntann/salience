@@ -4,33 +4,66 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Salience</title>
+<script>
+  // Before anything paints: the theme and the sidebar as the player left them.
+  try {
+    // ?theme= and ?rail= (for checking a look) win over what was kept.
+    const ask = new URLSearchParams(location.search);
+    if (ask.get("theme")) localStorage.setItem("salience.theme", ask.get("theme"));
+    if (ask.get("rail")) localStorage.setItem("salience.rail", ask.get("rail"));
+    const theme = localStorage.getItem("salience.theme");
+    if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+    if (localStorage.getItem("salience.rail") === "collapsed") document.documentElement.dataset.rail = "collapsed";
+  } catch (error) { /* storage blocked: the defaults */ }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&amp;family=M+PLUS+1+Code:wght@400;500;600&amp;display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <div class="app">
-  <header class="topbar">
-    <div class="brand-row">
-      <span class="brand">SALIENCE</span>
-      <nav class="nav" aria-label="Main">
-        <a href="#/" data-nav="library">LIBRARY</a>
-        <a href="#/rate" data-nav="rate">RATE <span class="badge" id="rate-badge" hidden></span></a>
-        <a href="#/settings" data-nav="settings">SETTINGS</a>
-      </nav>
+  <nav class="rail" aria-label="Main">
+    <div class="rail-top">
+      <span class="brand"><span class="brand-full">SALIENCE</span><span class="brand-short" aria-hidden="true">S</span></span>
+      <button class="collapse" id="collapse" aria-label="Collapse the sidebar" aria-expanded="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+      </button>
     </div>
+    <div class="nav">
+      <a href="#/" data-nav="library" title="Library">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
+        <span class="label">LIBRARY</span>
+      </a>
+      <a href="#/rate" data-nav="rate" title="Rate">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h10M4 12h7M4 17h5"></path><path d="M14 15l3 3 5-6"></path></svg>
+        <span class="label">RATE</span> <span class="badge" id="rate-badge" hidden></span>
+      </a>
+      <a href="#/settings" data-nav="settings" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg>
+        <span class="label">SETTINGS</span>
+      </a>
+    </div>
+
     <div class="status" id="recorder">
-      <div class="status-text">
-        <b><span class="dot" id="rec-dot"></span> <span id="rec-state">…</span></b>
-        <span id="rec-detail"></span>
-        <small id="status-quality"></small>
-      </div>
       <div class="status-top">
-        <span id="autoclip-label">AUTO-CLIP</span>
+        <span id="autoclip-label" class="label">AUTO-CLIP</span>
         <button class="switch" id="autoclip" role="switch" aria-checked="false" aria-labelledby="autoclip-label"><span></span></button>
       </div>
+      <b><span class="dot" id="rec-dot"></span> <span id="rec-state" class="label">…</span></b>
+      <span id="rec-detail" class="label"></span>
+      <small id="status-quality" class="label"></small>
     </div>
-  </header>
+
+    <div class="theme" role="radiogroup" aria-label="Theme">
+      <span class="label theme-name">THEME</span>
+      <button role="radio" data-theme="auto" aria-checked="true" title="Follow Windows">AUTO</button>
+      <button role="radio" data-theme="light" aria-checked="false" title="Light">LIGHT</button>
+      <button role="radio" data-theme="dark" aria-checked="false" title="Dark">DARK</button>
+      <button class="theme-cycle" id="theme-cycle" aria-label="Change the theme" title="Theme">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"></path></svg>
+      </button>
+    </div>
+  </nav>
   <main class="page" id="page" tabindex="-1"></main>
 </div>
 <script src="/static/app.js"></script>

@@ -174,6 +174,38 @@ setInterval(pollRecorder, 2000);
 setInterval(paintRecorder, 1000); // the recording clock
 pollRecorder();
 
+// The sidebar: its theme and whether it is collapsed, kept on this PC
+
+const store = {
+  get: (key) => { try { return localStorage.getItem(key); } catch (error) { return null; } },
+  set: (key, value) => { try { localStorage.setItem(key, value); } catch (error) { /* blocked: this run only */ } },
+};
+
+function applyTheme(theme) {
+  if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+  else delete document.documentElement.dataset.theme;  // auto: Windows decides
+  document.querySelectorAll(".theme [data-theme]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.theme === theme)));
+  document.getElementById("theme-cycle").setAttribute("aria-label", `Theme: ${theme}. Change it`);
+  store.set("salience.theme", theme);
+}
+document.querySelectorAll(".theme [data-theme]").forEach((b) => b.addEventListener("click", () => applyTheme(b.dataset.theme)));
+document.getElementById("theme-cycle").addEventListener("click", () => {
+  const order = ["auto", "light", "dark"];
+  applyTheme(order[(order.indexOf(store.get("salience.theme") || "auto") + 1) % order.length]);
+});
+applyTheme(store.get("salience.theme") || "auto");
+
+function applyRail(collapsed) {
+  if (collapsed) document.documentElement.dataset.rail = "collapsed";
+  else delete document.documentElement.dataset.rail;
+  const button = document.getElementById("collapse");
+  button.setAttribute("aria-expanded", String(!collapsed));
+  button.setAttribute("aria-label", collapsed ? "Expand the sidebar" : "Collapse the sidebar");
+  store.set("salience.rail", collapsed ? "collapsed" : "open");
+}
+document.getElementById("collapse").addEventListener("click", () => applyRail(store.get("salience.rail") !== "collapsed"));
+applyRail(store.get("salience.rail") === "collapsed");
+
 // Library
 
 async function showLibrary() {
@@ -194,7 +226,9 @@ async function showLibrary() {
   const draw = () => {
     const filtering = state.filter !== "all" || state.text;
     const sessions = lib.sessions.map((s) => ({ ...s, shown: s.highlights.filter(match) }));
-    const [latest, ...earlier] = sessions;
+    // The top spot is the newest session with highlights; empty ones (a lobby, say) wait below.
+    const latest = sessions.find((x) => x.highlights.length) || sessions[0];
+    const earlier = sessions.filter((x) => x !== latest);
     const body = filtering
       ? sessions.filter((s) => s.shown.length).map((s) => `<section class="section">
           <div class="section-head"><h2>${esc(when(s.started))}</h2></div>
@@ -211,7 +245,7 @@ async function showLibrary() {
           ${earlier.map((s) => `<a class="row" href="#/session/${enc(s.id)}">
             <div class="stills">${s.highlights.slice(0, 3).map((h) => `<img src="${thumb(s, h)}" alt="" loading="lazy">`).join("")}</div>
             <div class="what"><b>${esc(when(s.started))}</b><span>${esc(facts(s))}</span></div>
-            <span class="side">${s.unrated ? `${s.unrated} to rate` : "All rated"}</span>
+            <span class="side">${!s.highlights.length ? "No highlights" : s.unrated ? `${s.unrated} to rate` : "All rated"}</span>
           </a>`).join("")}</section>` : ""}`;
     page.querySelector("#results").innerHTML = body;
   };
