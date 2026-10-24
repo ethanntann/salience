@@ -273,13 +273,13 @@ async function showSession(id, file) {
               <div class="tl-keep" id="keep"></div>
               <button class="tl-handle" id="h-start" aria-label="Trim start"></button>
               <button class="tl-handle" id="h-end" aria-label="Trim end"></button>
-              ${current.kill != null ? '<span class="tl-kill" id="kill" title="The kill"></span>' : ""}
+              ${current.kill != null ? `<span class="tl-kill" id="kill" title="The ${esc(current.event || "moment")}"></span>` : ""}
               <span class="tl-head" id="head"></span>
             </div>
             <div class="controls">
               <button class="ctl" id="play" aria-label="Play">${PLAY}</button>
               <span class="time"><span id="now">0:00</span> <span class="faint">/ <span id="total">0:00</span></span></span>
-              ${current.kill != null ? `<span class="killnote">● kill at ${esc(clockOf(current.kill))}</span>` : ""}
+              ${current.kill != null ? `<span class="killnote">● ${esc(current.event || "moment")} at ${esc(clockOf(current.kill))}</span>` : ""}
               <span class="grow"></span>
               <span class="trimnote" id="trimnote" hidden></span>
               <button class="ctl" id="mute" aria-label="Mute">${SOUND}</button>

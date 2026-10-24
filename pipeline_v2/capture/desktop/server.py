@@ -110,6 +110,13 @@ def _lengths(out: Path, files: list[str]) -> dict[str, float | None]:
 KEYFRAME_GRID = 2.0  # seconds: where a stream-copied cut can start (`clips.cut_span`)
 
 
+def event_name(clip) -> str:
+    """What the marked moment is, in the player's words."""
+    if highlights.is_victory(clip):
+        return "win"
+    return {"elimination": "kill", "knock": "knock"}.get((clip.payload or {}).get("outcome"), "")
+
+
 def kill_at(clip, index: dict, length: float | None) -> float | None:
     """Where the window's moment sits in its exported highlight, in seconds.
 
@@ -172,8 +179,10 @@ def session_view(session: Path, conn) -> dict:
             "loved": bool(clip and clip.clip_sha in loved),
             "asked": bool(h.get("asked")), "added": h.get("trigger") == highlights.RATED_TRIGGER,
             "trimmed": (trimmed := (out / ORIGINALS / h["file"]).is_file()),
+            # Marked only where there is one: a lobby window was marked "kill" (2026-10-24).
             "kill": (kill_at(clip, index(), lengths.get(h["file"]))
-                     if clip and not trimmed and not (h.get("asked") and not clip) else None),
+                     if clip and not trimmed and highlights.event_tier(clip) > 0 else None),
+            "event": event_name(clip) if clip else "",
             "seconds": lengths.get(h["file"]),
         })
     segments = clips_mod.read_segments(session)
