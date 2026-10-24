@@ -34,7 +34,7 @@ FILE_NAME = re.compile(r"^[\w.-]+$")
 THUMBS = ".thumbs"  # inside highlights/, so a re-run's rebuild takes them too
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
          ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml",
-         ".jpg": "image/jpeg", ".png": "image/png"}
+         ".jpg": "image/jpeg", ".png": "image/png", ".json": "application/json"}
 
 WEAPONS = {"sniper": "Sniper", "shotgun": "Shotgun", "smg": "SMG", "assault_rifle": "Rifle",
            "pistol": "Pistol", "explosive": "Explosive", "melee": "Pickaxe"}

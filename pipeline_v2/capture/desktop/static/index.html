@@ -14,6 +14,9 @@
     if (ask.get("palette")) localStorage.setItem("salience.palette", ask.get("palette"));
     const palette = localStorage.getItem("salience.palette");
     if (palette) document.documentElement.dataset.palette = palette;
+    if (ask.get("pattern")) localStorage.setItem("salience.pattern", ask.get("pattern"));
+    const pattern = localStorage.getItem("salience.pattern");
+    if (pattern) document.documentElement.dataset.pattern = pattern;
     const theme = localStorage.getItem("salience.theme");
     if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
     if (localStorage.getItem("salience.rail") === "collapsed") document.documentElement.dataset.rail = "collapsed";

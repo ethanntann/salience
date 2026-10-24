@@ -1,0 +1,152 @@
+{
+ "palettes": [
+  {
+   "name": "concrete",
+   "label": "Concrete",
+   "light": {
+    "ground": "#D8D8D4",
+    "surface": "#E0E0DC",
+    "ink": "#3A3D40",
+    "select": "#C2C3BF",
+    "strong": "#4A4E52"
+   },
+   "dark": {
+    "ground": "#212427",
+    "surface": "#282C30",
+    "ink": "#C4C8CB",
+    "select": "#363C42",
+    "strong": "#B9BEC2"
+   }
+  },
+  {
+   "name": "stone",
+   "label": "Stone",
+   "light": {
+    "ground": "#DAD6CF",
+    "surface": "#E2DED7",
+    "ink": "#3E3A35",
+    "select": "#C8C2B8",
+    "strong": "#4D4842"
+   },
+   "dark": {
+    "ground": "#24221F",
+    "surface": "#2B2925",
+    "ink": "#CEC8BE",
+    "select": "#3B3832",
+    "strong": "#C4BDB1"
+   }
+  },
+  {
+   "name": "mist",
+   "label": "Mist",
+   "light": {
+    "ground": "#D5D9DC",
+    "surface": "#DDE1E4",
+    "ink": "#36414A",
+    "select": "#BDC6CC",
+    "strong": "#45525C"
+   },
+   "dark": {
+    "ground": "#1E2429",
+    "surface": "#252C32",
+    "ink": "#BCC7CF",
+    "select": "#323C45",
+    "strong": "#AEBBC4"
+   }
+  },
+  {
+   "name": "sage",
+   "label": "Sage",
+   "light": {
+    "ground": "#D3D7CD",
+    "surface": "#DCE0D6",
+    "ink": "#353B34",
+    "select": "#BAC1B2",
+    "strong": "#444B42"
+   },
+   "dark": {
+    "ground": "#1F2420",
+    "surface": "#262C27",
+    "ink": "#C3CCBF",
+    "select": "#343E35",
+    "strong": "#B5C0B0"
+   }
+  },
+  {
+   "name": "dust",
+   "label": "Dust",
+   "light": {
+    "ground": "#DCD3CF",
+    "surface": "#E4DCD8",
+    "ink": "#3F3537",
+    "select": "#C9BDBA",
+    "strong": "#4E4245"
+   },
+   "dark": {
+    "ground": "#252022",
+    "surface": "#2C2629",
+    "ink": "#D0C4C5",
+    "select": "#3D3437",
+    "strong": "#C6B9BA"
+   }
+  },
+  {
+   "name": "ink",
+   "label": "Ink (high contrast)",
+   "light": {
+    "ground": "#DCDCD8",
+    "surface": "#E6E6E2",
+    "ink": "#25282B",
+    "select": "#25282B",
+    "strong": "#25282B"
+   },
+   "dark": {
+    "ground": "#1C1F22",
+    "surface": "#24282C",
+    "ink": "#D4D8DB",
+    "select": "#D4D8DB",
+    "strong": "#D4D8DB"
+   }
+  }
+ ],
+ "patterns": [
+  {
+   "name": "lines",
+   "label": "Lines",
+   "image": "repeating-linear-gradient(0deg, var(--pattern-ink) 0 1px, transparent 1px 4px)",
+   "size": "auto"
+  },
+  {
+   "name": "dots",
+   "label": "Dots",
+   "image": "radial-gradient(var(--pattern-ink-strong) 0.8px, transparent 1.2px)",
+   "size": "12px 12px"
+  },
+  {
+   "name": "grid",
+   "label": "Grid",
+   "image": "linear-gradient(var(--pattern-ink) 1px, transparent 1px), linear-gradient(90deg, var(--pattern-ink) 1px, transparent 1px)",
+   "size": "24px 24px"
+  },
+  {
+   "name": "crosshatch",
+   "label": "Crosshatch",
+   "image": "repeating-linear-gradient(45deg, var(--pattern-ink) 0 1px, transparent 1px 9px), repeating-linear-gradient(-45deg, var(--pattern-ink) 0 1px, transparent 1px 9px)",
+   "size": "auto"
+  },
+  {
+   "name": "paper",
+   "label": "Paper",
+   "image": "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+   "size": "160px 160px"
+  },
+  {
+   "name": "none",
+   "label": "None",
+   "image": "none",
+   "size": "auto"
+  }
+ ],
+ "default_palette": "concrete",
+ "default_pattern": "lines"
+}

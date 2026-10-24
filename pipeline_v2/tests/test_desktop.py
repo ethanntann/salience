@@ -134,3 +134,15 @@ def test_a_mixed_highlight_is_played_with_its_mix_alone(tmp_path, monkeypatch):
 
     assert "amix" not in " ".join(commands[0])
     assert commands[0][commands[0].index("-map", commands[0].index("0:v:0")) + 1] == "0:a:0"
+
+
+def test_every_theme_is_readable_and_the_stylesheet_matches_its_definitions():
+    """Six palettes, light and dark: every text colour 4.5:1 or more; app.css and
+    themes.json are what themes.py writes (run it after changing a theme)."""
+    from pipeline_v2.capture.desktop import themes
+
+    assert themes.check() == []
+    assert themes.render() in themes.CSS.read_text(encoding="utf-8")
+    shipped = json.loads((themes.CSS.parent / "themes.json").read_text(encoding="utf-8"))
+    assert shipped == json.loads(json.dumps(themes.catalogue()))
+    assert {p["name"] for p in shipped["palettes"]} >= {"concrete", "stone", "mist", "sage", "dust", "ink"}

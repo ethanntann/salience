@@ -195,6 +195,18 @@ document.getElementById("theme-cycle").addEventListener("click", () => {
 });
 applyTheme(store.get("salience.theme") || "auto");
 
+// Palettes and patterns (themes.py writes static/themes.json): chosen in Settings.
+function applyPalette(name) {
+  document.documentElement.dataset.palette = name;
+  store.set("salience.palette", name);
+}
+function applyPattern(name) {
+  document.documentElement.dataset.pattern = name;
+  store.set("salience.pattern", name);
+}
+let themesCache = null;
+const themes = async () => themesCache || (themesCache = await (await fetch("/static/themes.json")).json());
+
 function applyRail(collapsed) {
   if (collapsed) document.documentElement.dataset.rail = "collapsed";
   else delete document.documentElement.dataset.rail;
@@ -649,6 +661,7 @@ async function showRate(id) {
 async function showSettings() {
   setNav("settings");
   let set = await api("/api/settings");
+  const looks = await themes();
   const names = { standard: "Standard", high: "High", max: "Max" };
 
   const draw = () => {
@@ -683,6 +696,31 @@ async function showSettings() {
         <div class="summary"><b>${custom ? "Custom" : names[set.quality]}: ${esc((set.resolutions[set.resolution] || "").replace(" (your screen's)", ""))}, ${set.fps} fps, ${set.mbps} Mbps</b>
           <span>About ${perHour} GB of raw footage an hour</span></div>
       </section>
+      <section class="panel" aria-labelledby="look">
+        <h2 id="look">Appearance</h2>
+        <div class="field"><span id="mode-label">Mode</span>
+          <div class="segmented" role="radiogroup" aria-labelledby="mode-label" style="max-width:420px">
+            ${["auto", "light", "dark"].map((m) => `<button role="radio" data-mode="${m}" aria-checked="${(store.get("salience.theme") || "auto") === m}"
+              class="${(store.get("salience.theme") || "auto") === m ? "on" : ""}">${m === "auto" ? "Follow Windows" : m === "light" ? "Light" : "Dark"}</button>`).join("")}
+          </div></div>
+        <div class="field"><span id="palette-label">Theme</span>
+          <div class="palettes" role="radiogroup" aria-labelledby="palette-label">
+            ${looks.palettes.map((t) => {
+              const on = (store.get("salience.palette") || looks.default_palette) === t.name;
+              const half = (c) => `<span class="swatch-half" style="background:${c.ground}"><span style="background:${c.select};color:${c.ink}">Aa</span><i style="background:${c.strong}"></i></span>`;
+              return `<button class="palette ${on ? "on" : ""}" role="radio" aria-checked="${on}" data-palette="${t.name}">
+                <span class="swatch">${half(t.light)}${half(t.dark)}</span><span class="palette-name">${esc(t.label)}</span></button>`;
+            }).join("")}
+          </div></div>
+        <div class="field"><span id="pattern-label">Background</span>
+          <div class="patterns" role="radiogroup" aria-labelledby="pattern-label">
+            ${looks.patterns.map((t) => {
+              const on = (store.get("salience.pattern") || looks.default_pattern) === t.name;
+              return `<button class="pattern ${on ? "on" : ""}" role="radio" aria-checked="${on}" data-pattern-pick="${t.name}">
+                <span class="pattern-preview" style="background-image:${t.image.replace(/"/g, "&quot;")};background-size:${t.size}"></span>${esc(t.label)}</button>`;
+            }).join("")}
+          </div></div>
+      </section>
       <section class="panel" aria-labelledby="gen">
         <h2 id="gen">General</h2>
         <div class="line"><div><div id="auto-label"><b>Auto-clip my games</b></div><span>Runs the recorder in the background. It records when Fortnite opens and makes highlights when you finish. Closing this window doesn't stop it.</span></div>
@@ -716,6 +754,9 @@ async function showSettings() {
     page.querySelectorAll("[data-fps]").forEach((b) => b.addEventListener("click", async () => {
       set = await api("/api/settings", { custom: { fps: Number(b.dataset.fps), mbps: set.mbps } }); draw(); refreshChrome();
     }));
+    page.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => { applyTheme(b.dataset.mode); draw(); }));
+    page.querySelectorAll(".palette").forEach((b) => b.addEventListener("click", () => { applyPalette(b.dataset.palette); draw(); }));
+    page.querySelectorAll("[data-pattern-pick]").forEach((b) => b.addEventListener("click", () => { applyPattern(b.dataset.patternPick); draw(); }));
     page.querySelector("#set-autoclip").addEventListener("click", () => setAutoclip(!set.autoclip));
     page.querySelector("#set-startup").addEventListener("click", async () => {
       set = await api("/api/startup", { on: !set.starts_with_windows }); draw();
