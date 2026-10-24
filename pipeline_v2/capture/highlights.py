@@ -489,11 +489,10 @@ def _session_clips(conn, clip_dir: Path) -> tuple[str | None, list]:
             "select path, clip_sha from clips where path like ? "
             "order by described_at", (root + "%",))
     }
-    inside = [
-        c for c in store.all_clips(conn, variant)
-        if str(Path(c.path).resolve()).startswith(root)
-        and newest.get(str(c.path)) == c.clip_sha
-    ]
+    # `newest` holds only this folder's paths, so membership places a clip
+    # here. Resolving every stored path on disk to check was 10,000 disk
+    # lookups a library load in the app (1.6s of its 2.6s, 2026-10-24).
+    inside = [c for c in store.all_clips(conn, variant) if newest.get(str(c.path)) == c.clip_sha]
     return variant, inside
 
 
@@ -719,6 +718,23 @@ def in_fight(clip) -> bool:
     return event_tier(clip) > 0 or bool(FIGHT_TAGS & set(payload.get("mechanics") or []))
 
 
+# Quiet moments (no kill, knock or fight: a funny one, an emote, a glitch)
+# become highlights once the player has kept this many on the rating page,
+# and the taste ranking places them. Loudness could not find them: each
+# session's three loudest quiet windows were the bus, deaths and a video
+# playing nearby, and 0 of 18 were kept (2026-10-24).
+QUIET_KEEPS_TO_LEARN = 5
+
+
+def quiet_keeps(conn) -> int:
+    """How many quiet moments the player has kept, across every session."""
+    from pipeline_v2 import store
+
+    kept = {row[0] for row in conn.execute("select clip_sha from preferences where label = 1")}
+    return sum(1 for clip in store.all_clips(conn, _configured_variant())
+               if clip.clip_sha in kept and event_tier(clip) == 0 and not in_fight(clip))
+
+
 def fight_extent(clip, by_start: dict, pad: tuple[float, float]) -> tuple[float, float] | None:
     """The span to export for `clip`: its window grown over the neighbouring
     windows of the same fight, plus `pad`, at most `MAX_HIGHLIGHT` long.
@@ -926,6 +942,7 @@ def run(
     try:
         basis, ordered = rank(conn, clip_dir)
         said = store.transcripts(conn)
+        learned_quiet = quiet_keeps(conn) >= QUIET_KEEPS_TO_LEARN
     finally:
         conn.close()
     if played["spans"] is not None:
@@ -958,7 +975,7 @@ def run(
     # asked for. Of 59 keeps, 1 had none of these (2026-10-24), and a session
     # spent in a lobby made four idle lobby screens its "highlights".
     moments = [(score, clip) for score, clip in ordered
-               if clip in pinned or event_tier(clip) > 0 or in_fight(clip)]
+               if clip in pinned or learned_quiet or event_tier(clip) > 0 or in_fight(clip)]
     picked = [pair for pair in pick(moments, top, pad, extent if coverage else None, pinned)
               if Path(pair[1].path).is_file() or clips_mod.released(Path(pair[1].path))]
     # Asked for, then asked for where nothing was looked at, then the rest.

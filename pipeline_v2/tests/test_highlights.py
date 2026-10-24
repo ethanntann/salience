@@ -651,3 +651,12 @@ def test_a_session_spent_in_the_lobby_has_no_highlights(tmp_path, isolated_data)
 
     assert manifest["highlights"] == []
     assert "No kills, knocks or fights" in manifest["why"]
+
+
+def test_quiet_moments_become_highlights_once_the_player_keeps_them(tmp_path, isolated_data, monkeypatch):
+    """Funny moments have no kill to find them; the player's keeps teach it."""
+    session = _session(tmp_path, ["no_event", "no_event"])
+    assert _run(session)["highlights"] == []
+
+    monkeypatch.setattr(highlights, "quiet_keeps", lambda conn: highlights.QUIET_KEEPS_TO_LEARN)
+    assert len(_run(session)["highlights"]) == 2

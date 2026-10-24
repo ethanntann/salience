@@ -173,6 +173,7 @@ pollRecorder();
 
 async function showLibrary() {
   setNav("library");
+  if (!libraryCache) page.innerHTML = SKELETON.library;
   const lib = await library(true);
   if (!lib.sessions.length) {
     page.innerHTML = `<div class="empty"><h2>No highlights yet</h2>
@@ -260,7 +261,7 @@ async function showSession(id, file) {
     ${current ? `<div class="split">
       <section class="stage" aria-label="Now playing">
         <div class="player" id="player-box">
-          <div class="screen" id="screen">
+          <div class="screen skel" id="screen">
             <video id="player" autoplay playsinline src="/video/${enc(s.id)}/${enc(current.file)}?v=${enc(current.length)}"></video>
             <button class="big-play" id="big-play" aria-label="Play" hidden>${PLAY}</button>
           </div>
@@ -394,6 +395,7 @@ function playerControls(s, current) {
     paint();
   };
   video.addEventListener("loadedmetadata", ready);
+  for (const done of ["loadeddata", "error"]) video.addEventListener(done, () => el("screen").classList.remove("skel"));
   if (video.readyState >= 1) ready();
   requestAnimationFrame(loop);
 
@@ -491,9 +493,25 @@ function playerControls(s, current) {
 
 // Rating
 
+// Shown at once while a view's data comes in, in the shape of what will fill it.
+const SKELETON = {
+  rate: `<header class="head"><div><h1>Rate clips</h1><p class="sub skel skel-line" style="width:340px"></p></div>
+      <div class="skel" style="width:240px;height:6px;border-radius:3px"></div></header>
+    <div class="split" aria-busy="true" aria-label="Loading the next moment">
+      <section class="stage"><div class="skel" style="aspect-ratio:16/9;border-radius:14px"></div>
+        <div class="skel skel-line" style="width:80%"></div><div class="skel skel-line" style="width:40%"></div></section>
+      <section class="calls"><div class="skel" style="height:56px;border-radius:12px"></div>
+        <div class="skel" style="height:56px;border-radius:12px"></div><div class="skel" style="height:56px;border-radius:12px"></div>
+        <div class="skel" style="height:44px;border-radius:999px;width:70%"></div></section></div>`,
+  library: `<header class="head"><div><h1>Library</h1><p class="sub skel skel-line" style="width:200px"></p></div></header>
+    <div class="grid" aria-busy="true" aria-label="Loading your highlights">${'<div class="card"><div class="skel" style="aspect-ratio:16/9;border-radius:12px"></div><div class="skel skel-line" style="width:70%"></div><div class="skel skel-line" style="width:45%"></div></div>'.repeat(8)}</div>`,
+};
+
 async function showRate(id) {
   setNav("rate");
-  const lib = await library(true);
+  page.innerHTML = SKELETON.rate;
+  // The library as already loaded: a fresh one is a round trip the player waits on.
+  const lib = await library();
   const s = lib.sessions.find((x) => x.id === id)
     || lib.sessions.find((x) => x.unrated > 0) || lib.sessions[0];
   if (!s) { page.innerHTML = '<div class="empty"><h2>Nothing to rate yet</h2><p>Play a session first.</p></div>'; return; }
@@ -506,7 +524,7 @@ async function showRate(id) {
     page.innerHTML = `<header class="head">
         <div><h1>Rate clips</h1><p class="sub">${esc(when(s.started))} · every rating teaches the ranking what you like</p></div>
         <div class="progress"><div class="track"><div class="fill" id="fill"></div></div><span id="count"></span></div>
-      </header><div id="body"></div>`;
+      </header><div id="body">${SKELETON.rate.slice(SKELETON.rate.indexOf('<div class="split"'))}</div>`;
   };
 
   const next = async () => {
@@ -525,7 +543,7 @@ async function showRate(id) {
     }
     body.innerHTML = `<div class="split">
       <section class="stage" aria-label="Moment">
-        <div class="screen"><video id="clip" src="/media/${enc(clip.sha)}" autoplay loop controls muted></video></div>
+        <div class="screen skel" id="clip-screen"><video id="clip" src="/media/${enc(clip.sha)}" autoplay loop controls muted></video></div>
         <div class="caption"><div class="words">
           <p style="font-size:16px;color:var(--ink)">${esc(clip.summary)}</p>
           <span class="when">${clip.said ? `You said: <i style="color:var(--ink)">“${esc(clip.said)}”</i>` : "Nothing said on the mic"}</span>
@@ -546,6 +564,10 @@ async function showRate(id) {
           Keeps join this session's highlights right away, with a 9:16 reel.</div>
       </section></div>`;
     const video = body.querySelector("#clip");
+    // The moment may be re-cut from the raw footage first (about a second).
+    for (const done of ["loadeddata", "error"]) {
+      video.addEventListener(done, () => body.querySelector("#clip-screen").classList.remove("skel"), { once: true });
+    }
     video.muted = false; // muted only so autoplay is allowed
     body.querySelectorAll("[data-call]").forEach((b) => b.addEventListener("click", () => rate(b.dataset.call)));
     body.querySelector("#wrong").addEventListener("click", toggleWrong);

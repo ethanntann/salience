@@ -131,6 +131,7 @@ h2 { margin: 0; font: 600 22px/1.25 var(--display); }
 .screen { position: relative; aspect-ratio: 16 / 9; border-radius: 14px; background: #000; border: 1px solid #262C37;
   overflow: hidden; display: flex; align-items: center; justify-content: center; }
 .screen video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+.screen.skel video { opacity: 0; }  /* the shimmer shows until the first frame */
 .screen.reel video { width: auto; height: 100%; aspect-ratio: 9 / 16; }
 .caption { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .caption .words { flex: 1 1 360px; display: flex; flex-direction: column; gap: 6px; }
@@ -214,6 +215,17 @@ button svg { pointer-events: none; }
 .grow { flex: 1; }
 .saved { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
 .saved b { color: var(--ink); }
+
+/* Loading and moving between views */
+.skel { background: linear-gradient(90deg, var(--surface) 0%, #20252E 50%, var(--surface) 100%);
+  background-size: 200% 100%; animation: shimmer 1.1s linear infinite; border-radius: 8px; }
+.skel-line { height: 14px; margin: 8px 0 0; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.page > * { animation: rise 0.18s ease-out both; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .skel, .page > * { animation: none; }
+}
 
 /* Rating */
 .calls { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }

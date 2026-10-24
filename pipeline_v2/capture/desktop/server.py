@@ -110,7 +110,7 @@ def _lengths(out: Path, files: list[str]) -> dict[str, float | None]:
 KEYFRAME_GRID = 2.0  # seconds: where a stream-copied cut can start (`clips.cut_span`)
 
 
-def kill_at(clip, inside: list, length: float | None) -> float | None:
+def kill_at(clip, index: dict, length: float | None) -> float | None:
     """Where the window's moment sits in its exported highlight, in seconds.
 
     The export grew the window over the rest of its fight and started the cut
@@ -122,8 +122,7 @@ def kill_at(clip, inside: list, length: float | None) -> float | None:
         moment = float(side["segment_start_sec"]) + float(side.get("event_sec", 4.0))
     except (KeyError, TypeError, ValueError):
         return None
-    span = highlights.fight_extent(clip, highlights.window_index([(0.0, c) for c in inside]),
-                                   (highlights.HIGHLIGHT_LEAD, highlights.HIGHLIGHT_LAG))
+    span = highlights.fight_extent(clip, index, (highlights.HIGHLIGHT_LEAD, highlights.HIGHLIGHT_LAG))
     if span is None:
         return None
     start = max(0.0, span[0] // KEYFRAME_GRID * KEYFRAME_GRID)
@@ -150,6 +149,13 @@ def session_view(session: Path, conn) -> dict:
     by_name = {Path(c.path).name: c for c in inside}
     rated = {row[0] for row in conn.execute("select clip_sha from preferences")}
     loved = {row[0] for row in conn.execute("select clip_sha from rating_notes where love = 1")}
+    built: list[dict] = []
+
+    def index() -> dict:  # once a session, and only if a highlight needs it
+        if not built:
+            built.append(highlights.window_index([(0.0, c) for c in inside]))
+        return built[0]
+
     shown = []
     for h in entries:
         clip = by_name.get(h.get("clip", ""))
@@ -166,7 +172,7 @@ def session_view(session: Path, conn) -> dict:
             "loved": bool(clip and clip.clip_sha in loved),
             "asked": bool(h.get("asked")), "added": h.get("trigger") == highlights.RATED_TRIGGER,
             "trimmed": (trimmed := (out / ORIGINALS / h["file"]).is_file()),
-            "kill": (kill_at(clip, inside, lengths.get(h["file"]))
+            "kill": (kill_at(clip, index(), lengths.get(h["file"]))
                      if clip and not trimmed and not (h.get("asked") and not clip) else None),
             "seconds": lengths.get(h["file"]),
         })
