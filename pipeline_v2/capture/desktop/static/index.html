@@ -11,6 +11,9 @@
     const ask = new URLSearchParams(location.search);
     if (ask.get("theme")) localStorage.setItem("salience.theme", ask.get("theme"));
     if (ask.get("rail")) localStorage.setItem("salience.rail", ask.get("rail"));
+    if (ask.get("palette")) localStorage.setItem("salience.palette", ask.get("palette"));
+    const palette = localStorage.getItem("salience.palette");
+    if (palette) document.documentElement.dataset.palette = palette;
     const theme = localStorage.getItem("salience.theme");
     if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
     if (localStorage.getItem("salience.rail") === "collapsed") document.documentElement.dataset.rail = "collapsed";
