@@ -1,0 +1,873 @@
+"""The tray app: records Fortnite on its own and hands back highlights.
+
+    pythonw -m pipeline_v2.capture.app        (no console; `python -m` shows the log)
+
+It waits in the tray. When the Fortnite window appears it starts recording,
+when the game has quit (or its window has been gone `GRACE` seconds) it stops, makes the
+highlights and says so. The player never opens a terminal or presses Ctrl+C,
+which is what made session 3 lose its highlights step: a second Ctrl+C
+during a silent stop cancelled it.
+
+Settings live in %APPDATA%\\Salience\\settings.env, written by the first-run
+dialog: the player's own Fireworks key (bring your own; a key shipped inside
+the app could be pulled out and spent by anyone). A developer `.env` in the
+repo still applies, and wins over the product defaults below.
+
+`Controller` decides when to record and holds no UI, so it is tested without
+a tray or a game. `main` is the thin pystray shell around it.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import json
+import os
+import sys
+import threading
+import time
+from pathlib import Path
+
+APP_DIR = Path(os.environ.get("APPDATA", Path.home())) / "Salience"
+SETTINGS = APP_DIR / "settings.env"
+LOG = APP_DIR / "salience.log"
+
+# What a player gets without a developer .env: the describer, prompt and prices
+# measured best (README, "Measured"). The budget is a runaway guard on the
+# spend this machine has recorded, not a monthly cap.
+PRODUCT_DEFAULTS = {
+    "FIREWORKS_MODEL": "accounts/fireworks/models/deepseek-v4p1-flash",
+    "V2_PRICE_MODEL": "deepseek-v4p1-flash",
+    "V2_INPUT_PRICE_PER_MTOK": "0.30",
+    "V2_OUTPUT_PRICE_PER_MTOK": "1.20",
+    "V2_CACHED_INPUT_PRICE_PER_MTOK": "0.30",
+    "V2_ABLATE": "killframes",
+    "V2_BUDGET_USD": "100",
+}
+
+# Seconds the game window may be missing before the session ends. Fortnite
+# recreates its window on some resolution changes, which should not split a
+# session in two.
+GRACE = 15.0
+TICK = 0.5
+
+
+def read_settings(path: Path = SETTINGS) -> dict[str, str]:
+    found: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return found
+    for line in lines:
+        key, sep, value = line.strip().partition("=")
+        if sep and key and not key.startswith("#"):
+            found[key.strip()] = value.strip()
+    return found
+
+
+def write_setting(key: str, value: str, path: Path = SETTINGS) -> None:
+    settings = read_settings(path)
+    settings[key] = value
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(f"{k}={v}\n" for k, v in settings.items()), encoding="utf-8")
+
+
+def load_environment(path: Path = SETTINGS) -> None:
+    """Player settings, then the repo .env (via `config`), then product defaults.
+
+    Each only fills what is still unset, so the order is the precedence.
+    """
+    for key, value in read_settings(path).items():
+        os.environ.setdefault(key, value)
+    from pipeline_v2 import config  # noqa: F401 -- loads the repo .env on import
+
+    for key, value in PRODUCT_DEFAULTS.items():
+        os.environ.setdefault(key, value)
+
+
+def check_key(key: str, base_url: str = "https://api.fireworks.ai/inference/v1") -> str | None:
+    """None if Fireworks accepts the key, else why not."""
+    import urllib.error
+    import urllib.request
+
+    from pipeline_v2.vlm import USER_AGENT
+
+    request = urllib.request.Request(
+        f"{base_url}/models",
+        headers={"Authorization": f"Bearer {key}", "User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=20):
+            return None
+    except urllib.error.HTTPError as exc:
+        return "Fireworks rejected that key" if exc.code in (401, 403) else f"HTTP {exc.code}"
+    except OSError as exc:
+        return f"could not reach Fireworks ({exc})"
+
+
+GAME_CHECK = 10.0  # seconds between looks at whether the game has closed
+PRIORITY_CHECK = 5.0  # seconds between looks while highlights are made
+QUIT_WAIT = 8.0  # seconds Quit waits for a recording to stop cleanly
+
+
+def set_below_normal(on: bool | None) -> None:
+    """The game first (True), the highlights first (False), or back to what
+    Windows decides (None).
+
+    Priority alone was not it: Windows also puts a windowless process like
+    this one in efficiency mode on its own (EcoQoS: the slow cores, low
+    clocks). Making highlights the game had closed on still ran there,
+    speech and laughter 3-5x slower than in a console: 4.7 minutes of a 6.5
+    minute wait (2026-10-27; forced, 5 minutes of mic 93s against 19). So
+    True asks for efficiency mode outright, False for none, None for neither.
+    """
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    class Throttling(ctypes.Structure):  # PROCESS_POWER_THROTTLING_STATE
+        _fields_ = [("Version", ctypes.c_ulong), ("ControlMask", ctypes.c_ulong), ("StateMask", ctypes.c_ulong)]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetCurrentProcess.restype = ctypes.c_void_p
+    kernel.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    kernel.SetProcessInformation.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_ulong]
+    process = kernel.GetCurrentProcess()  # the pseudo-handle, -1: a 32-bit int lost it
+    kernel.SetPriorityClass(process, 0x4000 if on else 0x20)  # BELOW_NORMAL / NORMAL
+    speed = 0x1  # PROCESS_POWER_THROTTLING_EXECUTION_SPEED
+    state = Throttling(1, 0 if on is None else speed, speed if on else 0)
+    kernel.SetProcessInformation(process, 4, ctypes.byref(state), ctypes.sizeof(state))  # ProcessPowerThrottling
+
+
+@contextlib.contextmanager
+def game_first(game_running, every: float = PRIORITY_CHECK, set_low=set_below_normal):
+    """The game first while it runs, the highlights once it has gone, looked
+    at every `every` s; then back to what Windows decides.
+
+    Decided once at the start, a game still shutting down (its window gone,
+    its process not yet) held an hour's highlights below normal for all
+    30 minutes of them, 4x slower than they run (2026-10-24).
+    """
+    done = threading.Event()
+
+    def follow() -> None:
+        low = None
+        while True:
+            now = bool(game_running())
+            if now != low:
+                set_low(now)
+                low = now
+            if done.wait(every):
+                break
+
+    watcher = threading.Thread(target=follow, name="game-first", daemon=True)
+    watcher.start()
+    try:
+        yield
+    finally:
+        done.set()
+        watcher.join(5)
+        set_low(None)
+
+
+class Controller:
+    """When to record, when to stop, and making the highlights afterwards.
+
+    `tick` is called every `TICK` seconds from one worker thread; everything
+    else only sets flags, so the tray's menu callbacks never race it.
+    """
+
+    def __init__(self, *, find_game, start_session, make_highlights, notify,
+                 clock=time.monotonic, grace: float = GRACE, game_running=lambda: True):
+        self.find_game = find_game
+        self.game_running = game_running
+        self.start_session = start_session
+        self.make_highlights = make_highlights
+        self.notify = notify
+        self.clock = clock
+        self.grace = grace
+        self.state = "waiting"  # waiting | recording | highlights
+        self.paused = False
+        # Stopped from the menu with the game still open: no new session until
+        # the game closes or the player starts one. It restarted a second later
+        # and said "Recording" the whole time after (2026-10-24).
+        self.held = False
+        # Sessions whose highlights wait for the game to close: nothing heavy
+        # runs beside it. Below-normal priority still left 5 cores of laughter
+        # and speech analysis beside a match, and constant low fps (2026-10-24).
+        self.make_up: list[Path] = []
+        self.session = None
+        self.last_session: Path | None = None
+        self._gone_since: float | None = None
+        self._stop_requested = False
+        self._warned: str | None = None
+
+    @property
+    def status(self) -> str:
+        if self.paused and self.state == "waiting":
+            return "Paused (not recording)"
+        if self.held and self.state == "waiting":
+            return "Stopped until Fortnite closes"
+        if self.make_up and self.state == "waiting" and not self.game_closed():
+            return "Highlights wait for Fortnite to close"
+        return {
+            "waiting": "Waiting for Fortnite",
+            "recording": getattr(self.session, "status_label", "Recording"),
+            "highlights": "Making highlights...",
+        }[self.state]
+
+    def request_stop(self) -> None:
+        self._stop_requested = True
+
+    def stop_now(self) -> None:
+        """The player's own stop: this session ends, and the next waits for a new game."""
+        self.held = True
+        self.request_stop()
+
+    def resume(self) -> None:
+        self.held = False
+
+    def set_paused(self, paused: bool) -> None:
+        """Paused: no new session starts. Pausing mid-session ends it."""
+        self.paused = paused
+        if paused and self.state == "recording":
+            self.request_stop()
+
+    def game_closed(self) -> bool:  # so heavy work may run
+        return self.find_game() is None and not self.game_running()
+
+    def tick(self) -> None:
+        if self.state == "waiting":
+            closed = self.game_closed()
+            if self.held and closed:
+                self.held = False  # that game is over: the next one records
+            if self.make_up and closed:
+                self._make(self.make_up.pop(0))
+                return
+            if self.paused or self.held:
+                return
+            hwnd = self.find_game()
+            if hwnd is not None:
+                self.session = self.start_session(hwnd)
+                self.last_session = self.session.path
+                self._gone_since, self._stop_requested = None, False
+                self.state = "recording"
+                self.notify(*getattr(self.session, "announce",
+                                     ("Recording", "Salience is recording this session.")))
+            return
+        if self.state != "recording":
+            return
+        self.session.tick()
+        warning = getattr(self.session, "warning", None)
+        if warning and warning != self._warned:
+            self._warned = warning
+            self.notify("Check your audio", warning)
+        if self.session.error:
+            self._finish(failed=True)
+            return
+        if self.find_game() is None:
+            self._gone_since = self._gone_since or self.clock()
+        else:
+            self._gone_since = None
+        # The grace is for a window the game recreates; once the game itself
+        # has exited there is nothing to wait for, and the player is waiting.
+        gone = self._gone_since is not None and (
+            self.clock() - self._gone_since >= self.grace or not self.game_running())
+        if gone or self._stop_requested:
+            self._finish()
+
+    def _finish(self, failed: bool = False) -> None:
+        session = self.session
+        session.stop()
+        self.session = None
+        if failed:
+            self.notify("Recording stopped", f"Capture failed: {session.error}")
+            self.state = "waiting"
+            return
+        if self.find_game() is not None and self.game_running():
+            # Stopped mid-game: the game keeps every frame until it closes.
+            self.make_up.append(session.path)
+            self.notify("Recording stopped", "Your highlights are made when you close Fortnite.")
+            self.state = "waiting"
+            return
+        self._make(session.path)
+
+    def _make(self, path: Path) -> None:
+        self.state = "highlights"
+        # At once, so quitting the game is answered before the work is done.
+        self.notify("Making highlights", "Your highlights will open in a few seconds.")
+        try:
+            manifest = self.make_highlights(path)
+        except Exception as exc:  # noqa: BLE001 -- report it, keep the app alive
+            self.notify("Highlights failed", f"{type(exc).__name__}: {exc}")
+        else:
+            count = len(manifest.get("highlights", []))
+            self.notify("Highlights ready",
+                        f"{count} highlights from this session." if count
+                        else manifest.get("why", "No highlights this time."))
+        self.state = "waiting"
+
+
+# How far back a session without highlights is still made up: older ones were
+# left that way on purpose (recorded with --no-highlights, say).
+UNFINISHED_DAYS = 2
+
+
+def unfinished(root: Path, now: float | None = None) -> list[Path]:
+    """Recent sessions with footage and no highlights, oldest first."""
+    now = time.time() if now is None else now
+    try:
+        from pipeline_v2.capture import obs_recordings
+
+        def listing(p: Path) -> Path:
+            # A game OBS recorded has no footage of its own until it is adopted.
+            return p / ("segments.csv" if (p / "segments.csv").is_file() else obs_recordings.PENDING)
+
+        found = [p for p in root.iterdir() if listing(p).is_file()
+                 and not (p / "highlights" / "highlights.json").is_file()
+                 and now - listing(p).stat().st_mtime < UNFINISHED_DAYS * 86400]
+    except OSError:
+        return []
+    return sorted(found, key=lambda p: p.name)
+
+
+def latest_session(root: Path) -> Path | None:
+    """The newest recording folder, so the menu works before this run records."""
+    try:
+        found = [p for p in root.iterdir() if p.is_dir() and (p / "segments.csv").exists()]
+    except OSError:
+        return None
+    return max(found, key=lambda p: p.name, default=None)
+
+
+def _recording_args():
+    from pipeline_v2.capture import record
+
+    args = record._parser().parse_args([])
+    args.mic = os.environ.get("SALIENCE_MIC", "")  # "" = Windows' default mic
+    args.fps, args.bitrate = custom_quality() if quality() == CUSTOM else record.QUALITY[quality()]
+    args.height = RESOLUTIONS[resolution()][0]
+    return args
+
+
+QUALITY_KEY = "SALIENCE_QUALITY"
+# What each preset costs on disk, so the choice in the menu is an informed one.
+QUALITY_LABELS = {
+    "standard": "Standard: 30 fps, ~4 GB an hour",
+    "high": "High: 60 fps, ~11 GB an hour",
+    "max": "Max: 60 fps, ~18 GB an hour",
+}
+
+
+# The desktop app's own frame rate and bitrate, beside the presets.
+CUSTOM = "custom"
+FPS_KEY, BITRATE_KEY = "SALIENCE_FPS", "SALIENCE_BITRATE_MBPS"
+FRAME_RATES = (30, 60)
+BITRATES = range(4, 51)  # Mbps: below 4 fights smear; above 50 NVENC adds nothing visible
+
+
+def quality() -> str:
+    from pipeline_v2.capture import record
+
+    chosen = os.environ.get(QUALITY_KEY, "").strip().lower()
+    return chosen if chosen in record.QUALITY or chosen == CUSTOM else record.DEFAULT_QUALITY
+
+
+def custom_quality() -> tuple[int, str]:
+    """(fps, bitrate) set in the app; the High preset's for anything unreadable."""
+    try:
+        fps = int(os.environ.get(FPS_KEY, ""))
+        mbps = int(os.environ.get(BITRATE_KEY, ""))
+    except ValueError:
+        return 60, "25M"
+    if fps not in FRAME_RATES or mbps not in BITRATES:
+        return 60, "25M"
+    return fps, f"{mbps}M"
+
+
+def set_custom_quality(fps: int, mbps: int, path: Path = SETTINGS) -> None:
+    if fps not in FRAME_RATES or mbps not in BITRATES:
+        raise ValueError(f"{fps} fps / {mbps} Mbps is outside what can be recorded")
+    for key, value in ((FPS_KEY, str(fps)), (BITRATE_KEY, str(mbps)), (QUALITY_KEY, CUSTOM)):
+        write_setting(key, value, path)
+        os.environ[key] = value
+
+
+def set_quality(name: str, path: Path = SETTINGS) -> None:
+    """Remembered for the next recording; one already running keeps its own."""
+    write_setting(QUALITY_KEY, name, path)
+    os.environ[QUALITY_KEY] = name
+
+
+RESOLUTION_KEY = "SALIENCE_RESOLUTION"
+# Lines recorded, and the menu's label. Never scaled up: a 1080p screen set to
+# 1080p records as it is. Smaller is less disk at the same bitrate's sharpness.
+RESOLUTIONS = {
+    "full": (None, "Full size (your screen's)"),
+    "1080": (1080, "1080p"),
+    "720": (720, "720p"),
+}
+
+
+def resolution() -> str:
+    chosen = os.environ.get(RESOLUTION_KEY, "").strip().lower()
+    return chosen if chosen in RESOLUTIONS else "full"
+
+
+def set_resolution(name: str, path: Path = SETTINGS) -> None:
+    """Remembered for the next recording; one already running keeps its own."""
+    write_setting(RESOLUTION_KEY, name, path)
+    os.environ[RESOLUTION_KEY] = name
+
+
+# The app and the background recorder (this tray) are two processes. The app
+# reads what the tray is doing from STATUS, and asks it to stop with
+# STOP_REQUEST; the tray finishes any recording, makes its highlights, and exits.
+STATUS = APP_DIR / "status.json"
+STOP_REQUEST = APP_DIR / "stop.request"
+AUTOCLIP_KEY = "SALIENCE_AUTOCLIP"
+LOGIN_FLAG = "--login"  # how Windows starts the tray at sign-in
+MUTEX = "Local\\SalienceTray"
+
+
+def reload_settings(path: Path = SETTINGS) -> None:
+    """The settings file over this process's own copy: the app changes it while
+    the tray runs, and a session must record with what the player chose."""
+    for key, value in read_settings(path).items():
+        os.environ[key] = value
+
+
+# Which recording highlights are made from: Salience's own, or the player's
+# OBS recordings (`obs_recordings`) in the folder OBS saves them to.
+RECORDER_KEY = "SALIENCE_RECORDER"
+OBS_FOLDER_KEY = "SALIENCE_OBS_FOLDER"
+
+
+def uses_obs() -> bool:
+    return os.environ.get(RECORDER_KEY, "salience").lower() == "obs"
+
+
+def obs_folder() -> Path | None:
+    from pipeline_v2.capture import obs_recordings
+
+    chosen = os.environ.get(OBS_FOLDER_KEY, "")
+    return Path(chosen) if chosen else obs_recordings.obs_folder()
+
+
+def set_obs(on: bool, folder: str | None = None, path: Path = SETTINGS) -> None:
+    write_setting(RECORDER_KEY, "obs" if on else "salience", path)
+    os.environ[RECORDER_KEY] = "obs" if on else "salience"
+    if folder is not None:
+        write_setting(OBS_FOLDER_KEY, folder, path)
+        os.environ[OBS_FOLDER_KEY] = folder
+
+
+def autoclip_on() -> bool:
+    """Whether the recorder should run. Unset is on: the tray ran before the switch did."""
+    return os.environ.get(AUTOCLIP_KEY, "on").strip().lower() != "off"
+
+
+def tray_running() -> bool:
+    if os.name != "nt":
+        return False
+    import ctypes
+
+    handle = ctypes.windll.kernel32.OpenMutexW(0x00100000, False, MUTEX)  # SYNCHRONIZE
+    if handle:
+        ctypes.windll.kernel32.CloseHandle(handle)
+    return bool(handle)
+
+
+def start_tray_when_free(wait: float = 20.0, step: float = 0.5, running=None, start=None) -> bool:
+    """Start the recorder, waiting out one that is on its way out: quitting
+    finishes the session first, a few seconds, and an app reopened meanwhile
+    saw a recorder running, started none, and the next match went unrecorded
+    (2026-11-05). Whether one was started."""
+    running = running or tray_running
+    start = start or start_tray
+    deadline = time.monotonic() + wait
+    while running():
+        if time.monotonic() >= deadline:
+            return False  # a recorder that is staying: it is the one
+        time.sleep(step)
+    start()
+    return True
+
+
+def start_tray() -> None:
+    """The background recorder, with no window of its own."""
+    import subprocess
+
+    pythonw = Path(sys.executable).with_name("pythonw.exe")
+    subprocess.Popen([str(pythonw if pythonw.is_file() else sys.executable), "-m",
+                      "pipeline_v2.capture.app"], cwd=os.getcwd(),
+                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+
+def set_autoclip(on: bool, path: Path = SETTINGS) -> None:
+    """On starts the recorder now; off asks it to finish what it is doing and stop."""
+    write_setting(AUTOCLIP_KEY, "on" if on else "off", path)
+    os.environ[AUTOCLIP_KEY] = "on" if on else "off"
+    if on:
+        STOP_REQUEST.unlink(missing_ok=True)
+        if not tray_running():
+            start_tray()
+    elif tray_running():
+        STOP_REQUEST.write_text("", encoding="utf-8")
+
+
+def write_status(state: str, status: str, started: float | None, session: str | None,
+                 path: Path | None = None) -> None:
+    from pipeline_v2.jsonio import write_json
+
+    try:
+        write_json(path or STATUS, {"state": state, "status": status, "started": started,
+                                    "session": session, "updated": time.time(),
+                                    "pid": os.getpid()})
+    except OSError:
+        pass
+
+
+def read_status(path: Path | None = None) -> dict:
+    try:
+        return json.loads((path or STATUS).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def open_app(session: Path | None = None, view: str = "session") -> None:
+    """The desktop app, at a view of `session`; the highlights folder if it cannot start."""
+    try:
+        from pipeline_v2.capture import desktop
+
+        desktop.launch(session, view)
+    except Exception as exc:  # noqa: BLE001 -- the highlights must still be reachable
+        print(f"app failed: {type(exc).__name__}: {exc}", flush=True)
+        out = session / "highlights" if session is not None else None
+        if out is not None and out.is_dir() and hasattr(os, "startfile"):
+            os.startfile(out)  # noqa: S606 -- the player's own folder
+
+
+def _single_instance() -> bool:
+    """False if another copy is already running (a named mutex per user)."""
+    if os.name != "nt":
+        return True
+    import ctypes
+
+    ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX)
+    return ctypes.windll.kernel32.GetLastError() != 183  # ERROR_ALREADY_EXISTS
+
+
+def ask_for_key(message: str = "") -> str | None:
+    """A small dialog for the player's Fireworks key; None if cancelled."""
+    import tkinter as tk
+    from tkinter import simpledialog
+
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        prompt = (message + "\n\n" if message else "") + (
+            "Paste your Fireworks API key (fireworks.ai -> API Keys).\n"
+            "It stays on this PC and is only sent to Fireworks.")
+        key = simpledialog.askstring("Salience", prompt, parent=root, show="*")
+    finally:
+        root.destroy()
+    return key.strip() if key else None
+
+
+def setup_key(ask=ask_for_key, check=check_key) -> bool:
+    """Ask until Fireworks accepts a key or the player cancels."""
+    message = ""
+    while True:
+        key = ask(message)
+        if not key:
+            return False
+        problem = check(key)
+        if problem is None:
+            write_setting("FIREWORKS_API_KEY", key)
+            os.environ["FIREWORKS_API_KEY"] = key
+            return True
+        message = problem
+
+
+_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+
+def starts_with_windows() -> bool:
+    import winreg
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _RUN_KEY) as key:
+            winreg.QueryValueEx(key, "Salience")
+            return True
+    except OSError:
+        return False
+
+
+def set_starts_with_windows(enabled: bool) -> None:
+    import winreg
+
+    pythonw = Path(sys.executable).with_name("pythonw.exe")
+    command = (f'"{pythonw if pythonw.exists() else sys.executable}" -m pipeline_v2.capture.app'
+               f" {LOGIN_FLAG}")
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
+        if enabled:
+            winreg.SetValueEx(key, "Salience", 0, winreg.REG_SZ, command)
+        else:
+            try:
+                winreg.DeleteValue(key, "Salience")
+            except OSError:
+                pass
+
+
+def _icon_image(recording: bool):
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((4, 4, 60, 60), radius=14, fill=(24, 28, 36, 255))
+    draw.polygon([(24, 18), (24, 46), (46, 32)], fill=(230, 232, 235, 255))
+    if recording:
+        draw.ellipse((40, 4, 60, 24), fill=(232, 64, 64, 255))
+    return image
+
+
+def hide_child_consoles() -> None:
+    """Start every child process without a console window.
+
+    The tray app has no console, so each ffmpeg it starts got a new one: a
+    window flashing up every few seconds, taking focus from the game and
+    freezing it (session 4's first try). Run from a terminal, the children
+    shared that terminal and nothing showed, which is why no earlier session
+    hit it. Done once for the whole process, so no call site can miss it.
+    """
+    import subprocess
+
+    flag = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if not flag or getattr(subprocess.Popen, "_salience_hidden", False):
+        return
+    original = subprocess.Popen.__init__
+
+    def __init__(self, *args, creationflags=0, **kwargs):
+        original(self, *args, creationflags=creationflags | flag, **kwargs)
+
+    subprocess.Popen.__init__ = __init__
+    subprocess.Popen._salience_hidden = True
+
+
+def main() -> int:
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+    if sys.stdout is None:  # pythonw: no console, so keep the log on disk
+        sys.stdout = sys.stderr = open(LOG, "a", encoding="utf-8", buffering=1)
+    hide_child_consoles()
+    load_environment()
+    from salience_media import ffmpeg as _ffmpeg
+
+    if _ffmpeg.simulate_no_efficiency_cores():  # a test: as on a CPU without them
+        print("test: running as on a CPU without efficiency cores (performance cores only)", flush=True)
+    if LOGIN_FLAG in sys.argv[1:] and not autoclip_on():
+        return 0  # started with Windows, but the player turned auto-clip off
+    if not _single_instance():
+        return 0
+    STOP_REQUEST.unlink(missing_ok=True)
+    if not os.environ.get("FIREWORKS_API_KEY") and not setup_key():
+        return 1
+
+    import pystray
+
+    from pipeline_v2.capture import highlights, record
+    from pipeline_v2.capture.windows import game_running, game_window
+
+    icon = pystray.Icon("salience", _icon_image(False), "Salience")
+
+    def notify(title: str, message: str) -> None:
+        print(f"[{time.strftime('%H:%M:%S')}] {title}: {message}", flush=True)
+        try:
+            icon.notify(message, title)
+        except Exception:  # noqa: BLE001 -- a missed toast is not worth a crash
+            pass
+
+    def start_session(hwnd):
+        from pipeline_v2.capture import presentmon
+
+        reload_settings()  # what the app set since this tray started
+        if uses_obs():
+            from pipeline_v2.capture import obs_recordings
+
+            return obs_recordings.Session(_recording_args(), hwnd, folder=obs_folder()).start()
+        session = record.Session(_recording_args(), hwnd).start()
+        # Frame times beside it while schedule D is being tried (`presentmon`).
+        frames = presentmon.start(session.path)
+        if frames is not None:
+            stop = session.stop
+
+            def stopped(*args, **kwargs):
+                try:
+                    return stop(*args, **kwargs)
+                finally:
+                    presentmon.stop(frames)
+
+            session.stop = stopped
+        return session
+
+    def warm_view(session: Path) -> None:
+        """Find each kill on screen before the app opens on the session: seconds, once."""
+        try:
+            from pipeline_v2 import store
+            from pipeline_v2.capture.desktop import server
+
+            server.session_view(session, store.connect(), find_markers=True)
+        except Exception as exc:  # noqa: BLE001 -- the app finds them itself, slower
+            print(f"warming {session.name} failed: {type(exc).__name__}: {exc}", flush=True)
+
+    def make_highlights(session: Path) -> dict:
+        # Made with no game open (`Controller`), but one can start meanwhile:
+        # then below it, so it takes what the game leaves. Every ffmpeg started
+        # meanwhile inherits the priority it starts with.
+        # The GPU, where faster, only while nothing is played (`devices`).
+        highlights.GPU_FREE = lambda: not game_running()
+        from pipeline_v2.capture import obs_recordings
+
+        if obs_recordings.pending(session):
+            problem = obs_recordings.adopt(session)
+            if problem is not None:
+                return {"session": str(session), "highlights": [],
+                        "why": f"No highlights: {problem}."}
+        with game_first(game_running):
+            manifest = highlights.run(session)
+            highlights.report(manifest)
+            if manifest.get("highlights"):
+                warm_view(session)
+        playing = game_running()
+        if manifest.get("highlights") and not playing:
+            open_app(session)  # nothing to show is a toast, not a window
+
+        def afterwards() -> None:
+            # Never over the game, and no encoding beside it: a window popping
+            # up mid-match was alt-tabbed away from, and stuttered (2026-10-24).
+            while game_running() and not quitting.is_set():
+                quitting.wait(GAME_CHECK)
+            if quitting.is_set():
+                return
+            if manifest.get("highlights") and playing:
+                open_app(session)
+            highlights.reels(session)
+            # Last: every step before it may still read the window copies.
+            highlights.release_windows(session)
+            clean_up()
+
+        # Behind the "ready" toast, not before it: 10 reels are 12s of encoding.
+        threading.Thread(target=afterwards, name="reels", daemon=True).start()
+        return manifest
+
+    def clean_up() -> None:
+        """Raw footage that has done its job (`cleanup`), never the session recording."""
+        from pipeline_v2.capture import cleanup
+
+        recording = getattr(controller.session, "path", None)
+        try:
+            for name, why, freed in cleanup.clean(_recording_args().out,
+                                                  active={recording.name} if recording else set()):
+                print(f"cleanup: {name}'s raw footage deleted ({why}), {freed / 1e9:.1f} GB", flush=True)
+        except Exception as exc:  # noqa: BLE001 -- never take the app down over disk space
+            print(f"cleanup failed: {type(exc).__name__}: {exc}", flush=True)
+
+    controller = Controller(find_game=game_window, start_session=start_session,
+                            make_highlights=make_highlights, notify=notify,
+                            game_running=game_running)
+    controller.last_session = latest_session(_recording_args().out)
+    threading.Thread(target=clean_up, name="cleanup", daemon=True).start()
+    quitting = threading.Event()
+    closing = threading.Event()  # quit from the menu, not auto-clip turned off
+
+    def worker() -> None:
+        # A session that ended without highlights (quit mid-recording, a crash,
+        # the PC shut down) gets them once no game is running: first, if none is.
+        controller.make_up = unfinished(_recording_args().out)
+        shown = None
+        started = None
+        stopping = False
+        while not quitting.is_set():
+            if STOP_REQUEST.exists():
+                STOP_REQUEST.unlink(missing_ok=True)
+                # Paused ends a recording the way the game closing does: its
+                # highlights are made before the tray goes.
+                stopping = True
+                controller.set_paused(True)
+            try:
+                controller.tick()
+            except Exception as exc:  # noqa: BLE001 -- the tray must outlive a bad tick
+                print(f"tick failed: {type(exc).__name__}: {exc}", flush=True)
+            if (controller.state, controller.paused, controller.held, len(controller.make_up)) != shown:
+                shown = (controller.state, controller.paused, controller.held, len(controller.make_up))
+                started = time.time() if controller.state == "recording" else None
+                icon.icon = _icon_image(controller.state == "recording")
+                icon.title = f"Salience: {controller.status}"
+                icon.update_menu()
+                write_status(controller.state, controller.status, started,
+                             controller.last_session.name if controller.last_session else None)
+            if stopping and controller.state == "waiting":
+                break
+            quitting.wait(TICK)
+        if controller.session is not None:
+            controller.session.stop()  # quitting mid-session keeps the footage
+        if closing.is_set():
+            write_status("closed", "Salience was closed", None, None)
+        else:
+            write_status("off", "Auto-clip is off", None, None)
+        quitting.set()
+        icon.stop()
+
+    def turn_off(*_):
+        # As the app's switch does: finish this session, then stop.
+        set_autoclip(False)
+
+    def quit_now(*_):
+        # At once: a recording stops with its footage kept, and its highlights
+        # are made the next time the recorder starts (`unfinished`).
+        closing.set()
+        quitting.set()
+        # Everything closes: the app window too, not only the recorder.
+        from pipeline_v2.capture import desktop
+
+        desktop.close_running()
+
+        def gone() -> None:
+            # The worker stops a recording with its footage kept; if it is busy
+            # (making highlights, minutes), the process goes anyway: they are
+            # made up at the next start. Nothing of Salience is left running.
+            work.join(QUIT_WAIT)
+            session = controller.session
+            if session is not None:
+                try:
+                    session.stop()
+                except Exception:  # noqa: BLE001 -- going regardless
+                    pass
+            write_status("closed", "Salience was closed", None, None)
+            os._exit(0)
+
+        threading.Thread(target=gone, name="quit").start()
+
+    # Everything else is the app's (Settings); the tray says it is there.
+    menu = pystray.Menu(
+        pystray.MenuItem(lambda _: controller.status, None, enabled=False),
+        pystray.MenuItem("Open Salience", lambda *_: open_app(controller.last_session),
+                         default=True),
+        pystray.MenuItem("Stop recording now", lambda *_: controller.stop_now(),
+                         visible=lambda _: controller.state == "recording"),
+        pystray.MenuItem("Start recording", lambda *_: controller.resume(),
+                         visible=lambda _: controller.held and controller.state == "waiting"),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Turn off auto-clip", turn_off),
+        pystray.MenuItem("Quit Salience", quit_now),
+    )
+    icon.menu = menu
+    write_status(controller.state, controller.status, None,
+                 controller.last_session.name if controller.last_session else None)
+    work = threading.Thread(target=worker, name="salience-worker", daemon=True)
+    work.start()
+    icon.run()
+    quitting.set()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
