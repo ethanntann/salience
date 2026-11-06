@@ -1,0 +1,34 @@
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+
+# Footage, recordings and the local store: never committed
+*.mkv
+*.mp4
+*.mov
+*.webm
+*.db
+*.db-journal
+*.sqlite
+pipeline_v2/.data/
+.local-data/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Logs, editors, OS
+*.log
+.idea/
+.vscode/
+.claude/
+.DS_Store
+Thumbs.db

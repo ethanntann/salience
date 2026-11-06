@@ -1,0 +1,536 @@
+"""Local review and ranked inbox.
+Explicit keep/skip decisions populate the v2 preference store."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import sqlite3
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from pipeline_v2 import store
+from pipeline_v2 import prompt
+from pipeline_v2 import config
+from pipeline_v2.http_media import serve_video
+
+# Why a skip was skipped, keyed 1-3 on the page.
+SKIP_REASONS = ("spray", "bot", "dull")
+
+PAGE = """<!doctype html>
+<meta charset="utf-8"><title>Salience review</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; font:15px/1.5 system-ui,sans-serif; background:#0d0f13; color:#e6e8eb;
+         display:flex; flex-direction:column; align-items:center; gap:14px; padding:22px; }
+  video { width:min(94vw,900px); border-radius:10px; background:#000; }
+  #summary { max-width:min(94vw,900px); font-size:17px; }
+  #meta { color:#94a0ae; font-size:13px; }
+  #said { max-width:min(94vw,900px); color:#c9b98a; font-style:italic; }
+  #progress { color:#94a0ae; font-size:13px; letter-spacing:.03em; }
+  .keys { display:flex; gap:10px; }
+  button { font:inherit; padding:9px 20px; border-radius:8px; border:1px solid #2a313a;
+           background:#161b22; color:#e6e8eb; cursor:pointer; }
+  button:hover { background:#1e242c; }
+  kbd { background:#222933; border-radius:4px; padding:1px 6px; font-size:12px; }
+  #done { font-size:19px; }
+  #wrong.on { background:#5a1d1d; border-color:#a33; }
+  .reasons { color:#94a0ae; font-size:13px; align-items:center; }
+  .reasons button { padding:5px 12px; font-size:13px; }
+</style>
+<div id="progress"></div>
+<video id="v" controls autoplay muted></video>
+<div id="summary"></div>
+<div id="said"></div>
+<div id="meta"></div>
+<div class="keys">
+  <button onclick="rate(0)">Skip &nbsp;<kbd>J</kbd></button>
+  <button onclick="rate(1)">Keep &nbsp;<kbd>K</kbd></button>
+  <button onclick="rate(1, {love: true})">Love &nbsp;<kbd>L</kbd></button>
+  <button id="wrong" onclick="toggleWrong()">Description wrong &nbsp;<kbd>W</kbd></button>
+</div>
+<div class="keys reasons">
+  <span>Skip because:</span>
+  <button onclick="rate(0, {reason: 'spray'})">Spray &nbsp;<kbd>1</kbd></button>
+  <button onclick="rate(0, {reason: 'bot'})">Bot &nbsp;<kbd>2</kbd></button>
+  <button onclick="rate(0, {reason: 'dull'})">Dull &nbsp;<kbd>3</kbd></button>
+</div>
+<script>
+let current = null;
+let rating = false;
+let wrong = false;
+function toggleWrong() {
+  wrong = !wrong;
+  document.getElementById('wrong').classList.toggle('on', wrong);
+}
+async function load() {
+  const r = await fetch('/api/next');
+  const d = await r.json();
+  if (d.done) {
+    document.body.innerHTML = '<div id="done">All rated \\u2014 ' + d.rated +
+      ' decisions. Run <code>taste --organic-only</code>.</div>';
+    return;
+  }
+  current = d;
+  wrong = false;
+  document.getElementById('wrong').classList.remove('on');
+  document.getElementById('progress').textContent =
+    d.rated + ' rated \\u00b7 ' + d.remaining + ' left';
+  const v = document.getElementById('v');
+  v.src = '/media/' + d.sha;
+  // Start a little before the located event: the interesting part is the
+  // approach, and rating the same three seconds every time is what makes a
+  // few hundred decisions bearable.
+  v.currentTime = Math.max(0, (d.event_sec || 0) - 4);
+  v.onloadedmetadata = () => { v.currentTime = Math.max(0, (d.event_sec || 0) - 4); };
+  document.getElementById('summary').textContent = d.summary;
+  document.getElementById('said').textContent = d.said ? 'Said: “' + d.said + '”' : '';
+  document.getElementById('meta').textContent = d.name + (d.analysis_start_sec == null ? '' :
+    ' · Description window: ' + d.analysis_start_sec.toFixed(1) + '–' + d.analysis_end_sec.toFixed(1) + 's');
+}
+async function rate(label, extra) {
+  if (!current || rating) return;
+  rating = true;
+  try {
+    const r = await fetch('/api/rate', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(Object.assign({sha: current.sha, label, wrong}, extra || {}))});
+    if (!r.ok) throw new Error('Decision was not saved. Please retry.');
+    await load();
+  } catch (error) {
+    document.getElementById('meta').textContent = error.message;
+  } finally { rating = false; }
+}
+addEventListener('keydown', e => {
+  if (e.key === 'j' || e.key === 'J') rate(0);
+  if (e.key === 'k' || e.key === 'K') rate(1);
+  if (e.key === 'w' || e.key === 'W') toggleWrong();
+  if (e.key === 'l' || e.key === 'L') rate(1, {love: true});
+  if (e.key === '1') rate(0, {reason: 'spray'});
+  if (e.key === '2') rate(0, {reason: 'bot'});
+  if (e.key === '3') rate(0, {reason: 'dull'});
+});
+load();
+</script>
+"""
+
+
+# Which storage variant this server rates and ranks. Set once by `serve`. Reads
+# otherwise resolve to the bare variant, which deliberately omits the `-window`
+# suffix capture clips are stored under -- so without this, the only page that
+# writes v2 labels could not show a single clip from the native recorder.
+_VARIANT: str | None = None
+# Folder whose clips are queued for rating, or None for all. Set by `serve`, so
+# the session just played is not queued behind every older unrated window.
+_ONLY: str | None = None
+
+
+def _variant() -> str:
+    return _VARIANT or prompt.active_variant(config.load_config())
+
+
+# A re-cut window writes new content under the same filename; only the newest
+# row for a path describes the file now on disk, so only it is worth rating.
+_CURRENT = (
+    " and c.described_at = (select max(c2.described_at) from clips c2"
+    " where c2.path = c.path)"
+)
+
+
+def _said(conn: sqlite3.Connection, sha: str) -> str:
+    """What the mic heard during the clip, if it was transcribed."""
+    row = conn.execute("select text from transcripts where clip_sha = ?", (sha,)).fetchone()
+    return row[0] if row else ""
+
+
+def _pc_said(conn: sqlite3.Connection, sha: str) -> str:
+    """What the PC's audio (friends, the game) said during the clip."""
+    try:
+        row = conn.execute("select text from pc_transcripts where clip_sha = ?", (sha,)).fetchone()
+    except sqlite3.OperationalError:
+        return ""
+    return row[0] if row else ""
+
+
+def _within() -> str:
+    gone = " and c.path not like ?" * len(_GONE())
+    shas = _ONLY_SHAS()
+    offered = "" if shas is None else f" and c.clip_sha in ({','.join('?' * len(shas)) or 'null'})"
+    return (" and c.path like ?" if _ONLY else "") + gone + offered
+
+
+def _within_args() -> tuple:
+    shas = _ONLY_SHAS()
+    return (((_ONLY + "%",) if _ONLY else ()) + tuple(prefix + "%" for prefix in _GONE())
+            + (() if shas is None else tuple(sorted(shas))))
+
+
+# What the capture app plugs in (`capture.rating`): how a window whose copy is
+# gone is watched, and what a rating does beyond being stored. Never imported
+# from here: this module must import without the capture subsystem.
+_PLAYABLE = lambda path: path if path.is_file() else None  # noqa: E731
+# Folders whose windows can no longer be watched: their footage was deleted
+# (`capture.cleanup`), so they are not offered for rating.
+_GONE = lambda: ()  # noqa: E731
+# Windows to offer first, best first (`capture.desktop.server`: the kills the
+# player's taste is least sure of); the rest follow in the order described.
+_FIRST = lambda: ()  # noqa: E731
+# What taking a rating back does beyond the store (a keep's highlight goes).
+_ON_UNRATED = lambda sha, label: None  # noqa: E731
+# Who laughed in a window ("mic", "game"), shown on the rating page.
+_LAUGHED = lambda path: ()  # noqa: E731
+# The only windows offered, or None for all (`capture.desktop.server`: those
+# that could be highlights, `capture.highlights.rateable`).
+_ONLY_SHAS = lambda: None  # noqa: E731
+_ON_RATED = lambda sha, label: None  # noqa: E731
+
+
+def _next_clip(conn: sqlite3.Connection) -> dict:
+    variant = _variant()
+    rated = conn.execute("select count(*) from preferences").fetchone()[0]
+    # In the order they were played, newest session first: newest-described
+    # first ran each session backwards (a finish before its knock), and the
+    # least-certain kills first jumped about (2026-11-04). Those keep a note.
+    rows = conn.execute(
+        "select c.clip_sha, c.path, c.event_sec, c.facts_json, d.summary from clips c"
+        " join descriptions d on d.clip_sha = c.clip_sha"
+        " where c.clip_sha not in (select clip_sha from preferences)"
+        " and d.prompt_ver = ?" + _CURRENT + _within(),
+        (variant, *_within_args()),
+    ).fetchall()
+    row = min(rows, key=_played_order, default=None)
+    unsure = row is not None and row["clip_sha"] in set(_FIRST())
+    if row is None:
+        return {"done": True, "rated": rated}
+    return _offer(conn, row, rated, unsure)
+
+
+def _played_order(row) -> tuple:
+    """Newest session first, then each window in the order it was played."""
+    path = Path(row["path"])
+    session = path.parent.parent.name
+    return (tuple(-ord(ch) for ch in session), path.name)
+
+
+def clip_again(conn: sqlite3.Connection, sha: str) -> dict:
+    """One window offered again, as `_next_clip` offers one: going back."""
+    row = conn.execute(
+        "select c.clip_sha, c.path, c.event_sec, c.facts_json, d.summary from clips c"
+        " join descriptions d on d.clip_sha = c.clip_sha"
+        " where c.clip_sha = ? and d.prompt_ver = ?" + _CURRENT + " limit 1",
+        (sha, _variant()),
+    ).fetchone()
+    if row is None:
+        return {"done": True}
+    rated = conn.execute("select count(*) from preferences").fetchone()[0]
+    return _offer(conn, row, rated, False)
+
+
+def unrate(conn: sqlite3.Connection, sha: str) -> int | None:
+    """Take a rating back, every trace of it; the label it had, or None."""
+    row = conn.execute("select label from preferences where clip_sha = ?", (sha,)).fetchone()
+    if row is None:
+        return None
+    with conn:
+        conn.execute("delete from preferences where clip_sha = ?", (sha,))
+        conn.execute("delete from rating_notes where clip_sha = ?", (sha,))
+        conn.execute("delete from description_flags where clip_sha = ? and prompt_ver = ?", (sha, _variant()))
+    return int(row[0])
+
+
+def _offer(conn: sqlite3.Connection, row, rated: int, unsure: bool) -> dict:
+    variant = _variant()
+    remaining = conn.execute(
+        "select count(*) from clips c join descriptions d on d.clip_sha = c.clip_sha"
+        " where c.clip_sha not in (select clip_sha from preferences)"
+        " and d.prompt_ver = ?" + _CURRENT + _within(),
+        (variant, *_within_args()),
+    ).fetchone()[0]
+    return {
+        "done": False,
+        "sha": row["clip_sha"],
+        "name": Path(row["path"]).name,
+        "summary": row["summary"],
+        "said": _said(conn, row["clip_sha"]),
+        "pc_said": _pc_said(conn, row["clip_sha"]),
+        "event_sec": row["event_sec"],
+        "analysis_start_sec": json.loads(row["facts_json"]).get("analysis_start_sec"),
+        "analysis_end_sec": json.loads(row["facts_json"]).get("analysis_end_sec"),
+        "rated": rated,
+        "remaining": remaining,
+        "unsure": unsure,
+        "laughed": sorted(set(_LAUGHED(Path(row["path"])))),
+    }
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args) -> None:  # quiet
+        pass
+
+    def _json(self, payload: dict, status: int = 200) -> None:
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:
+        if self.path == "/":
+            body = PAGE.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path == "/ranked":
+            body = RANKED_PAGE.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path == "/api/ranked":
+            self._json(_ranked_payload())
+            return
+
+        if self.path == "/api/next":
+            conn = store.connect()
+            self._json(_next_clip(conn))
+            conn.close()
+            return
+
+        if self.path.startswith("/media/"):
+            self._serve_media(self.path[len("/media/") :])
+            return
+
+        self.send_error(404)
+
+    def _serve_media(self, sha: str) -> None:
+        conn = store.connect()
+        row = conn.execute(
+            "select path from clips where clip_sha = ?", (sha,)
+        ).fetchone()
+        conn.close()
+        if row is None:
+            self.send_error(404)
+            return
+        path = _PLAYABLE(Path(row["path"]))
+        if path is None:
+            self.send_error(404)
+            return
+
+        serve_video(self, path)
+
+    def do_POST(self) -> None:
+        if self.path == "/api/unrate":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                sha = json.loads(self.rfile.read(length)).get("sha") if 0 < length <= 4096 else None
+            except (ValueError, TypeError, AttributeError):
+                sha = None
+            if not isinstance(sha, str):
+                self._json({"error": "provide a clip sha"}, 400)
+                return
+            conn = store.connect()
+            try:
+                label = unrate(conn, sha)
+                if label is None:
+                    self._json({"error": "not rated"}, 404)
+                    return
+                again = clip_again(conn, sha)
+            finally:
+                conn.close()
+            _ON_UNRATED(sha, label)
+            self._json({"ok": True, "label": label, "clip": again})
+            return
+        if self.path != "/api/rate":
+            self.send_error(404)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if not 0 < length <= 4096:
+                raise ValueError("invalid request length")
+            payload = json.loads(self.rfile.read(length))
+            if not isinstance(payload, dict) or type(payload.get("label")) is not int:
+                raise ValueError("label must be 0 or 1")
+            if payload["label"] not in (0, 1) or not isinstance(
+                payload.get("sha"), str
+            ):
+                raise ValueError("provide a clip sha and a 0/1 label")
+            love = payload.get("love") is True
+            reason = payload.get("reason")
+            if (love and payload["label"] != 1) or (
+                    reason is not None and (payload["label"] != 0 or reason not in SKIP_REASONS)):
+                raise ValueError("love is a keep; a reason is one of a skip's")
+        except (ValueError, TypeError):
+            self._json({"error": "invalid preference"}, 400)
+            return
+        conn = store.connect()
+        try:
+            if not conn.execute(
+                "select 1 from clips where clip_sha=?", (payload["sha"],)
+            ).fetchone():
+                self._json({"error": "clip not found"}, 404)
+                return
+            with conn:
+                conn.execute(
+                    "insert or replace into preferences (clip_sha, label, decided_at)"
+                    " values (?, ?, strftime('%s','now'))",
+                    (payload["sha"], payload["label"]),
+                )
+                conn.execute("delete from rating_notes where clip_sha=?", (payload["sha"],))
+                if love or reason:
+                    conn.execute(
+                        "insert into rating_notes (clip_sha, love, reason) values (?, ?, ?)",
+                        (payload["sha"], int(love), reason))
+                # Rating again replaces the flag too, so un-flagging sticks.
+                conn.execute(
+                    "delete from description_flags where clip_sha=? and prompt_ver=?",
+                    (payload["sha"], _variant()),
+                )
+                if payload.get("wrong") is True:
+                    conn.execute(
+                        "insert into description_flags (clip_sha, prompt_ver, decided_at)"
+                        " values (?, ?, strftime('%s','now'))",
+                        (payload["sha"], _variant()),
+                    )
+        finally:
+            conn.close()
+        threading.Thread(target=_ON_RATED, args=(payload["sha"], payload["label"]),
+                         name="rated-highlight", daemon=True).start()
+        self._json({"ok": True})
+
+
+def serve(port: int = 8777, variant: str | None = None, only: Path | None = None,
+          playable=None, on_rated=None) -> None:
+    global _VARIANT, _ONLY, _PLAYABLE, _ON_RATED
+    _VARIANT = variant
+    _ONLY = str(Path(only).resolve()) if only else None
+    _PLAYABLE = playable or _PLAYABLE
+    _ON_RATED = on_rated or _ON_RATED
+    conn = store.connect()
+    pending = _next_clip(conn)
+    conn.close()
+    print(f"variant:       {_variant()}")
+    print(f"ranked inbox:  http://localhost:{port}/ranked")
+    if not pending.get("done"):
+        print(
+            f"rate clips:    http://localhost:{port}/   "
+            f"({pending['remaining']} waiting, J = skip, K = keep, L = love, 1-3 = skip because, W = description wrong)"
+        )
+    print("Ctrl+C to stop")
+    with ThreadingHTTPServer(("127.0.0.1", port), Handler) as server:
+        server.serve_forever()
+
+
+RANKED_PAGE = """<!doctype html>
+<meta charset="utf-8"><title>Salience ranked</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; font:14px/1.55 system-ui,sans-serif; background:#0d0f13; color:#e6e8eb;
+         display:grid; grid-template-columns: 420px 1fr; height:100vh; }
+  #list { overflow-y:auto; border-right:1px solid #1e242c; }
+  #head { padding:14px 16px; border-bottom:1px solid #1e242c; color:#94a0ae; font-size:13px; }
+  .row { padding:11px 16px; border-bottom:1px solid #161b22; cursor:pointer; }
+  .row:hover { background:#141920; }
+  .row.on { background:#182029; border-left:3px solid #4c8dff; padding-left:13px; }
+  .rk { color:#6f7c8c; font-variant-numeric:tabular-nums; margin-right:8px; }
+  .sc { color:#4c8dff; font-variant-numeric:tabular-nums; float:right; }
+  .sib { color:#7f8b99; font-size:12px; margin-top:4px; }
+  #pane { padding:22px; display:flex; flex-direction:column; gap:14px; align-items:center;
+          justify-content:center; }
+  video { width:100%; max-width:900px; border-radius:10px; background:#000; }
+  #sum { max-width:900px; font-size:16px; }
+  #meta { max-width:900px; color:#94a0ae; font-size:12px; }
+  #sibs { max-width:900px; display:flex; gap:8px; flex-wrap:wrap; }
+  #sibs button { font:inherit; font-size:12px; padding:5px 11px; border-radius:7px;
+                 border:1px solid #2a313a; background:#161b22; color:#c7d0da; cursor:pointer; }
+</style>
+<div id="list"><div id="head">loading…</div></div>
+<div id="pane">
+  <video id="v" controls></video>
+  <div id="sum"></div>
+  <div id="sibs"></div>
+  <div id="meta"></div>
+</div>
+<script>
+let fights = [];
+function play(sha, name, summary, eventSec) {
+  const v = document.getElementById('v');
+  v.src = '/media/' + sha;
+  v.onloadedmetadata = () => { v.currentTime = Math.max(0, (eventSec || 0) - 4); };
+  v.play().catch(() => {});
+  document.getElementById('sum').textContent = summary;
+  document.getElementById('meta').textContent = name;
+}
+function show(i) {
+  document.querySelectorAll('.row').forEach((r, j) => r.classList.toggle('on', i === j));
+  const f = fights[i];
+  play(f.sha, f.name, f.summary, f.event_sec);
+  const sibs = document.getElementById('sibs');
+  sibs.innerHTML = '';
+  f.siblings.forEach(s => {
+    const b = document.createElement('button');
+    b.textContent = 'sibling: ' + s.name.replace(/^Fortnite /, '');
+    b.onclick = () => play(s.sha, s.name, s.summary, s.event_sec);
+    sibs.appendChild(b);
+  });
+}
+fetch('/api/ranked').then(r => r.json()).then(d => {
+  fights = d.fights;
+  const list = document.getElementById('list');
+  list.innerHTML = '<div id="head">' + d.fights.length + ' fights \u00b7 trained on ' +
+    d.labels + ' labels \u00b7 ranked best first</div>';
+  fights.forEach((f, i) => {
+    const el = document.createElement('div');
+    el.className = 'row';
+    const score = document.createElement('span');
+    score.className = 'sc'; score.textContent = f.score.toFixed(2);
+    const rank = document.createElement('span');
+    rank.className = 'rk'; rank.textContent = i + 1;
+    el.append(score, rank, document.createTextNode(f.summary));
+    if (f.siblings.length) {
+      const siblings = document.createElement('div');
+      siblings.className = 'sib';
+      siblings.textContent = '+' + f.siblings.length + ' more clip(s) of this fight';
+      el.appendChild(siblings);
+    }
+    el.onclick = () => show(i);
+    list.appendChild(el);
+  });
+  if (fights.length) show(0);
+});
+</script>
+"""
+
+
+def _ranked_payload() -> dict:
+    from pipeline_v2 import ranking
+
+    conn = store.connect()
+    fights, labels = ranking.ranked_fights(conn, variant=_variant())
+    conn.close()
+
+    def brief(clip) -> dict:
+        return {
+            "sha": clip.clip_sha,
+            "name": clip.path.name,
+            "summary": clip.summary,
+            "event_sec": clip.event_sec,
+        }
+
+    return {
+        "labels": labels,
+        "fights": [
+            {
+                "score": fight.score,
+                **brief(fight.best),
+                "siblings": [brief(s) for s in fight.siblings],
+            }
+            for fight in fights
+        ],
+    }

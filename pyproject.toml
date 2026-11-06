@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "salience"
+version = "0.2.0"
+description = "A Fortnite auto-clipper that ranks your highlights by your own taste"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "pydantic>=2.8", "scikit-learn>=1.5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2", "ruff>=0.11"]
+semantic = ["sentence-transformers>=3"]
+# Windows Graphics Capture, the backend that replaces Desktop Duplication.
+# A prebuilt wheel, so it bundles into a shipped executable and the end
+# user installs nothing.
+capture = ["soundcard>=0.4", "windows-capture>=2.0"]
+# Drives OBS's replay buffer over obs-websocket. `capture/obs_client.py`
+# needed this and nothing declared it.
+obs = ["obsws-python>=1.6"]
+# onnx: to quantize the laughter detector (`capture.reactions`) to int8 on first use.
+# On Windows, onnxruntime with DirectML: the CPU and any DirectX 12 GPU, the
+# faster of which runs the audio models after a session (`pipeline_v2.devices`).
+audio = ["soundfile>=0.12", "onnx-asr[hub]>=0.12", "onnx>=1.16",
+         "onnxruntime-directml>=1.24; sys_platform == 'win32'",
+         "onnxruntime>=1.18.1,!=1.24.1,!=1.25.*,!=1.26.0; sys_platform != 'win32'"]
+# The tray app (`pipeline_v2.capture.app`): icon and menu. Its dialogs are tkinter.
+app = ["pystray>=0.19", "pillow>=10", "pywebview>=6.2"]
+# pywebview: the desktop app's window (`pipeline_v2.capture.desktop`), on the
+# WebView2 runtime Windows 11 ships with.
+
+[project.scripts]
+salience = "pipeline_v2.cli:main"
+
+[tool.setuptools.package-data]
+"pipeline_v2.capture.desktop" = ["static/*"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pipeline_v2*", "salience_media*"]
+exclude = ["pipeline_v2.tests*", "salience_media.tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["pipeline_v2/tests", "salience_media/tests"]
+pythonpath = ["."]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
