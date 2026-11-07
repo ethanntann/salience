@@ -14,10 +14,12 @@ build leaves it out. Only what the app imports is installed: no PyTorch.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import shutil
 import subprocess
 import sys
+import tomllib
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -25,26 +27,34 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build" / "Salience"
 DIST = ROOT / "dist"
-VERSION = "0.3.0"
-# What the app imports at run time (`pyproject.toml` extras audio, app, capture).
-PACKAGES = [
-    "numpy", "pydantic", "scikit-learn", "scipy",
-    # Not windows-capture: the Python recorder for an FFmpeg older than 8, never
-    # used with the FFmpeg bundled here, and it brings 115 MB of OpenCV.
-    "soundcard", "soundfile",
-    "onnx-asr[hub]", "onnx", "onnxruntime-directml",
-    "pystray", "pillow", "pywebview",
-]
+# One version for the app and its installer: `pyproject.toml`'s.
+VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+# What the app imports at run time (`pyproject.toml` extras audio, app, capture),
+# at the exact versions it was tested with, dependencies included. Not
+# windows-capture: the Python recorder for an FFmpeg older than 8, never used
+# with the FFmpeg bundled here, and it brings 115 MB of OpenCV.
+LOCK = ROOT / "installer" / "requirements.lock"
+# The embeddable Python's SHA-256, so a tampered download fails the build.
+# python.org lists only an MD5 (85a5dcd0350f7ca4e2876295b0b281e3), checked
+# against this download before its SHA-256 was taken (2026-11-07).
+PYTHON_SHA256 = {
+    "3.14.2": "f05e28d161c6b15af64a7cb7f08b4a22b3a6b03eee71baee24ea557b3bdd5798",
+}
 APP_PACKAGES = ["pipeline_v2", "salience_media"]
 
 
 def python_embed(target: Path) -> None:
     v = sys.version_info
     version = f"{v.major}.{v.minor}.{v.micro}"
+    if version not in PYTHON_SHA256:
+        raise SystemExit(f"no checksum for Python {version}: add one to PYTHON_SHA256")
     url = f"https://www.python.org/ftp/python/{version}/python-{version}-embed-amd64.zip"
     print(f"python {version}: {url}")
     with urllib.request.urlopen(url, timeout=120) as response:
-        zipfile.ZipFile(io.BytesIO(response.read())).extractall(target)
+        data = response.read()
+    if hashlib.sha256(data).hexdigest() != PYTHON_SHA256[version]:
+        raise SystemExit(f"{url} does not match its checksum: not building with it")
+    zipfile.ZipFile(io.BytesIO(data)).extractall(target)
     # tkinter, which the embeddable build leaves out.
     base = Path(sys.base_prefix)
     shutil.copytree(base / "Lib" / "tkinter", target / "Lib" / "tkinter",
@@ -60,15 +70,26 @@ def python_embed(target: Path) -> None:
 
 
 def packages(target: Path) -> None:
+    # Exact versions with no dependency resolving: `--only-binary :all:` once
+    # made pip skip pywebview 6 (its proxy_tools has no wheel) for 3.4, from
+    # 2020, whose window could not open (2026-11-07).
     site = target / "Lib" / "site-packages"
     subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "--no-warn-script-location",
-                    "--only-binary", ":all:", "--target", str(site), *PACKAGES], check=True)
+                    "--no-deps", "--target", str(site), "-r", str(LOCK)], check=True)
     # Libraries' own tests: not needed to run, large, and ONNX's test data has
     # names long enough to pass Windows' 260-character path limit, which made
     # the installer roll back (2026-11-06).
     for junk in [*site.glob("**/tests"), site / "onnx" / "backend" / "test"]:
         if junk.is_dir():
             shutil.rmtree(junk, ignore_errors=True)
+    # What was installed is what the lock says, or the build stops.
+    found = subprocess.run([sys.executable, "-m", "pip", "list", "--path", str(site), "--format=freeze"],
+                           capture_output=True, text=True, check=True).stdout
+    def pins(text: str) -> set[str]:
+        return {line.strip().lower().replace("_", "-") for line in text.splitlines()
+                if line.strip() and not line.startswith("#")}
+    if pins(found) != pins(LOCK.read_text(encoding="utf-8")):
+        raise SystemExit(f"installed packages differ from {LOCK.name}: {sorted(pins(found) ^ pins(LOCK.read_text(encoding='utf-8')))}")
     longest = max(len(str(f.relative_to(target.parent))) for f in site.rglob("*"))
     print(f"longest path inside the install: {longest} characters")
 
@@ -124,7 +145,10 @@ def main() -> int:
     size = sum(f.stat().st_size for f in BUILD.rglob("*") if f.is_file())
     print(f"bundle: {size / 1e6:.0f} MB")
     setup = inno()
-    print(f"installer: {setup} ({setup.stat().st_size / 1e6:.0f} MB)")
+    digest = hashlib.sha256(setup.read_bytes()).hexdigest()
+    # Published beside the release, so a tester can check their download.
+    setup.with_name(setup.name + ".sha256").write_text(f"{digest}  {setup.name}\n", encoding="utf-8")
+    print(f"installer: {setup} ({setup.stat().st_size / 1e6:.0f} MB), sha256 {digest}")
     return 0
 
 

@@ -370,3 +370,36 @@ def test_a_recorder_on_its_way_out_is_waited_for_then_replaced():
     started.clear()
     assert not app.start_tray_when_free(wait=0.01, step=0.005, running=lambda: True, start=lambda: started.append(1))
     assert started == []  # one that stays is the recorder
+
+
+def test_a_nearly_full_drive_frees_old_footage_first_then_stops_the_recording(tmp_path):
+    world = _World(tmp_path)
+    free = [50e9]
+    freed = []
+
+    def free_up():
+        freed.append(world.now)
+        free[0] += 3e9  # finished sessions had a little to give
+
+    controller = world.controller(game_running=lambda: True, free_bytes=lambda: free[0], free_up=free_up)
+    world.window = 1
+    _run(controller, world, 60)
+    assert controller.state == "recording" and freed == []
+
+    free[0] = 4e9
+    _run(controller, world, 40)
+    assert freed and world.sessions[0].stopped and "Drive almost full" in world.toasts
+    # Made once the game closes, and no new session in the meantime.
+    assert controller.make_up == [world.sessions[0].path]
+    _run(controller, world, 60)
+    assert len(world.sessions) == 1
+
+
+def test_room_made_by_freeing_footage_keeps_it_recording(tmp_path):
+    world = _World(tmp_path)
+    free = [8e9]
+    controller = world.controller(free_bytes=lambda: free[0],
+                                  free_up=lambda: free.__setitem__(0, 25e9))
+    world.window = 1
+    _run(controller, world, 120)
+    assert controller.state == "recording" and not world.sessions[0].stopped

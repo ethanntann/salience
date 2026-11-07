@@ -28,6 +28,7 @@ You need a free Cloudflare account and Node.js.
 
 ```powershell
 cd relay
+npm.cmd ci                                       # wrangler, at the version in package-lock.json
 npx.cmd wrangler login
 npx.cmd wrangler d1 create salience-relay        # paste the database_id it prints into wrangler.toml
 npx.cmd wrangler d1 execute salience-relay --remote --file=schema.sql
@@ -63,4 +64,5 @@ curl -X POST https://salience-relay.<you>.workers.dev/admin/disable `
 `FIREWORKS_API_KEY` set, a stand-in answers instead of Fireworks, so nothing
 is spent. Point the app at it with `SALIENCE_RELAY_URL=http://127.0.0.1:8787`.
 
-Tests: `npm test` (Node's built-in runner, nothing to install).
+Tests: `npm test` (Node's built-in runner). Logs: Cloudflare dashboard, Workers > salience-relay > Logs
+(errors and request outcomes; frames are never logged).

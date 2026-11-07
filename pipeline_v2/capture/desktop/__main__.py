@@ -80,9 +80,7 @@ def main(argv: list[str]) -> int:
 
         threading.Thread(target=app.start_tray_when_free, name="start-recorder", daemon=True).start()
     port = running.server_address[1]
-    port_file = desktop._port_file()
-    port_file.parent.mkdir(parents=True, exist_ok=True)
-    port_file.write_text(str(port), encoding="utf-8")
+    desktop.write_running(port, server.Handler.secret)
     window = webview.create_window(
         "Salience", f"http://127.0.0.1:{port}/" + desktop.target(session, view),
         width=1360, height=880, min_size=(980, 640), background_color="#0D0F13")
@@ -127,8 +125,8 @@ def main(argv: list[str]) -> int:
         webview.start(private_mode=False)
     finally:
         running.shutdown()
-        if desktop._running_port() == port:
-            port_file.unlink(missing_ok=True)
+        if (desktop._running() or (None,))[0] == port:
+            desktop._port_file().unlink(missing_ok=True)
     return 0
 
 

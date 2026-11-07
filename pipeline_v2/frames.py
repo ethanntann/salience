@@ -169,7 +169,6 @@ def _extract_one_pass(clip: Path, timestamps: list[float], out_dir: Path, tag: s
     the seeks are the fallback.
     """
     import os
-    import subprocess
 
     if len(timestamps) < 2 or (gpu and os.getenv("SALIENCE_FFMPEG_HWACCEL", "cuda") != "cuda"):
         return None

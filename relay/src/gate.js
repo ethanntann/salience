@@ -28,7 +28,7 @@ export class Limits {
     const id = `${now}-${this.next++}`;
     this.leases.set(id, { player, at: now });
     this.minute.count += 1;
-    return { ok: true, id };
+    return { ok: true, id, mine: mine + 1 };
   }
 
   release(id) {

@@ -20,11 +20,18 @@ MAX_PER_MINUTE = "15000"    # 75% of the account's 20,000 a minute
 MAX_PER_PLAYER = "16"
 MAX_OUTPUT_TOKENS = "1500"
 MAX_IMAGES = "16"
+MAX_TEXT_CHARS = "40000"    # Salience's prompt is about 12,000
+PLAYER_USD_PER_HOUR = "1.8" # each player's dollar cap: an hour of matches is about $1.20
+
+# Errors and request outcomes in the Cloudflare dashboard (Workers > Logs).
+# Bodies (the frames) are never logged.
+[observability]
+enabled = true
 
 [[d1_databases]]
 binding = "DB"
 database_name = "salience-relay"
-database_id = "bc0883f1-6383-476b-8d94-29c8219abaea"
+database_id = "<the id `wrangler d1 create` prints>"
 
 [[durable_objects.bindings]]
 name = "GATE"

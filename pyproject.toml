@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "salience"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Fortnite auto-clipper that ranks your highlights by your own taste"
 requires-python = ">=3.11"
 dependencies = ["numpy>=1.26", "pydantic>=2.8", "scikit-learn>=1.5", "scipy>=1.13"]

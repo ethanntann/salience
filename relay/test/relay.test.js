@@ -12,11 +12,12 @@ const env = {
   PRICE_IN_PER_M: "0.30", PRICE_OUT_PER_M: "1.20", FIREWORKS_API_KEY: "fw_secret", ADMIN_TOKEN: "admin",
 };
 const now = new Date("2026-11-06T08:00:00Z");
+const FRAME = "data:image/jpeg;base64,/9j/AA==";
 
 function describeBody(extra = {}) {
   return { model: MODEL, temperature: 0, max_tokens: 600,
     messages: [{ role: "system", content: "x" },
-      { role: "user", content: [{ type: "text", text: "describe" }, { type: "image_url", image_url: { url: "data:," } }] }],
+      { role: "user", content: [{ type: "text", text: "describe" }, { type: "image_url", image_url: { url: FRAME } }] }],
     ...extra };
 }
 
@@ -94,7 +95,7 @@ test("the key describes gameplay with Salience's model and nothing else", () => 
   assert.match(checkRequest(env, describeBody({ stream: true })), /streaming/);
   assert.match(checkRequest(env, describeBody({ max_tokens: 100000 })), /max_tokens/);
   const many = describeBody();
-  many.messages[1].content = Array(40).fill({ type: "image_url", image_url: { url: "data:," } });
+  many.messages[1].content = Array(40).fill({ type: "image_url", image_url: { url: FRAME } });
   assert.match(checkRequest(env, many), /images/);
 });
 
@@ -162,4 +163,61 @@ test("admin routes need the admin token", async () => {
   const made = await call("/admin/invites", { method: "POST", token: "admin", body: { uses: 3, note: "discord" }, deps: { store } });
   assert.equal(made.body.uses, 3);
   assert.equal(store.invites.get(made.body.code).uses_left, 3);
+});
+
+test("only Salience's own request shape: no other fields, links or walls of text", () => {
+  assert.match(checkRequest(env, describeBody({ tools: [] })), /unexpected fields: tools/);
+  const link = describeBody();
+  link.messages[1].content[1] = { type: "image_url", image_url: { url: "https://example.com/a.jpg" } };
+  assert.match(checkRequest(env, link), /text and gameplay frames/);
+  const wall = describeBody();
+  wall.messages[1].content[0].text = "x".repeat(40001);
+  assert.match(checkRequest(env, wall), /too much text/);
+  assert.match(checkRequest(env, describeBody({ messages: [{ role: "assistant", content: "hi" }] })), /unexpected messages/);
+});
+
+test("a player's dollars run out before their hours if their calls are costly", async () => {
+  const store = new MemoryStore();
+  const token = await registered(store);
+  const hash = [...store.installs.keys()][0];
+  store.usageRows.set(`${hash}|${monthKey(now)}`, { calls: 10, cost_usd: 9 }); // 5 h x $1.80
+  const upstream = fireworks();
+  const reply = await call("/v1/chat/completions", { method: "POST", token, body: describeBody(),
+    deps: { store, fetch: upstream, gate: openGate() } });
+  assert.equal(reply.status, 402);
+  assert.equal(upstream.calls.length, 0);
+});
+
+test("calls in flight count against the allowance", async () => {
+  const store = new MemoryStore();
+  const token = await registered(store);
+  const hash = [...store.installs.keys()][0];
+  store.usageRows.set(`${hash}|${monthKey(now)}`, { calls: (5 * 3600) / 8 - 3, cost_usd: 0 });
+  const released = [];
+  const busy = { acquire: async () => ({ ok: true, id: "l", mine: 4 }), release: async (id) => released.push(id) };
+  const upstream = fireworks();
+  const reply = await call("/v1/chat/completions", { method: "POST", token, body: describeBody(),
+    deps: { store, fetch: upstream, gate: busy } });
+  assert.equal(reply.status, 402);
+  assert.deepEqual(released, ["l"]);
+  assert.equal(upstream.calls.length, 0);
+});
+
+test("Fireworks' own error text stays in the relay", async () => {
+  const store = new MemoryStore();
+  const token = await registered(store);
+  const reply = await call("/v1/chat/completions", { method: "POST", token, body: describeBody(),
+    deps: { store, fetch: fireworks(400), gate: openGate() } });
+  assert.equal(reply.status, 400);
+  assert.equal(reply.body.error.code, "upstream_error");
+  assert.ok(!JSON.stringify(reply.body).includes("busy"));
+});
+
+test("disabling takes a hex id, never a wildcard", async () => {
+  const store = new MemoryStore();
+  await registered(store);
+  const reply = await call("/admin/disable", { method: "POST", token: "admin", body: { id: "%%%%%%%%" }, deps: { store } });
+  assert.equal(reply.status, 400);
+  assert.equal([...store.installs.values()][0].disabled, 0);
+  assert.equal((await call("/admin/usage", { token: "admin-ish", deps: { store } })).status, 401);
 });

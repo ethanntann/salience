@@ -16,6 +16,7 @@ One decode of the span, 10 frames a second, about a second a highlight.
 from __future__ import annotations
 
 import subprocess
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -248,8 +249,8 @@ def _onset_times(times: np.ndarray, series: np.ndarray) -> list[float]:
 
 SCAN_WORKERS = 2
 
-_SCANNING: dict[str, "threading.Lock"] = {}
-_SCANNING_GUARD = __import__("threading").Lock()
+_SCANNING: dict[str, threading.Lock] = {}
+_SCANNING_GUARD = threading.Lock()
 
 
 def session_scores(session: Path, until: float, runner=subprocess.run) -> tuple[np.ndarray, dict]:
