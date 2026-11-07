@@ -1164,6 +1164,9 @@ def run(
     fresh = (undescribed_fn or undescribed)(clip_dir) if cut else 0
     _step(f"{fresh} windows left to describe, speech beside")
     if fresh:
+        from pipeline_v2 import vlm
+
+        vlm.allowance_reset()
         _step("describing: taking the frames")
         if describe_fn is describe:  # a segment's frames in one pass (`live.bank_frames`)
             from pipeline_v2 import cache, store
@@ -1175,6 +1178,11 @@ def run(
                                        and cache.clip_sha(p) not in done])
             _step("describing: frames taken, asking the model")
         describe_fn(clip_dir, max_calls=fresh)
+        if vlm.LAST_ALLOWANCE is not None and (undescribed_fn or undescribed)(clip_dir):
+            # The month's match time ran out part way: no highlights from
+            # half a session. It is made whole when the allowance resets.
+            hearing.join()
+            raise vlm.LAST_ALLOWANCE
         _step("described (speech may still be going)")
     hearing.join()
     heard, found_laughs = listened["heard"], listened["laughs"]

@@ -1,0 +1,35 @@
+# Deploy: see README.md. The Fireworks key and the admin token are secrets
+# (`wrangler secret put`), never in this file.
+name = "salience-relay"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+# The relay's address is its workers.dev one; no preview copies of it.
+workers_dev = true
+preview_urls = false
+
+[vars]
+# The one model testers may use, as Salience asks for it.
+MODEL = "accounts/fireworks/models/deepseek-v4p1-flash"
+FREE_HOURS = "5"            # of matches a month
+PRO_HOURS = "30"
+MONTHLY_BUDGET_USD = "60"   # the relay stops before your spend passes this
+PRICE_IN_PER_M = "0.30"     # estimates for the cap above, per million tokens
+PRICE_OUT_PER_M = "1.20"
+MAX_IN_FLIGHT = "300"       # across everyone
+MAX_PER_MINUTE = "15000"    # 75% of the account's 20,000 a minute
+MAX_PER_PLAYER = "16"
+MAX_OUTPUT_TOKENS = "1500"
+MAX_IMAGES = "16"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "salience-relay"
+database_id = "bc0883f1-6383-476b-8d94-29c8219abaea"
+
+[[durable_objects.bindings]]
+name = "GATE"
+class_name = "Gate"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Gate"]

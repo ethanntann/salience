@@ -170,6 +170,11 @@ async function pollRecorder() {
   paintRecorder();
 }
 
+function matchTime(seconds) {
+  const h = Math.floor(seconds / 3600), m = Math.round((seconds % 3600) / 60);
+  return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
+}
+
 // Clips the player likes. Asked about only while an import is under way,
 // and the box is redrawn only when what it says changes.
 let importState = null;
@@ -913,6 +918,8 @@ async function showSettings() {
         <div class="line"><div><div id="obs-label"><b>Use my OBS recordings</b></div><span>If you already record or stream with OBS. Salience records nothing itself; when you close Fortnite it takes that game from your OBS recording. Keep OBS recording while you play.${set.uses_obs ? ` Looking in ${esc(set.obs_folder || "your Videos folder")}.` : ""}</span>
           ${set.uses_obs ? `<div style="margin-top:8px"><button class="button" id="obs-folder">Change folder…</button></div>` : ""}</div>
           <button class="switch" id="set-obs" role="switch" aria-checked="${set.uses_obs}" aria-labelledby="obs-label"><span></span></button></div>
+        <div class="line"><div><b>Export my stats</b><span id="stats-note">A small file of counts: sessions, highlights, what you kept, how long highlights took, and whether the game stuttered. No video, audio, words or names. Nothing is sent: you choose who gets it.</span></div>
+          <button class="button" id="export-stats">Export…</button></div>
         <div class="line"><div><div id="pc-label"><b>Transcribe friends</b></div><span>Turns what your PC plays (friends on Discord or party chat, and the game) into text, so funny moments and their "clip that" count. It's kept on this PC and never sent anywhere. Your friends' voices are recorded either way.</span></div>
           <button class="switch" id="set-pc" role="switch" aria-checked="${set.transcribe_pc}" aria-labelledby="pc-label"><span></span></button></div>
       </section>
@@ -923,6 +930,16 @@ async function showSettings() {
       </section>
       <section class="panel" aria-labelledby="ai">
         <h2 id="ai">Describer</h2>
+        ${set.relay ? `<div class="line"><div><b>Beta: ${matchTime(set.relay.left_seconds)} of match time left this month</b>
+          <span>Of ${matchTime(set.relay.allowance_seconds)}. It comes back on ${new Date(set.relay.resets_at).toLocaleDateString(undefined, { month: "long", day: "numeric" })}. Highlights from games past it are made then.</span></div></div>` : ""}
+        ${set.invites_open && !set.relay ? `<div class="field">
+          <label for="invite">Invite code</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <input id="invite" class="search" style="flex:1 1 280px;width:auto" autocomplete="off" placeholder="From the person who invited you">
+            <button class="button primary" id="save-invite">Use code</button>
+          </div>
+          <small id="invite-note">No Fireworks account needed: the beta describes your games for you, 5 hours of matches a month.</small>
+        </div>` : ""}
         <div class="field">
           <label for="key">Fireworks API key</label>
           <div style="display:flex;flex-wrap:wrap;gap:8px">
@@ -964,6 +981,21 @@ async function showSettings() {
     });
     page.querySelector("#set-startup").addEventListener("click", async () => {
       set = await api("/api/startup", { on: !set.starts_with_windows }); draw();
+    });
+    page.querySelector("#export-stats").addEventListener("click", async (e) => {
+      e.target.disabled = true; e.target.textContent = "Counting…";
+      const { status, data } = await postJson("/api/stats-export", {});
+      e.target.disabled = false; e.target.textContent = "Export…";
+      setText("stats-note", status === 200 ? `Saved to ${data.path}. It's open in File Explorer.` : "That didn't work.");
+    });
+    const invite = page.querySelector("#save-invite");
+    if (invite) invite.addEventListener("click", async (e) => {
+      const code = page.querySelector("#invite").value.trim();
+      e.target.disabled = true; e.target.textContent = "Checking…";
+      const { status, data } = await postJson("/api/invite", { code });
+      if (status === 200) { set = data; draw(); pollRecorder(); return; }
+      e.target.disabled = false; e.target.textContent = "Use code";
+      page.querySelector("#invite-note").textContent = data.error || "That code didn't work.";
     });
     page.querySelector("#save-key").addEventListener("click", async (e) => {
       const key = page.querySelector("#key").value.trim();
