@@ -509,6 +509,8 @@ def settings() -> dict:
         "autoclip": app.autoclip_on(),
         "transcribe_pc": _voice().pc_enabled(),
         "has_key": bool(os.environ.get("FIREWORKS_API_KEY")),
+        "relay": app.relay_usage(),  # match time left, for a beta tester on an invite
+        "invites_open": bool(app.relay_url()),
         "uses_obs": app.uses_obs(),
         "obs_folder": str(app.obs_folder() or ""),
     }
@@ -839,6 +841,19 @@ class Handler(review.Handler):
 
             app.set_starts_with_windows(bool(data.get("on")))
             return self._json(settings())
+        if self.path == "/api/stats-export":
+            from pipeline_v2.capture import stats
+
+            path = stats.export()
+            subprocess.Popen(["explorer", "/select,", str(path)], creationflags=_NO_CONSOLE)
+            return self._json({"ok": True, "path": str(path)})
+        if self.path == "/api/invite":
+            from pipeline_v2.capture import app
+
+            problem = app.redeem_invite(str(data.get("code", "")).strip())
+            if problem is not None:
+                return self._json({"ok": False, "error": problem}, 400)
+            return self._json({"ok": True, **settings()})
         if self.path == "/api/key":
             from pipeline_v2.capture import app
 

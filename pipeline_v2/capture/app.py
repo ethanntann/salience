@@ -311,9 +311,52 @@ class Controller:
 UNFINISHED_DAYS = 2
 
 
+# A session whose describing waits for the month's match time to come back
+# (`vlm.AllowanceUsed`): when, so it is made then, however old it is by then.
+WAITING = "waiting_for_allowance.json"
+
+
+def wait_for_allowance(session: Path, resets_at: str | None) -> None:
+    (session / WAITING).write_text(json.dumps({"resets_at": resets_at}), encoding="utf-8")
+
+
+def _resumes_at(session: Path) -> float | None:
+    from datetime import datetime
+
+    try:
+        when = json.loads((session / WAITING).read_text(encoding="utf-8")).get("resets_at")
+        return datetime.fromisoformat(str(when).replace("Z", "+00:00")).timestamp()
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _friendly_date(resets_at: str | None) -> str:
+    from datetime import datetime
+
+    try:
+        when = datetime.fromisoformat(str(resets_at).replace("Z", "+00:00")).astimezone()
+    except (ValueError, TypeError):
+        return "when your match time resets"
+    return f"on {when.strftime('%B')} {when.day}"
+
+
 def unfinished(root: Path, now: float | None = None) -> list[Path]:
-    """Recent sessions with footage and no highlights, oldest first."""
+    """Recent sessions with footage and no highlights, oldest first; and any
+    session waiting for the month's match time, once it is back."""
     now = time.time() if now is None else now
+    waiting = []
+    try:
+        for p in root.iterdir():
+            if (p / WAITING).is_file() and not (p / "highlights" / "highlights.json").is_file():
+                resumes = _resumes_at(p)
+                if resumes is None or now >= resumes:
+                    waiting.append(p)
+    except OSError:
+        pass
+    return sorted(set(waiting) | set(_recent_unfinished(root, now)), key=lambda p: p.name)
+
+
+def _recent_unfinished(root: Path, now: float) -> list[Path]:
     try:
         from pipeline_v2.capture import obs_recordings
 
@@ -323,6 +366,7 @@ def unfinished(root: Path, now: float | None = None) -> list[Path]:
 
         found = [p for p in root.iterdir() if listing(p).is_file()
                  and not (p / "highlights" / "highlights.json").is_file()
+                 and not (p / WAITING).is_file()
                  and now - listing(p).stat().st_mtime < UNFINISHED_DAYS * 86400]
     except OSError:
         return []
@@ -556,6 +600,80 @@ def _single_instance() -> bool:
     return ctypes.windll.kernel32.GetLastError() != 183  # ERROR_ALREADY_EXISTS
 
 
+# The relay (`relay/`): a beta tester describes with the project's key through
+# it, with an invite code instead of a key of their own. Its address is set
+# once the relay is deployed; `SALIENCE_RELAY_URL` overrides it.
+RELAY_URL_KEY = "SALIENCE_RELAY_URL"
+DEFAULT_RELAY_URL = ""  # your deployed relay (relay/README.md)
+
+
+def relay_url() -> str:
+    return (os.environ.get(RELAY_URL_KEY) or DEFAULT_RELAY_URL).rstrip("/")
+
+
+def uses_relay() -> bool:
+    url = relay_url()
+    return bool(url) and os.environ.get("FIREWORKS_BASE_URL", "").startswith(url)
+
+
+def _relay_call(path: str, body: dict | None = None, token: str | None = None,
+                timeout: float = 15.0) -> tuple[int, dict]:
+    import urllib.error
+    import urllib.request
+
+    from pipeline_v2.vlm import USER_AGENT
+
+    headers = {"User-Agent": USER_AGENT, "Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(
+        relay_url() + path, data=json.dumps(body).encode() if body is not None else None,
+        headers=headers, method="POST" if body is not None else "GET")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status, json.loads(response.read() or b"{}")
+    except urllib.error.HTTPError as exc:
+        try:
+            return exc.code, json.loads(exc.read() or b"{}")
+        except ValueError:
+            return exc.code, {}
+
+
+def redeem_invite(code: str, call=None) -> str | None:
+    """None once `code` is redeemed and this install describes through the
+    relay, else why not."""
+    if not relay_url():
+        return "Invite codes aren't open yet."
+    try:
+        status, reply = (call or _relay_call)("/v1/register", {"invite": code})
+    except OSError as exc:
+        return f"could not reach Salience's server ({exc})"
+    if status != 200 or not reply.get("token"):
+        return (reply.get("error") or {}).get("message") or f"HTTP {status}"
+    for key, value in (("FIREWORKS_API_KEY", reply["token"]), ("FIREWORKS_BASE_URL", reply["base_url"]),
+                       ("FIREWORKS_MODEL", reply["model"])):
+        write_setting(key, value)
+        os.environ[key] = value
+    return None
+
+
+def relay_usage(call=None) -> dict | None:
+    """This month's match time on the relay: used, allowance, left, resets_at."""
+    if not uses_relay():
+        return None
+    try:
+        status, reply = (call or _relay_call)(
+            "/v1/usage", token=os.environ.get("FIREWORKS_API_KEY", ""), timeout=5.0)
+    except OSError:
+        return None
+    return reply if status == 200 else None
+
+
+def is_invite(text: str) -> bool:
+    """An invite code, not a Fireworks key (those begin `fw_`)."""
+    return bool(text) and not text.startswith("fw_")
+
+
 def ask_for_key(message: str = "") -> str | None:
     """A small dialog for the player's Fireworks key; None if cancelled."""
     import tkinter as tk
@@ -565,26 +683,32 @@ def ask_for_key(message: str = "") -> str | None:
     root.withdraw()
     try:
         prompt = (message + "\n\n" if message else "") + (
-            "Paste your Fireworks API key (fireworks.ai -> API Keys).\n"
-            "It stays on this PC and is only sent to Fireworks.")
+            "Paste your invite code, or your own Fireworks API key\n"
+            "(fireworks.ai -> API Keys). A key stays on this PC and is only sent to Fireworks.")
         key = simpledialog.askstring("Salience", prompt, parent=root, show="*")
     finally:
         root.destroy()
     return key.strip() if key else None
 
 
-def setup_key(ask=ask_for_key, check=check_key) -> bool:
-    """Ask until Fireworks accepts a key or the player cancels."""
+def setup_key(ask=ask_for_key, check=check_key, redeem=None) -> bool:
+    """Ask until Fireworks accepts a key, or the relay an invite code, or the player cancels."""
+    redeem = redeem or redeem_invite
     message = ""
     while True:
         key = ask(message)
         if not key:
             return False
-        problem = check(key)
-        if problem is None:
-            write_setting("FIREWORKS_API_KEY", key)
-            os.environ["FIREWORKS_API_KEY"] = key
-            return True
+        if is_invite(key) and relay_url():
+            problem = redeem(key)
+            if problem is None:
+                return True
+        else:
+            problem = check(key)
+            if problem is None:
+                write_setting("FIREWORKS_API_KEY", key)
+                os.environ["FIREWORKS_API_KEY"] = key
+                return True
         message = problem
 
 
@@ -731,8 +855,16 @@ def main() -> int:
             if problem is not None:
                 return {"session": str(session), "highlights": [],
                         "why": f"No highlights: {problem}."}
+        from pipeline_v2 import vlm
+
         with game_first(game_running):
-            manifest = highlights.run(session)
+            try:
+                manifest = highlights.run(session)
+            except vlm.AllowanceUsed as used:
+                wait_for_allowance(session, used.resets_at)
+                when = _friendly_date(used.resets_at)
+                return {"session": str(session), "highlights": [],
+                        "why": f"{used} This session's highlights are made {when}."}
             highlights.report(manifest)
             if manifest.get("highlights"):
                 warm_view(session)

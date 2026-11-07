@@ -30,6 +30,30 @@ class BudgetExceeded(RuntimeError):
     """A call limit or already-recorded spend threshold prevents another call."""
 
 
+class AllowanceUsed(BudgetExceeded):
+    """The relay (`relay/`) says this install's monthly match time is used up,
+    or the beta's own budget is: describing waits until `resets_at`."""
+
+    def __init__(self, message: str, resets_at: str | None = None) -> None:
+        super().__init__(message)
+        self.resets_at = resets_at
+
+
+# Set when a call met `AllowanceUsed` since `allowance_reset()`: the highlights
+# run then knows its undescribed windows wait for next month, not a retry.
+LAST_ALLOWANCE: AllowanceUsed | None = None
+
+
+def allowance_reset() -> None:
+    global LAST_ALLOWANCE
+    LAST_ALLOWANCE = None
+
+
+# A busy answer (HTTP 429) is waited out this many times. Through the relay
+# many players share one key, and a busy minute is normal, not a failure.
+RATE_RETRIES = 8
+
+
 @dataclass
 class CallBudget:
     """Shared per-invocation allowance; reserve before an ambiguous network attempt."""
@@ -137,8 +161,9 @@ def _request_payload(cfg: Config, content: list[dict]) -> dict:
 
 
 def _post(cfg: Config, content: list[dict]) -> dict:
+    global LAST_ALLOWANCE
     body = json.dumps(_request_payload(cfg, content)).encode("utf-8")
-    for attempt in range(4):
+    for attempt in range(RATE_RETRIES):
         request = urllib.request.Request(
             f"{cfg.base_url}/chat/completions",
             data=body,
@@ -155,14 +180,34 @@ def _post(cfg: Config, content: list[dict]) -> dict:
             with urllib.request.urlopen(request, timeout=120) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            if exc.code in (402, 503):
+                # The relay's answers when the month's match time, or the
+                # beta's budget, is spent: nothing to retry until it resets.
+                try:
+                    error = json.loads(detail).get("error") or {}
+                except (ValueError, AttributeError):
+                    error = {}
+                if isinstance(error, dict) and error.get("code") in ("allowance_used", "relay_budget"):
+                    LAST_ALLOWANCE = AllowanceUsed(str(error.get("message") or "allowance used"),
+                                                   error.get("resets_at"))
+                    raise LAST_ALLOWANCE from None
             # Only retry an explicit rate rejection. A server error may follow
             # completed inference; replaying it can bill the same clip twice.
             retryable = exc.code == 429
-            if not retryable or attempt == 3:
-                detail = exc.read().decode("utf-8", errors="replace")
+            if not retryable or attempt == RATE_RETRIES - 1:
                 raise RuntimeError(f"fireworks request failed: {exc.code} {detail}")
-            time.sleep(min(30.0, 3 ** (attempt + 1)))
+            time.sleep(_retry_wait(exc.headers.get("retry-after") if exc.headers else None, attempt))
     raise RuntimeError("unreachable")
+
+
+def _retry_wait(retry_after: str | None, attempt: int) -> float:
+    """How long to wait after a busy answer: as long as asked, else growing."""
+    try:
+        asked = float(retry_after) if retry_after else None
+    except ValueError:
+        asked = None
+    return min(60.0, asked if asked is not None and asked >= 0 else 3 ** min(attempt + 1, 4))
 
 
 def cache_version(cfg: Config, clip_facts: ClipFacts) -> Config:

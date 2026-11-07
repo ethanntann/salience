@@ -63,10 +63,10 @@ All measured out of sample on my own sessions (one player, so far):
 | Ranking with "what happened, then taste" (train on one evening, test on another) | **97.4%** of kept/skipped pairs in the right order |
 | Telling the model the player's name and match phase from the game log (33 kept moments) | kept moments in the top 10: **11 → 15** |
 | Leaving out kills you'd skip, held out one session at a time | shows **83%** of kept kills and drops **56%** of skipped ones (taste alone: 64% / 67%) |
-| Choosing the vision model: 8 models tried on the 9 hardest windows | the chosen one matched the most accurate on 8 of 9 at **1/20 the price** (~$0.002 a window, ~$0.35 per half hour of matches) |
+| Choosing the vision model: 8 models tried on the 9 hardest windows | the chosen one matched the most accurate on 8 of 9 at **1/20 the price** (~$0.003 a window, about $0.50 per half hour of matches) |
 | A new player's taste with 20 liked clips added (simulated) | **78% → 85%** with only 10 ratings |
 | Use so far | 45 sessions, 173 highlights, 1,873 ratings |
-| Tests | 631, `python -m pytest` |
+| Tests | 639 Python (`python -m pytest`) + 9 for the relay (`npm test` in `relay/`) |
 
 The full measurement log, with every design decision and the experiments
 behind it, is in [`docs/engineering-notes.md`](docs/engineering-notes.md).
@@ -81,8 +81,8 @@ behind it, is in [`docs/engineering-notes.md`](docs/engineering-notes.md).
   frames on a 1 s beat, and now nothing in the window redraws on a timer.
 - **Look at everything, not just triggers.** Describing every in-match
   window costs cents and finds the moments a trigger misses.
-- **Bring your own key, keep data local.** Only gameplay frames go to the
-  vision model, through the player's own Fireworks key. Audio, transcripts,
+- **Keep data local.** Only gameplay frames go to the vision model, through
+  the player's own Fireworks key or the beta relay. Audio, transcripts,
   inputs and ratings stay on the PC.
 - **No game hooks, no OBS requirement.** Capture uses the same OS APIs as
   any screen recorder. OBS users can still let Salience use their OBS
@@ -90,6 +90,21 @@ behind it, is in [`docs/engineering-notes.md`](docs/engineering-notes.md).
 - **Cold start.** A new player can add clips or montages they already like
   (Settings → Clips you like). Imports count as half a rating and are
   dropped automatically if they make the player's own ratings rank worse.
+
+## Beta: no API key, one-click install
+
+- **Installer** (`installer/`): `python installer/build.py` makes a 205 MB
+  per-user setup with its own Python, the app and FFmpeg. Testers install
+  nothing else and need no admin rights.
+- **Relay** (`relay/`): a Cloudflare Worker that holds the project's
+  Fireworks key so testers never see it. An invite code gets each install its
+  own token and 5 hours of matches a month. The relay keeps calls under the
+  account's limit, shares capacity fairly between players, only allows
+  Salience's model, and stops itself at a monthly budget. Frames pass
+  through it and are never stored.
+- **Export my stats** (Settings): a tester can send back counts (sessions,
+  highlights kept, time to highlights, stalls during matches) and nothing
+  else.
 
 ## Built with AI
 
@@ -110,8 +125,8 @@ python -m pip install -e ".[dev,audio,app]"
 .\Salience.cmd
 ```
 
-The first run asks for your Fireworks key, which is stored only on your PC in
-`%APPDATA%\Salience\settings.env`. Turn on **Auto-clip**, play, and close
+The first run asks for your Fireworks key (or a beta invite code), which is
+stored only on your PC in `%APPDATA%\Salience\settings.env`. Turn on **Auto-clip**, play, and close
 Fortnite; the highlights open when they're ready. Recordings are about
 11 GB an hour, and raw footage is deleted after 7 days by default
 (`SALIENCE_KEEP_FOOTAGE_DAYS`).
@@ -123,5 +138,7 @@ pipeline_v2/            describing, embedding, the taste ranker, the CLI
 pipeline_v2/capture/    recorder, tray app, highlights pipeline, desktop app
 pipeline_v2/games/      the Fortnite word bank and log reading
 salience_media/         FFmpeg helpers
+relay/                  the beta's Cloudflare Worker (key, invites, limits)
+installer/              builds Salience-Setup.exe
 docs/                   engineering notes and screenshots
 ```
