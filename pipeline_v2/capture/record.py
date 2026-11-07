@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import os
 import signal
+import threading
 import time
 from pathlib import Path
 
@@ -140,6 +141,12 @@ def skipped() -> set[str]:
     return {part.strip().lower() for part in os.environ.get(SKIP_KEY, "").split(",")} & set(SKIPPABLE)
 
 
+# How often the lobby so far is deleted while recording (`cleanup.drop_lobby`):
+# reading the game log's new lines and deleting a few files, on its own
+# thread at the lowest priority.
+LOBBY_EVERY = 300.0
+
+
 class Session:
     """One recording: capture, input, detectors and live describing.
 
@@ -156,6 +163,8 @@ class Session:
         self.warning: str | None = None
         self._seen_samples = 0
         self._origin_saved = False
+        self._lobby_at = time.monotonic()
+        self._lobby: threading.Thread | None = None
 
     def start(self) -> "Session":
         from pipeline_v2.capture import clips
@@ -227,11 +236,31 @@ class Session:
                             "different output than Windows' default sound device.")
             print(f"  WARNING: {self.warning}")
 
+    def _drop_lobby(self) -> None:
+        if time.monotonic() - self._lobby_at < LOBBY_EVERY or (self._lobby and self._lobby.is_alive()):
+            return
+        self._lobby_at = time.monotonic()
+
+        def work() -> None:
+            from pipeline_v2.capture import cleanup, live
+
+            try:
+                with live.lowest_thread_priority():
+                    freed = cleanup.drop_lobby(self.path)
+                if freed:
+                    print(f"  lobby : {freed / 1e9:.1f} GB of lobby footage deleted", flush=True)
+            except Exception as exc:  # noqa: BLE001 -- the recording matters more
+                print(f"  lobby : not deleted ({type(exc).__name__}: {exc})", flush=True)
+
+        self._lobby = threading.Thread(target=work, name="lobby", daemon=True)
+        self._lobby.start()
+
     def tick(self) -> None:
         from pipeline_v2.capture import clips
 
         rec = self.rec
         self._check_audio()
+        self._drop_lobby()
         if not self._origin_saved and rec.stats.first_frame_at is not None:
             # Written now rather than at stop: `live` lines the game log up
             # with the video while it is still recording.

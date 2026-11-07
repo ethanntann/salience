@@ -15,6 +15,8 @@ import json
 import os
 import re
 import shutil
+import hmac
+import secrets
 import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -312,7 +314,8 @@ def session_view(session: Path, conn, find_markers: bool = False) -> dict:
     started = datetime.strptime(session.name, "%Y%m%d-%H%M%S")
     gameplay = manifest.get("gameplay") or {}
     offered = highlights.rateable(session, inside)
-    unrated = sum(c.clip_sha not in rated for c in inside if c.clip_sha in offered)
+    unrated = 0 if cleanup.footage_deleted(session) else sum(
+        c.clip_sha not in rated for c in inside if c.clip_sha in offered)
     return {
         "id": session.name, "started": started.isoformat(),
         "minutes": round(segments[-1].end / 60) if segments else (
@@ -336,12 +339,13 @@ _UNSURE_LOCK = threading.Lock()
 
 
 def _rated_sessions(session: Path | None) -> list[Path]:
-    """`session`, or every session with highlights (None)."""
+    """`session`, or every session with highlights (None) and footage to
+    play: a window of one whose footage was deleted cannot be watched."""
     if session is not None:
-        return [session]
+        return [] if cleanup.footage_deleted(session) else [session]
     try:
         return sorted(p for p in recordings_root().iterdir() if p.is_dir() and SESSION_ID.match(p.name)
-                      and (p / "highlights" / "highlights.json").is_file())
+                      and (p / "highlights" / "highlights.json").is_file() and not cleanup.footage_deleted(p))
     except OSError:
         return []
 
@@ -655,8 +659,21 @@ def import_view() -> dict:
             "has_key": bool(os.environ.get("FIREWORKS_API_KEY"))}
 
 
+# Requests the app's own page makes carry this header, with a secret made at
+# each launch and written into that page. 127.0.0.1 keeps other machines out,
+# not other websites: any page open in a browser on this PC could post here
+# (delete highlights, switch settings), and with DNS rebinding read transcripts
+# and footage (security audit, 2026-11-07).
+SECRET_HEADER = "X-Salience"
+# What a <video> or <img> loads, which cannot send a header; still behind the
+# Host check, so another site can show them but never read them.
+OPEN_PATHS = ("/static/", "/video/", "/reel/", "/thumb/", "/media/")
+
+
 class Handler(review.Handler):
     """The rating page's routes, under the app's own."""
+
+    secret = secrets.token_urlsafe(32)
 
     show = None  # set by the window: bring it forward
     goto = None  # where the page is to go next, collected with /api/status
@@ -664,6 +681,31 @@ class Handler(review.Handler):
     choose_videos = None  # set by the window: an Open dialog for videos, () -> [paths]
     choose_folder = None  # set by the window: a folder dialog, (start) -> path or None
     quit = None  # set by the window: close it (Quit Salience in the tray)
+
+    def parse_request(self) -> bool:
+        if not super().parse_request():
+            return False
+        problem = self.refused()
+        if problem is not None:
+            self.send_error(403, problem)
+            return False
+        return True
+
+    def refused(self) -> str | None:
+        """Why this request is not the app's own, or None."""
+        port = self.server.server_address[1]
+        ours = (f"127.0.0.1:{port}", f"localhost:{port}")
+        if self.headers.get("Host", "") not in ours:
+            return "not this app's address"  # DNS rebinding: another name for 127.0.0.1
+        origin = self.headers.get("Origin")
+        if origin is not None and origin not in tuple(f"http://{host}" for host in ours):
+            return "another site"
+        path = urlparse(self.path).path
+        if self.command in ("GET", "HEAD") and (path == "/" or path.startswith(OPEN_PATHS)):
+            return None
+        if not hmac.compare_digest(self.headers.get(SECRET_HEADER, ""), Handler.secret):
+            return "not from the app's window"
+        return None
 
     def _static(self, name: str) -> None:
         path = (STATIC / name).resolve()
@@ -673,7 +715,8 @@ class Handler(review.Handler):
         body = path.read_bytes()
         if name == "index.html":  # the kept look, before anything paints
             body = body.replace(b"<script>", b"<script>window.SALIENCE_LOOK = "
-                                + json.dumps(appearance()).encode() + b";", 1)
+                                + json.dumps(appearance()).encode() + b"; window.SALIENCE_SECRET = "
+                                + json.dumps(Handler.secret).encode() + b";", 1)
         self.send_response(200)
         self.send_header("Content-Type", TYPES.get(path.suffix, "application/octet-stream"))
         self.send_header("Content-Length", str(len(body)))

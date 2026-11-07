@@ -1,5 +1,8 @@
 # Salience
 
+[![CI](https://github.com/ethanntann/salience/actions/workflows/ci.yml/badge.svg)](https://github.com/ethanntann/salience/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **A Fortnite auto-clipper that keeps the clips *you* would have kept.**
 
 Salience records your games in the background. When you close Fortnite, a
@@ -66,7 +69,7 @@ All measured out of sample on my own sessions (one player, so far):
 | Choosing the vision model: 8 models tried on the 9 hardest windows | the chosen one matched the most accurate on 8 of 9 at **1/20 the price** (~$0.003 a window, about $0.50 per half hour of matches) |
 | A new player's taste with 20 liked clips added (simulated) | **78% → 85%** with only 10 ratings |
 | Use so far | 45 sessions, 173 highlights, 1,873 ratings |
-| Tests | 639 Python (`python -m pytest`) + 9 for the relay (`npm test` in `relay/`) |
+| Tests | 649 Python (`python -m pytest`) + 14 for the relay (`npm test` in `relay/`), on every push (CI) |
 
 The full measurement log, with every design decision and the experiments
 behind it, is in [`docs/engineering-notes.md`](docs/engineering-notes.md).
@@ -98,13 +101,28 @@ behind it, is in [`docs/engineering-notes.md`](docs/engineering-notes.md).
   nothing else and need no admin rights.
 - **Relay** (`relay/`): a Cloudflare Worker that holds the project's
   Fireworks key so testers never see it. An invite code gets each install its
-  own token and 5 hours of matches a month. The relay keeps calls under the
-  account's limit, shares capacity fairly between players, only allows
-  Salience's model, and stops itself at a monthly budget. Frames pass
+  own token and 5 hours of matches a month, with a dollar cap. The relay
+  keeps calls under the account's limit, shares capacity fairly between
+  players, forwards only Salience's own requests (its model and fields, text
+  and inline frames), and stops itself at a monthly budget. Frames pass
   through it and are never stored.
 - **Export my stats** (Settings): a tester can send back counts (sessions,
   highlights kept, time to highlights, stalls during matches) and nothing
   else.
+
+## Privacy and security
+
+- **What leaves your PC:** only gameplay frames, about 7 per 8 seconds of a
+  match, sent to the vision model through Fireworks (your own key) or the
+  beta relay (Cloudflare, then Fireworks). The relay never stores or logs
+  them. Audio, transcripts, key presses and ratings stay on your PC.
+- **Storage:** raw footage is deleted 3 days after a session is fully rated,
+  or after 7 days; lobby footage while you play; and recording stops with
+  under 10 GB free. Highlights and reels are kept.
+- **The app's local server** answers only its own window (a per-launch
+  secret and a `Host` check), so a website you visit cannot drive it.
+- The installer's Python download and every package are pinned and checked.
+  See [SECURITY.md](SECURITY.md) to report a problem.
 
 ## Built with AI
 
@@ -130,6 +148,11 @@ stored only on your PC in `%APPDATA%\Salience\settings.env`. Turn on **Auto-clip
 Fortnite; the highlights open when they're ready. Recordings are about
 11 GB an hour, and raw footage is deleted after 7 days by default
 (`SALIENCE_KEEP_FOOTAGE_DAYS`).
+
+## License
+
+[MIT](LICENSE). Fortnite is a trademark of Epic Games; Salience is not
+affiliated with or endorsed by Epic Games.
 
 ## Layout
 

@@ -7,7 +7,6 @@ colour is 4.5:1 or more on its ground (`check`). Footage is never themed.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 CSS = Path(__file__).parent / "static" / "app.css"

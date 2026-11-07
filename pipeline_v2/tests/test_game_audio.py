@@ -12,8 +12,9 @@ def names(table):
 def test_the_device_the_game_plays_on_beats_the_default_and_others():
     # Headphones picked in Fortnite's settings: its session plays there, and
     # only sits open on the speakers (2026-10-24: "game audio not detected").
-    listing = lambda: [("speakers", 4212, 0), ("broadcast", 4212, 0), ("headphones", 4212, 1),
-                       ("headphones", 6608, 1)]
+    def listing():
+        return [("speakers", 4212, 0), ("broadcast", 4212, 0), ("headphones", 4212, 1),
+                ("headphones", 6608, 1)]
     assert game_audio.game_device(GAME, listing, names({4212: GAME, 6608: "discord.exe"})) == "headphones"
 
 

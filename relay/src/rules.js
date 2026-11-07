@@ -33,10 +33,24 @@ export function costUsd(env, reply) {
   return (input * Number(env.PRICE_IN_PER_M || 0.3) + output * Number(env.PRICE_OUT_PER_M || 1.2)) / 1e6;
 }
 
+// What a player may spend a month, in dollars: an hour of matches costs about
+// $1.20 (450 calls at $0.0027), so this leaves room. Counting calls alone let a
+// call stuffed with text cost 100 times a real one (audit, 2026-11-07).
+export function playerBudgetUsd(env, tier) {
+  const perHour = Number(env.PLAYER_USD_PER_HOUR || 1.8);
+  return (allowanceSeconds(env, tier) / 3600) * perHour;
+}
+
+// The fields Salience sends, and only those: anything else is not a description.
+const FIELDS = new Set(["model", "temperature", "max_tokens", "messages", "reasoning_effort", "top_p", "n", "stream"]);
+const ROLES = new Set(["system", "user"]);
+
 // A request the relay will forward, or why not. Your key may only describe
 // gameplay with the one model Salience uses, never be used for anything else.
 export function checkRequest(env, body) {
-  if (!body || typeof body !== "object") return "not a JSON request";
+  if (!body || typeof body !== "object" || Array.isArray(body)) return "not a JSON request";
+  const extra = Object.keys(body).filter((key) => !FIELDS.has(key));
+  if (extra.length) return `unexpected fields: ${extra.join(", ")}`;
   const allowed = String(env.MODEL || "").split(",").map((m) => m.trim()).filter(Boolean);
   if (!allowed.includes(body.model)) return `model ${body.model} is not offered`;
   if (body.stream) return "streaming is not offered";
@@ -49,11 +63,24 @@ export function checkRequest(env, body) {
   }
   if (body.n !== undefined && body.n !== 1) return "one answer per request";
   let images = 0;
+  let text = 0;
   for (const message of body.messages) {
-    if (Array.isArray(message.content)) {
-      images += message.content.filter((part) => part && part.type === "image_url").length;
+    if (!message || typeof message !== "object" || !ROLES.has(message.role)) return "unexpected messages";
+    const parts = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content;
+    if (!Array.isArray(parts)) return "unexpected messages";
+    for (const part of parts) {
+      if (part && part.type === "text" && typeof part.text === "string") {
+        text += part.text.length;
+      } else if (part && part.type === "image_url" && part.image_url
+                 && /^data:image\/(jpeg|png|webp);base64,/.test(String(part.image_url.url))) {
+        images += 1; // frames travel inside the request: the relay never fetches a link
+      } else {
+        return "only text and gameplay frames";
+      }
     }
   }
   if (images > Number(env.MAX_IMAGES || 16)) return "too many images";
+  // Salience's prompt is about 12,000 characters.
+  if (text > Number(env.MAX_TEXT_CHARS || 40000)) return "too much text";
   return null;
 }

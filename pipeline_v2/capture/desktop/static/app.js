@@ -26,6 +26,12 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => (
   { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const enc = encodeURIComponent;
 
+// Every request to the app carries its launch secret (`server.SECRET_HEADER`):
+// the server refuses any that does not, so other websites cannot use it.
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (input, init = {}) => nativeFetch(input, {
+  ...init, headers: { ...(init.headers || {}), "X-Salience": window.SALIENCE_SECRET || "" } });
+
 async function api(path, body) {
   const response = await fetch(path, body === undefined ? {} : {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

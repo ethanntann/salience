@@ -22,6 +22,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import shutil
 import sys
 import threading
 import time
@@ -168,6 +169,12 @@ def game_first(game_running, every: float = PRIORITY_CHECK, set_low=set_below_no
         set_low(None)
 
 
+# Recording stops with less than this free: room left for making the
+# highlights, and for Windows.
+LOW_DISK_GB = 10.0
+DISK_EVERY = 30.0
+
+
 class Controller:
     """When to record, when to stop, and making the highlights afterwards.
 
@@ -176,8 +183,14 @@ class Controller:
     """
 
     def __init__(self, *, find_game, start_session, make_highlights, notify,
-                 clock=time.monotonic, grace: float = GRACE, game_running=lambda: True):
+                 clock=time.monotonic, grace: float = GRACE, game_running=lambda: True,
+                 free_bytes=None, free_up=lambda: None):
         self.find_game = find_game
+        # The drive's free space, and a way to make more (`cleanup`): the
+        # recorder had no limit of its own, at 11.5 GB an hour (2026-11-07).
+        self.free_bytes = free_bytes
+        self.free_up = free_up
+        self._disk_checked = float("-inf")
         self.game_running = game_running
         self.start_session = start_session
         self.make_highlights = make_highlights
@@ -263,6 +276,12 @@ class Controller:
         if self.session.error:
             self._finish(failed=True)
             return
+        if self._short_of_room():
+            self.notify("Drive almost full", f"Recording stopped with under {LOW_DISK_GB:g} GB free. "
+                        "This session is saved.")
+            self.held = True  # not again until this game closes
+            self._finish()
+            return
         if self.find_game() is None:
             self._gone_since = self._gone_since or self.clock()
         else:
@@ -273,6 +292,21 @@ class Controller:
             self.clock() - self._gone_since >= self.grace or not self.game_running())
         if gone or self._stop_requested:
             self._finish()
+
+    def _short_of_room(self) -> bool:
+        """Under `LOW_DISK_GB` free even after deleting finished sessions'
+        footage; looked at every `DISK_EVERY` seconds."""
+        now = self.clock()
+        if self.free_bytes is None or now - self._disk_checked < DISK_EVERY:
+            return False
+        self._disk_checked = now
+        try:
+            if self.free_bytes() >= LOW_DISK_GB * 1e9:
+                return False
+            self.free_up()
+            return self.free_bytes() < LOW_DISK_GB * 1e9
+        except OSError:
+            return False
 
     def _finish(self, failed: bool = False) -> None:
         session = self.session
@@ -904,7 +938,9 @@ def main() -> int:
 
     controller = Controller(find_game=game_window, start_session=start_session,
                             make_highlights=make_highlights, notify=notify,
-                            game_running=game_running)
+                            game_running=game_running,
+                            free_bytes=lambda: shutil.disk_usage(_recording_args().out).free,
+                            free_up=clean_up)
     controller.last_session = latest_session(_recording_args().out)
     threading.Thread(target=clean_up, name="cleanup", daemon=True).start()
     quitting = threading.Event()
