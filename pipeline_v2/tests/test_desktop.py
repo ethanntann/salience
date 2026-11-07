@@ -31,7 +31,7 @@ def test_only_a_recording_folder_by_its_own_name_is_served(tmp_path, monkeypatch
     (session / "segments.csv").write_text("part-00000.mkv,0,30\n", encoding="utf-8")
 
     assert server.session_dir("20261022-184935") == session
-    for bad in ("..", "../20261022-184935", "20261022-184935/..", "C:\Windows", ""):
+    for bad in ("..", "../20261022-184935", "20261022-184935/..", r"C:\Windows", ""):
         assert server.session_dir(bad) is None
     assert server.session_dir("20261022-184936") is None  # no such recording
 

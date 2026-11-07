@@ -292,15 +292,16 @@ class WgcRecorder:
         self._latest = frame.frame_buffer.tobytes()
 
     def start(self) -> "WgcRecorder":
-        import windows_capture as wc
-
         global _SESSION_STARTED
+        # Before the import: the refusal must not depend on the library.
         if _SESSION_STARTED:
             raise WgcSessionReused(
                 "a WGC capture already ran in this process; starting a second "
                 "one crashes the interpreter. Run each recording session in "
                 "its own process (see .local-data/tools/wgc_record.py)."
             )
+        import windows_capture as wc
+
         _SESSION_STARTED = True
 
         if self.audio:
