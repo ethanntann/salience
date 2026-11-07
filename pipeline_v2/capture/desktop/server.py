@@ -687,6 +687,15 @@ class Handler(review.Handler):
             return False
         problem = self.refused()
         if problem is not None:
+            # Read what was sent first (a little of it): closing on an unread
+            # body resets the connection on Windows and the 403 never arrives.
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if 0 < length <= 65536:
+                    self.rfile.read(length)
+            except (ValueError, OSError):
+                pass
+            self.close_connection = True
             self.send_error(403, problem)
             return False
         return True
@@ -904,8 +913,7 @@ class Handler(review.Handler):
             problem = app.check_key(key) if key else "Paste your Fireworks API key first."
             if problem is not None:
                 return self._json({"ok": False, "error": problem}, 400)
-            app.write_setting("FIREWORKS_API_KEY", key)
-            os.environ["FIREWORKS_API_KEY"] = key
+            app.use_own_key(key)
             return self._json({"ok": True, **settings()})
         if self.path == "/api/settings":
             from pipeline_v2.capture import app

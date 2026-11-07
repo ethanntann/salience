@@ -1,4 +1,4 @@
-# Exactly what Salience-Setup 0.3.0 was built and tested with: every package
+# Exactly what Salience-Setup was built and tested with: every package
 # and every package they need. installer/build.py installs these and nothing
 # newer (--no-deps), so two builds are the same build. To update: change a
 # version, rebuild, run the installed app, then commit.

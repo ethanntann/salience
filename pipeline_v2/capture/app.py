@@ -85,7 +85,22 @@ def load_environment(path: Path = SETTINGS) -> None:
         os.environ.setdefault(key, value)
 
 
-def check_key(key: str, base_url: str = "https://api.fireworks.ai/inference/v1") -> str | None:
+FIREWORKS_URL = "https://api.fireworks.ai/inference/v1"
+
+
+def use_own_key(key: str) -> None:
+    """The player's own Fireworks key, and Fireworks itself to send it to.
+
+    A tester on an invite has the relay saved as where to send calls; saving
+    their own key left it there, so the key went to the relay, which refused
+    it, and nothing was described (2026-11-07).
+    """
+    for name, value in (("FIREWORKS_API_KEY", key), ("FIREWORKS_BASE_URL", FIREWORKS_URL)):
+        write_setting(name, value)
+        os.environ[name] = value
+
+
+def check_key(key: str, base_url: str = FIREWORKS_URL) -> str | None:
     """None if Fireworks accepts the key, else why not."""
     import urllib.error
     import urllib.request
@@ -716,10 +731,15 @@ def ask_for_key(message: str = "") -> str | None:
     root = tk.Tk()
     root.withdraw()
     try:
+        # An invite is what a tester has; their own key is the way round it.
         prompt = (message + "\n\n" if message else "") + (
-            "Paste your invite code, or your own Fireworks API key\n"
-            "(fireworks.ai -> API Keys). A key stays on this PC and is only sent to Fireworks.")
-        key = simpledialog.askstring("Salience", prompt, parent=root, show="*")
+            "Paste your invite code.\n\n"
+            "Or, if you have your own Fireworks API key, paste that instead:\n"
+            "it stays on this PC and is only sent to Fireworks."
+            if relay_url() else
+            "Paste your Fireworks API key (fireworks.ai -> API Keys).\n"
+            "It stays on this PC and is only sent to Fireworks.")
+        key = simpledialog.askstring("Salience", prompt, parent=root)
     finally:
         root.destroy()
     return key.strip() if key else None
@@ -740,8 +760,7 @@ def setup_key(ask=ask_for_key, check=check_key, redeem=None) -> bool:
         else:
             problem = check(key)
             if problem is None:
-                write_setting("FIREWORKS_API_KEY", key)
-                os.environ["FIREWORKS_API_KEY"] = key
+                use_own_key(key)
                 return True
         message = problem
 

@@ -665,6 +665,12 @@ body.still *, body.still *::before, body.still *::after { animation: none !impor
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field > span, .field > label { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
 .field small { color: var(--faint); font-size: 11px; }
+/* Your own Fireworks key, under the invite: there for whoever needs it, not in a tester's way. */
+details.advanced { margin-top: 14px; border-top: 1px solid var(--rule); padding-top: 12px; }
+details.advanced > summary { cursor: pointer; color: var(--muted); font-size: 12px; letter-spacing: 0.06em; }
+details.advanced[open] > summary { margin-bottom: 10px; }
+.advanced-note { color: var(--faint); font-size: 12px; margin: 0 0 12px; }
+.advanced-note a { color: inherit; }
 .segmented { display: flex; gap: 2px; border: 1px solid var(--frame); padding: 2px; }
 .segmented button { flex: 1; height: 36px; border: none; background: transparent; color: var(--ink); font-size: 12px;
   letter-spacing: 0.14em; }

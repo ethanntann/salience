@@ -144,7 +144,7 @@ function paintRecorder() {
   let dot = "", state, detail;
   if (!on && r.running) { state = "Turning off…"; detail = "Finishing this session first."; }
   else if (!on) { state = "Auto-clip is off"; detail = "Nothing is recorded. Turn it on to clip your games."; }
-  else if (!r.has_key) { state = "Needs your key"; detail = "Add your Fireworks key in Settings to start."; }
+  else if (!r.has_key) { state = "Not set up"; detail = "Add your invite code (or your own Fireworks key) in Settings to start."; }
   else if (!r.running && r.state === "closed") { state = "Recorder closed"; detail = "You quit it from the tray. Click the switch to start it again."; }
   else if (!r.running) { state = "Starting…"; detail = "The recorder is starting in the background."; }
   else if (r.state === "recording") {
@@ -191,7 +191,7 @@ function importText(job) {
   switch (job.stage.replace(/-waiting$/, "")) {
     case "cutting": return job.stage.endsWith("waiting") ? "Waiting for Fortnite to close before getting your clips ready."
       : `Getting ${files} ready…`;
-    case "ready": return `Found ${moments(n)} in ${files}. Describing ${n === 1 ? "it" : "them"} takes ${n} call${n === 1 ? "" : "s"} to your Fireworks key.`;
+    case "ready": return `Found ${moments(n)} in ${files}. Describing ${n === 1 ? "it" : "them"} takes ${n} call${n === 1 ? "" : "s"} to the describer.`;
     case "describing": return job.stage.endsWith("waiting") ? "Waiting for Fortnite to close before describing."
       : `Describing ${moments(n)}…`;
     case "done": return `Added ${moments(job.liked)}. They now count toward your taste.`;
@@ -220,7 +220,7 @@ function paintImport(page) {
     on("#import-go", async () => {
       const { status, data } = await postJson("/api/import/describe", {});
       importState = data.stage ? data : importState;
-      if (status === 409 && data.need_key) { setText("import-note", "Add your Fireworks key below first."); return; }
+      if (status === 409 && data.need_key) { setText("import-note", "Add your invite code (or your own Fireworks key) in Settings first."); return; }
       paintImport(page); followImport(page);
     });
   }
@@ -931,7 +931,7 @@ async function showSettings() {
       </section>
       <section class="panel" aria-labelledby="liked">
         <h2 id="liked">Clips you like</h2>
-        <div class="line"><div><b>Teach Salience your taste</b><span>Add clips you saved or montages you made. Salience splits them into moments and learns what you like from them, before you've rated anything. Describing them uses your Fireworks key, one call per moment.</span></div></div>
+        <div class="line"><div><b>Teach Salience your taste</b><span>Add clips you saved or montages you made. Salience splits them into moments and learns what you like from them, before you've rated anything. Describing them takes one call per moment, from your match time or your own key.</span></div></div>
         <div id="import-box"></div>
       </section>
       <section class="panel" aria-labelledby="ai">
@@ -946,15 +946,21 @@ async function showSettings() {
           </div>
           <small id="invite-note">No Fireworks account needed: the beta describes your games for you, 5 hours of matches a month.</small>
         </div>` : ""}
+        ${set.invites_open ? `<details class="advanced"${set.has_key && !set.relay ? " open" : ""}>
+          <summary>Advanced: use your own Fireworks key</summary>
+          <p class="advanced-note">Instead of an invite: describing is billed to your own
+          <a href="https://fireworks.ai" target="_blank" rel="noopener">Fireworks</a> account, with no monthly limit.</p>` : ""}
         <div class="field">
           <label for="key">Fireworks API key</label>
           <div style="display:flex;flex-wrap:wrap;gap:8px">
             <input id="key" class="search" style="flex:1 1 280px;width:auto" type="password" autocomplete="off"
-              placeholder="${set.has_key ? "Saved. Paste a new key to replace it" : "Paste your key from fireworks.ai"}">
+              placeholder="${set.has_key && !set.relay ? "Saved. Paste a new key to replace it" : "Paste your key from fireworks.ai"}">
             <button class="button primary" id="save-key">Save</button>
           </div>
-          <small id="key-note">${set.has_key ? "Saved on this PC and sent only to Fireworks." : "Highlights can't be described without it."}</small>
+          <small id="key-note">${set.has_key && !set.relay ? "Saved on this PC and sent only to Fireworks."
+            : set.invites_open ? "Replaces your invite on this PC." : "Highlights can't be described without it."}</small>
         </div>
+        ${set.invites_open ? "</details>" : ""}
       </section>`;
 
     page.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", async () => {

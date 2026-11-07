@@ -119,3 +119,16 @@ def test_a_waiting_session_comes_back_when_the_month_resets(tmp_path):
     assert app.unfinished(tmp_path, now=resets - 7 * 86400) == []
     # Weeks later than the usual two days, and still made.
     assert app.unfinished(tmp_path, now=resets + 2 * 86400) == [session]
+
+
+def test_an_own_key_after_an_invite_goes_to_fireworks_not_the_relay(settings):
+    def call(path, body=None, token=None, timeout=15.0):
+        return 200, {"token": "slc_abc", "base_url": "https://relay.example/v1",
+                     "model": "accounts/fireworks/models/deepseek-v4p1-flash"}
+
+    app.redeem_invite("BETA1", call)
+    assert app.uses_relay()
+    app.use_own_key("fw_mine")
+    saved = app.read_settings(settings)
+    assert saved["FIREWORKS_API_KEY"] == "fw_mine"
+    assert saved["FIREWORKS_BASE_URL"] == app.FIREWORKS_URL and not app.uses_relay()

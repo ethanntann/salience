@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1 (2026-11-07)
+
+- First run asks for an invite code; your own Fireworks key is the
+  alternative, and sits under "Advanced" in Settings.
+- Fixed: saving your own key after using an invite sent it to the relay
+  instead of Fireworks, and nothing was described.
+- Fixed: the installer shipped pywebview 3.4, whose window could not open
+  (in 0.3.0's first build only; never released).
+
 ## 0.3.0 (2026-11-07): beta
 
 - **Beta relay**: testers describe with the project's key through a Cloudflare

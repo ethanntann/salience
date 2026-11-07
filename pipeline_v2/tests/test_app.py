@@ -223,6 +223,7 @@ def test_key_setup_retries_until_fireworks_accepts(monkeypatch):
     saved = {}
     monkeypatch.setattr(app, "write_setting", lambda key, value: saved.update({key: value}))
     monkeypatch.delenv("FIREWORKS_API_KEY", raising=False)
+    monkeypatch.delenv("FIREWORKS_BASE_URL", raising=False)  # put back afterwards
     asked, messages = iter(["fw_bad", "fw_good"]), []
 
     def ask(message):
@@ -232,7 +233,7 @@ def test_key_setup_retries_until_fireworks_accepts(monkeypatch):
     ok = app.setup_key(ask=ask, check=lambda key: None if key == "fw_good" else "rejected")
 
     assert ok and messages == ["", "rejected"]  # told why, then asked again
-    assert saved == {"FIREWORKS_API_KEY": "fw_good"}
+    assert saved == {"FIREWORKS_API_KEY": "fw_good", "FIREWORKS_BASE_URL": app.FIREWORKS_URL}
     monkeypatch.delenv("FIREWORKS_API_KEY", raising=False)
 
 
